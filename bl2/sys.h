@@ -10,9 +10,11 @@ extern int io_printf(const char *format, ...);
 #define DEBUGP(lev,a ...)
 #endif
 
+extern int sys_lev;
 struct task;
 
 struct sleep_obj {
+	char *name;
 	struct task *task_list;
 	struct task *task_list_last;
 };
