@@ -8,6 +8,8 @@
 
 #include <string.h>
 
+int sys_lev;
+
 struct task {
 	char 		*name;            /* 0-3 */
 	unsigned int 	sp;               /* 4-7 */
@@ -68,6 +70,7 @@ struct tq {
 volatile unsigned int tq_tic;
 
 
+#if 0
 void *SysTick_Handler_c(unsigned int *sp);
 
 void __attribute__ (( naked )) SysTick_Handler(void) {
@@ -125,8 +128,9 @@ void __attribute__ (( naked )) SysTick_Handler(void) {
 	);
 #endif
 }
+#endif
 
-void *SysTick_Handler_c(unsigned int *sp) {
+void *SysTick_Handler(void) {
 	struct tq *tqp;
 	tq_tic++;
 	tqp=&tq[tq_tic%1024];
@@ -155,8 +159,8 @@ void *SysTick_Handler_c(unsigned int *sp) {
 		n->next=0;
 		n->state=1;
 
-		switch_context(n);
 		DEBUGP(DLEV_SCHED,"time slice: switch out %s, switch in %s\n", current->name, n->name);
+		switch_context(n);
 		return 0;
 	}
 	return 0;
@@ -303,9 +307,9 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			ready=ready->next;
 			n->next=0;
 			n->state=1;
+			DEBUGP(DLEV_SCHED,"sleep task: name %s, switch in %s\n", current->name, n->name);
 			switch_context(n);
 
-			DEBUGP(DLEV_SCHED,"sleep task: name %s, switch in %s\n", current->name, n->name);
 			return 0;
 			break;
 		}
@@ -331,8 +335,8 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			n->next=0;
 			n->state=1;
 
+			DEBUGP(DLEV_SCHED,"sleepon %s task: name %s, switch in %s\n", so->name,current->name, n->name);
 			switch_context(n);
-			DEBUGP(DLEV_SCHED,"sleepon task: name %s, switch in %s\n", current->name, n->name);
 			return 0;
 			break;
 			
@@ -360,9 +364,11 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			n->state=1;
 
 			n->bsize=bsize;
-			__builtin_memcpy(n->bp,bp,bsize);
+			if (bp&&bsize) {
+				__builtin_memcpy(n->bp,bp,bsize);
+			} 
+			DEBUGP(DLEV_SCHED,"wakeup %s task: name %s, switch in %s\n",so->name,n->name,current->name);
 			switch_context(n);
-			DEBUGP(DLEV_SCHED,"wakeup task: name %s, switch in %s\n",n->name,current->name);
 		 	return 0;
 			break;
 		}
@@ -388,6 +394,14 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			int driver_ix=fd_tab[fd].driver_ix;
 
 			svc_args[0]=driver->control(driver_ix,RD_CHAR,(void *)svc_args[1],svc_args[2]);
+			return 0;
+		}
+		case SVC_IO_WRITE: {
+			int fd=(int)svc_args[0];
+			struct driver *driver=fd_tab[fd].driver;
+			int driver_ix=fd_tab[fd].driver_ix;
+
+			svc_args[0]=driver->control(driver_ix,WR_CHAR,(void *)svc_args[1],svc_args[2]);
 			return 0;
 		}
 		default:
@@ -463,7 +477,7 @@ int __attribute__ (( naked )) switch_context(struct task *next) {
 
 void *sys_sleepon(struct sleep_obj *so, void *bp, int bsize) {
 	struct task *n=0;
-
+	
 	current->bp=bp;
 	current->bsize=bsize;
 
@@ -481,9 +495,9 @@ void *sys_sleepon(struct sleep_obj *so, void *bp, int bsize) {
 	ready=ready->next;
 	n->next=0;
 	n->state=1;
-	switch_context(n);
 
-	DEBUGP(DLEV_SCHED,"sleepon task: name %s, switch in %s\n", current->name, n->name);
+	DEBUGP(DLEV_SCHED,"sleepon %s task: name %s, switch in %s\n", so->name, current->name, n->name);
+	switch_context(n);
 	return n;
 }
 
@@ -507,9 +521,11 @@ void *sys_wakeup(struct sleep_obj *so, void *bp, int bsize) {
 	n->state=1;
 
 	n->bsize=bsize;
-	__builtin_memcpy(n->bp,bp,bsize);
+	if (bp&&bsize) {
+		__builtin_memcpy(n->bp,bp,bsize);
+	}
+	DEBUGP(DLEV_SCHED,"wakeup %s task: name %s, switch in %s\n",so->name,n->name,current->name);
 	switch_context(n);
-	DEBUGP(DLEV_SCHED,"wakeup task: name %s, switch in %s\n",n->name,current->name);
  	return 0;
 }
 
@@ -740,7 +756,7 @@ int io_read(int fd, char *buf, int size) {
 }
 
 int io_write(int fd, const char *buf, int size) {
-	return -1;
+	return svc_io_write(fd,buf,size);
 }
 
 int io_control(int fd, int cmd, void *d, int sz) {
@@ -777,7 +793,7 @@ int get_state(struct task *t) {
 int ps_fnc(int argc, char **argv) {
 	struct task *t=troot;
 	while(t) {
-		io_printf("task(%x) %12s, sp=0x%08x, pc=0x%08x, state=%c\n", 
+		printf("task(%x) %12s, sp=0x%08x, pc=0x%08x, state=%c\n", 
 			t, t->name, t->sp, ((unsigned int *)t->sp)[13], get_state(t));
 		t=t->next2;
 	}
@@ -844,24 +860,22 @@ int argit(char *str, int len, char *argv[16]) {
 	return ac;
 }
 
-extern struct sleep_obj io_term;
-
 int argc;
 char *argv[16];
 
 void sys_mon(void *dum) {
 	char *buf=getSlab_256();
 	int fd=io_open(USART_DRV);
-	io_puts("Starting sys_mon\n");
+	io_write(fd,"Starting sys_mon\n",17);
 
 	while(1) {
-		io_printf("\n--->");
+		printf("\n--->");
 		{
 		int rc=io_read(fd,buf,256);
 		if (rc>0) {
 			struct cmd *cmd;
 			buf[rc]=0;
-			io_printf("got %s from st_term\n",buf);
+			fprintf(fd,"got %s from st_term\n",buf);
 			rc=argit(buf,rc,argv);
 			if (rc<0) {
 				continue;
@@ -869,7 +883,7 @@ void sys_mon(void *dum) {
 			argc=rc;
 			cmd=lookup_cmd(argv[0]);
 			if (!cmd) {
-				io_printf("cmd %s, not found\n", argv[0]);
+				fprintf(fd,"cmd %s, not found\n", argv[0]);
 				continue;
 			}
 			cmd->fnc(argc,argv);

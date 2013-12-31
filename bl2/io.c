@@ -7,9 +7,6 @@
 #include "usart_drv.h"
 
 
-struct sleep_obj io_term;
-
-
 #define MIN(A,B) (A<B?A:B)
 
 #define TX_BUF_SIZE 1024
@@ -235,4 +232,59 @@ void init_io(void) {
 	thread_create(st_io_r,0,256,"st_io_r");
 	thread_create(st_io_t,0,256,"st_io_t");
 #endif
+}
+
+int fprintf(int fd, const char *fmt, ...) {
+	int i=0;
+	va_list ap;
+	char numericbuf[16];
+	
+	va_start(ap,fmt);
+	while(1) {
+		int c=fmt[i++];
+		if (!c) break;
+		else if (c=='%') {
+			int prepend_zero=0, prepend_num=0;
+			i+=parse_fmt(&fmt[i],&prepend_num, &prepend_zero);
+			switch((c=fmt[i++])) {
+				case 's': {
+					char *s=va_arg(ap,char *);
+					int len=io_write(fd,s,__builtin_strlen(s));
+					if ((prepend_num-len)>0) {
+						int j;
+						for(j=0;j<(prepend_num-len);j++) {
+							io_write(fd," ",1);
+						}
+					}
+					break;
+				}
+				case 'c': {
+					int gruuk=va_arg(ap, int);
+					io_write(fd,&gruuk,1);
+					break;
+				}
+				case 'd': {
+					char *s=itoa(va_arg(ap,int),numericbuf,
+								prepend_zero, prepend_num);
+					io_write(fd,s,__builtin_strlen(s));
+					break;
+				}
+				case 'x': {
+					char *s=xtoa(va_arg(ap,int),numericbuf,
+							prepend_zero, prepend_num);
+					io_write(fd,s,__builtin_strlen(s));
+					break;
+				}
+				default: {
+					io_write(fd,"%",1);
+					io_write(fd,&c,1);
+				}
+			}
+		} else {
+			io_write(fd,&c,1);
+		}
+		
+	}
+	va_end(ap);
+	return 0;
 }

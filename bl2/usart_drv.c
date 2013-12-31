@@ -45,8 +45,8 @@ static char rx_buf[RX_BSIZE];
 static int rx_i;
 static int rx_o;
 
-struct sleep_obj usart_rxobj;
-struct sleep_obj usart_txobj;
+struct sleep_obj usart_rxobj = { "rxobj",};
+struct sleep_obj usart_txobj = { "txobj",};
 
 void USART3_IRQHandler(void) {
 	unsigned int st=USART3->SR;
