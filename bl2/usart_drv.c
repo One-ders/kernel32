@@ -57,7 +57,7 @@ void USART3_IRQHandler(void) {
 		if ((tx_in-tx_out)==0) {
 			sys_wakeup(&usart_txobj,0,0);
 		}
-	} else if(st&USART_SR_TC) {
+	} else if((st&USART_SR_TC)) {
 		USART3->CR1&=~(USART_CR1_TE|USART_CR1_TXEIE|USART_CR1_TCIE);
 		txr=0;
 	}
