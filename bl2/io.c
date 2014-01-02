@@ -6,6 +6,7 @@
 
 #include "usart_drv.h"
 
+#define ASSERT(a) {while(!(a)) ; }
 
 #define MIN(A,B) (A<B?A:B)
 
@@ -86,16 +87,18 @@ int io_add_str(const char *str) {
 char cmap[]={'0','1','2','3','4','5','6','7','8','9',
 		'a','b','c','d','e','f'};
 
-char *itoa(int val, char *buf, int prepend_zero, int prepend_num) {
+char *itoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_num) {
 	int i=0;
 	int j;
 	int to;
 	char p_char=prepend_zero?'0':' ';	
 
 	if (!val) {
-		buf[i++]=cmap[(val%10)];
+		ASSERT(i<bz);
+		buf[i++]=cmap[0];
 	} else {
 		while(val) {
+			ASSERT(i<bz);
 			buf[i]=cmap[(val%10)];
 			i++;
 			val=val/10;
@@ -103,11 +106,13 @@ char *itoa(int val, char *buf, int prepend_zero, int prepend_num) {
 	}
 	to=prepend_num-i;
 	if (to<0)to=0;
+	ASSERT(i<bz);
 	for(j=0;j<i/2;j++) {
 		char tmp=buf[j];
 		buf[j]=buf[i-j-1];
 		buf[i-j-1]=tmp;
 	}
+	ASSERT((i+to)<bz);
 	__builtin_memmove(&buf[to],buf,i);
 	__builtin_memset(buf,p_char,to);
 	buf[i+to]=0;
@@ -115,16 +120,18 @@ char *itoa(int val, char *buf, int prepend_zero, int prepend_num) {
 	return buf;
 }
 
-char *xtoa(int val, char *buf, int prepend_zero, int prepend_num) {
+char *xtoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_num) {
 	int i=0;
 	int j;
 	int to;
 	char p_char=prepend_zero?'0':' ';
 
 	if (!val) {
+		ASSERT(i<bz);
 		buf[i++]=cmap[(val%10)];
 	} else {
 		while(val) {
+			ASSERT(i<bz);
 			buf[i]=cmap[(val%16)];
 			i++;
 			val=val>>4;
@@ -132,11 +139,13 @@ char *xtoa(int val, char *buf, int prepend_zero, int prepend_num) {
 	}
 	to=prepend_num-i;
 	if (to<0)to=0;
+	ASSERT(i<bz);
 	for(j=0;j<i/2;j++) {
 		char tmp=buf[j];
 		buf[j]=buf[i-1-j];
 		buf[i-1-j]=tmp;
 	}
+	ASSERT((i+to)<bz);
 	__builtin_memmove(&buf[to],buf,i);
 	__builtin_memset(buf,p_char,to);
 	buf[i+to]=0;
@@ -196,13 +205,13 @@ int io_printf(const char *fmt, ...) {
 					break;
 				}
 				case 'd': {
-					char *s=itoa(va_arg(ap,int),numericbuf,
+					char *s=itoa(va_arg(ap,unsigned int),numericbuf, 16,
 								prepend_zero, prepend_num);
 					io_add_str(s);
 					break;
 				}
 				case 'x': {
-					char *s=xtoa(va_arg(ap,int),numericbuf,
+					char *s=xtoa(va_arg(ap,unsigned int),numericbuf, 16,
 							prepend_zero, prepend_num);
 					io_add_str(s);
 					break;
@@ -264,13 +273,13 @@ int fprintf(int fd, const char *fmt, ...) {
 					break;
 				}
 				case 'd': {
-					char *s=itoa(va_arg(ap,int),numericbuf,
+					char *s=itoa(va_arg(ap,unsigned int),numericbuf, 16,
 								prepend_zero, prepend_num);
 					io_write(fd,s,__builtin_strlen(s));
 					break;
 				}
 				case 'x': {
-					char *s=xtoa(va_arg(ap,int),numericbuf,
+					char *s=xtoa(va_arg(ap,unsigned int),numericbuf, 16,
 							prepend_zero, prepend_num);
 					io_write(fd,s,__builtin_strlen(s));
 					break;

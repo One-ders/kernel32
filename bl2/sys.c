@@ -8,6 +8,8 @@
 
 #include <string.h>
 
+#define ASSERT(a) { while (!(a)) ; }
+
 int sys_lev;
 
 struct task {
@@ -20,7 +22,6 @@ struct task {
 	void		*bp;
 	int		bsize;
 	int		stack_sz;         /* 16-19 */
-	unsigned int	stack[];
 };
 
 
@@ -28,7 +29,7 @@ struct task *ready;
 struct task *ready_last;
 
 
-struct task main_task = { "init_main", 0x20020000, 0, 0 };
+struct task main_task = { "init_main", 0x20020000, 0, 0, 0, 0,0,512 };
 struct task *current = &main_task;
 struct task *troot =&main_task;
 
@@ -39,6 +40,27 @@ int __attribute__ (( naked )) enter_context(struct task *next);
 int save_context(void);
 int enter_context(struct task *next);
 int switch_context(struct task *next);
+
+
+struct Slab_256 {
+	unsigned char mem[256];
+};
+
+struct Slab_256 slab_256[80];
+int free_slab_256=0;
+
+void *getSlab_256(void) {
+	if (free_slab_256<80) {
+		return &slab_256[free_slab_256++];
+	}
+	return 0;
+}
+
+void *getSlab_512(void) {
+	int t=free_slab_256;
+	free_slab_256+=2;
+	return &slab_256[t];
+};
 
 
 struct user_fd {
@@ -130,7 +152,7 @@ void __attribute__ (( naked )) SysTick_Handler(void) {
 }
 #endif
 
-void *SysTick_Handler(void) {
+void SysTick_Handler(void) {
 	struct tq *tqp;
 	tq_tic++;
 	tqp=&tq[tq_tic%1024];
@@ -143,6 +165,7 @@ void *SysTick_Handler(void) {
 		} else {
 			ready_last->next=t;
 		}
+		ASSERT(ready);
 //		while(t->next) t=t->next;
 		ready_last=tqp->tq_out_last;
 		tqp->tq_out_first=tqp->tq_out_last=0;
@@ -150,20 +173,22 @@ void *SysTick_Handler(void) {
 
 	if (ready) {
 		struct task *n=0;
+		if (current->state!=1) return;
 		ready_last->next=current;
 		ready_last=current;
 		current->state=2;
 
 		n=ready;
 		ready=ready->next;
+		ASSERT(ready);
 		n->next=0;
 		n->state=1;
 
 		DEBUGP(DLEV_SCHED,"time slice: switch out %s, switch in %s\n", current->name, n->name);
 		switch_context(n);
-		return 0;
+		return;
 	}
-	return 0;
+	return;
 }
 
 /*
@@ -250,7 +275,7 @@ void __attribute__ (( naked )) SVC_Handler(void) {
 
 #endif
 
-#define SVC_SWITCH_TO	1
+#define SVC_CREATE_TASK 1
 #define SVC_SLEEP	2
 #define SVC_SLEEP_ON    3
 #define SVC_WAKEUP      4
@@ -270,6 +295,7 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 
 	svc_number=((char *)svc_args[6])[-2];
 	switch(svc_number) {
+#if 0
 		case SVC_SWITCH_TO: {
 			struct task *n=(struct task *)svc_args[0];
 
@@ -291,9 +317,65 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			return n;
 			break;
 		}
+#endif
+		case SVC_CREATE_TASK: {
+			unsigned int fnc=svc_args[0];
+			unsigned int val=svc_args[1];
+			unsigned int stacksz=svc_args[2];
+			char *name=(char *)svc_args[3];
+			struct task *t=(struct task *)getSlab_512();
+			unsigned int *stackp;
+			__builtin_memset(t,0,512);
+			t->sp=((unsigned int)((unsigned char *)t)+512);
+			stackp=(unsigned int *)t->sp;
+			*(--stackp)=0x01000000; 		 // xPSR
+			*(--stackp)=(unsigned int)fnc;    // r15
+			*(--stackp)=0;     // r14
+			*(--stackp)=0;     // r12
+			*(--stackp)=0;     // r3
+			*(--stackp)=0;     // r2
+			*(--stackp)=0;     // r1
+			*(--stackp)=(unsigned int)val;    // r0
+////
+			*(--stackp)=0;     // r4
+			*(--stackp)=0;     // r5
+			*(--stackp)=0;     // r6
+			*(--stackp)=0;     // r7
+			*(--stackp)=0;     // r8
+			*(--stackp)=0;     // r9
+			*(--stackp)=0;     // r10
+			*(--stackp)=0;     // r11
+
+			t->sp=(unsigned int) stackp;
+			t->state=0;
+			t->name=name;
+			t->next2=troot;
+			troot=t;
+
+			current->state=2;
+			if(!ready) {
+				ready_last=current;
+				ready=current;
+			} else {
+				ready_last->next=current;
+				ready_last=current;
+			}
+			ASSERT(ready);
+
+			if (save_context()) {
+				return 0;
+			}
+
+			DEBUGP(DLEV_SCHED,"Create task: name %s, switch out %s\n", t->name, current->name);
+			t->next=0;
+			t->state=1;
+			return t;
+			break;
+		}
 		case SVC_SLEEP: {
 			struct task *n=0;
 			struct tq *tout=&tq[(svc_args[0]+tq_tic)%1024];
+			if (current->state!=1) return 0;
 			current->state=3;
 			if (!tout->tq_out_first) {
 				tout->tq_out_first=current;
@@ -303,6 +385,7 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 				tout->tq_out_last=current;
 			}
 
+			ASSERT(ready);
 			n=ready;
 			ready=ready->next;
 			n->next=0;
@@ -319,6 +402,7 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			int   bsize=svc_args[2];
 			struct task *n=0;
 
+			if (current->state!=1) return 0;
 			current->bp=bp;
 			current->bsize=bsize;
 
@@ -330,6 +414,7 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			}
 			so->task_list_last=current;
 
+			ASSERT(ready);
 			n=ready;
 			ready=ready->next;
 			n->next=0;
@@ -347,6 +432,8 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			int   bsize=svc_args[2];
 			struct task *n;
 
+			if (current->state!=1) return 0;
+
 			if (!so->task_list) return 0;
 			n=so->task_list;
 			if (n->bsize<bsize) return 0;
@@ -360,6 +447,7 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 				ready=current;
 			}
 			ready_last=current;
+			ASSERT(ready);
 			n->next=0;
 			n->state=1;
 
@@ -478,6 +566,7 @@ int __attribute__ (( naked )) switch_context(struct task *next) {
 void *sys_sleepon(struct sleep_obj *so, void *bp, int bsize) {
 	struct task *n=0;
 	
+	if (current->state!=1) return 0;
 	current->bp=bp;
 	current->bsize=bsize;
 
@@ -491,6 +580,7 @@ void *sys_sleepon(struct sleep_obj *so, void *bp, int bsize) {
 	}
 	so->task_list_last=current;
 
+	ASSERT(ready);
 	n=ready;
 	ready=ready->next;
 	n->next=0;
@@ -508,7 +598,19 @@ void *sys_wakeup(struct sleep_obj *so, void *bp, int bsize) {
 	n=so->task_list;
 	if (n->bsize<bsize) return 0;
 	so->task_list=so->task_list->next;
+	n->next=0;
+	n->state=2;
 
+	if (ready) {
+		ready_last->next=n;
+	} else {
+		ready=n;
+	}
+	ready_last=n;
+	ASSERT(ready);
+		
+	DEBUGP(DLEV_SCHED,"wakeup(readying) %s task: name %s, switch in %s\n",so->name,n->name,current->name);
+#if 0
 	current->state=2;
 
 	if(ready) {
@@ -526,6 +628,7 @@ void *sys_wakeup(struct sleep_obj *so, void *bp, int bsize) {
 	}
 	DEBUGP(DLEV_SCHED,"wakeup %s task: name %s, switch in %s\n",so->name,n->name,current->name);
 	switch_context(n);
+#endif
  	return 0;
 }
 
@@ -553,7 +656,8 @@ int dbglev=0;
  * frame for our SVC call
  */
 
-int svc_switch_to(void *);
+//int svc_switch_to(void *);
+int svc_create_task(void *fnc, void *val, int stacksz, char *name);
 int svc_sleep(unsigned int);
 int svc_sleep_on(struct sleep_obj *, void *buf, int size);
 int svc_wakeup(struct sleep_obj *, void *buf, int size);
@@ -564,11 +668,20 @@ int svc_io_write(int fd, const char *b, int size);
 int svc_io_control(int fd, int cmd, void *b, int s);
 int svc_io_close(int fd);
 
+#if 0
 __attribute__ ((noinline)) int svc_switch_to(void *task) {
 	register int rc asm("r0");
 	svc(SVC_SWITCH_TO);
 	return rc;
 }
+#endif
+
+__attribute__ ((noinline)) int svc_create_task(void *fnc, void *val, int stacksz, char *name) {
+	register int rc asm("r0");
+	svc(SVC_CREATE_TASK);
+	return rc;
+}
+
 
 __attribute__ ((noinline)) int svc_sleep(unsigned int ms) {
 	register int rc asm("r0");
@@ -620,28 +733,9 @@ __attribute__ ((noinline)) int svc_io_close(int fd) {
 }
 
 
-struct Slab_256 {
-	unsigned char mem[256];
-};
-
-struct Slab_256 slab_256[80];
-int free_slab_256=0;
-
-void *getSlab_256(void) {
-	if (free_slab_256<80) {
-		return &slab_256[free_slab_256++];
-	}
-	return 0;
-}
-
-void *getSlab_512(void) {
-	int t=free_slab_256;
-	free_slab_256+=2;
-	return &slab_256[t];
-};
-
-
 int thread_create(void *fnc, void *val, int stacksz, char *name) {
+	return svc_create_task(fnc, val, stacksz, name);
+#if 0
 	struct task *t=(struct task *)getSlab_512();
 	unsigned int *stackp;
 	memset(t,0,512);
@@ -672,6 +766,7 @@ int thread_create(void *fnc, void *val, int stacksz, char *name) {
 	troot=t;
 	svc_switch_to(t);
 	return 1;
+#endif
 }
 
 
@@ -794,7 +889,7 @@ int ps_fnc(int argc, char **argv) {
 	struct task *t=troot;
 	while(t) {
 		printf("task(%x) %12s, sp=0x%08x, pc=0x%08x, state=%c\n", 
-			t, t->name, t->sp, ((unsigned int *)t->sp)[13], get_state(t));
+			t, t->name, t->sp, ((unsigned int *)t->sp)[0], get_state(t));
 		t=t->next2;
 	}
 	return 0;
@@ -902,6 +997,9 @@ void init_sys(void) {
 	driver_init();
 	driver_start();
 #endif	
+}
+
+void start_sys(void) {
 	thread_create(sys_mon,0,256,"sys_mon");
 }
 
@@ -912,6 +1010,9 @@ void init_sys(void) {
 	driver_ini();
 	driver_start();
 #endif	
+}
+
+void start_sys(void) {
 }
 
 #endif

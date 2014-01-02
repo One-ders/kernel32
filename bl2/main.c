@@ -52,11 +52,14 @@ int main(void) {
 	init_usart();
 	init_sys();
 	init_io();
+
+	start_sys();
 	printf("In main, starting blink tasks\n");
 
 	thread_create(blink,&green,256,"green");
 	thread_create(blink,&amber,256,"amber");
-	thread_create(blink_loop,&red,256,"red_looping");
+//	thread_create(blink_loop,&red,256,"red_looping");
+	thread_create(blink,&red,256,"red");
 	thread_create(blink,&blue,256,"blue");
 	while (1);
 }
