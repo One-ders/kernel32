@@ -49,7 +49,6 @@ int main(void) {
 	GPIOD->MODER |= (1 << 28); // set pin 14 to be general purpose output
 	GPIOD->MODER |= (1 << 30); // set pin 15 to be general purpose output
 
-	init_usart();
 	init_sys();
 	init_io();
 

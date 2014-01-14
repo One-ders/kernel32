@@ -18,10 +18,10 @@ struct task {
 	
 	struct task 	*next;            /* 8-11 */
 	struct task	*next2;		  /* 12-15 */
-	int 		state;
-	void		*bp;
-	int		bsize;
-	int		stack_sz;         /* 16-19 */
+	int 		state;		  /* 16-19 */
+	void		*bp;		  /* 20-23 */ /* communication buffer for sleeping context */
+	int		bsize;            /* 24-27 */ /* size of the buffer */
+	int		stack_sz;         /* 28-31 */
 };
 
 
@@ -33,13 +33,9 @@ struct task main_task = { "init_main", 0x20020000, 0, 0, 0, 0,0,512 };
 struct task *current = &main_task;
 struct task *troot =&main_task;
 
-#if 0
-int __attribute__ (( naked )) save_context(void);
-int __attribute__ (( naked )) enter_context(struct task *next);
-#endif
 int save_context(void);
 int enter_context(struct task *next);
-int switch_context(struct task *next);
+int switch_context(struct task *next, struct task *prev);
 
 
 struct Slab_256 {
@@ -165,30 +161,144 @@ void SysTick_Handler(void) {
 		} else {
 			ready_last->next=t;
 		}
+		ready_last=tqp->tq_out_last;
 		ASSERT(ready);
 //		while(t->next) t=t->next;
-		ready_last=tqp->tq_out_last;
 		tqp->tq_out_first=tqp->tq_out_last=0;
 	}
 
 	if (ready) {
 		struct task *n=0;
+		struct task *p=0;
 		if (current->state!=1) return;
-		ready_last->next=current;
+		p=ready_last->next=current;
 		ready_last=current;
 		current->state=2;
 
-		n=ready;
+		current=n=ready;
 		ready=ready->next;
-		ASSERT(ready);
 		n->next=0;
 		n->state=1;
 
-		DEBUGP(DLEV_SCHED,"time slice: switch out %s, switch in %s\n", current->name, n->name);
-		switch_context(n);
+		DEBUGP(DLEV_SCHED,"time slice: switch out %s, switch in %s\n", p->name, n->name);
+		switch_context(n,p);
 		return;
 	}
 	return;
+}
+
+void *Error_Handler_c(unsigned int *sp);
+
+#if 0
+void __attribute__ (( naked )) UsageFault_Handler(void) {
+  
+	asm volatile ( "tst lr,#4\n\t"
+			"ite eq\n\t"
+			"mrseq r0,msp\n\t"
+			"mrsne r0,psp\n\t"
+			"mov r1,lr\n\t"
+			"mov r2,r0\n\t"
+			"push {r1-r2}\n\t"
+			"bl %[Error_Handler_c]\n\t"
+			"pop {r1-r2}\n\t"
+			"mov lr,r1\n\t"
+			"cmp	r0,#0\n\t"
+			"bne.n	1f\n\t"
+			"bx lr\n\t"
+			"1:\n\t"
+			"ldr r1,=current\n\t"
+			"str r0,[r1,#0]\n\t"
+			"ldr r0,[r0,#4]\n\t"
+			"mov sp,r0\n\t"
+			"ldmfd sp!,{r4-r11}\n\t"
+			"bx lr\n\t"
+			:
+			: [Error_Handler_c] "i" (Error_Handler_c)
+			: "r0"
+	);
+}
+#endif
+
+/*
+ * WWDG_IRQHandler
+ */
+void __attribute__ (( naked )) WWDG_IRQHandler(void) {
+  
+	asm volatile ( "tst lr,#4\n\t"
+			"ite eq\n\t"
+			"mrseq r0,msp\n\t"
+			"mrsne r0,psp\n\t"
+			"mov r1,lr\n\t"
+			"mov r2,r0\n\t"
+			"push {r1-r2}\n\t"
+			"bl %[Error_Handler_c]\n\t"
+			"pop {r1-r2}\n\t"
+			"mov lr,r1\n\t"
+			"cmp	r0,#0\n\t"
+			"bne.n	1f\n\t"
+			"bx lr\n\t"
+			"1:\n\t"
+			"ldr r1,=current\n\t"
+			"str r0,[r1,#0]\n\t"
+			"ldr r0,[r0,#4]\n\t"
+			"mov sp,r0\n\t"
+			"ldmfd sp!,{r4-r11}\n\t"
+			"bx lr\n\t"
+			:
+			: [Error_Handler_c] "i" (Error_Handler_c)
+			: "r0"
+	);
+}
+
+void *Error_Handler_c(unsigned int *sp) {
+	ASSERT(0);
+}
+
+
+/*
+ * PendSV handler
+ */
+void *PendSV_Handler_c(unsigned long int *svc_args);
+
+void __attribute__ (( naked )) PendSV_Handler(void) {
+	asm volatile ( "tst lr,#4\n\t"
+			"ite eq\n\t"
+			"mrseq r0,msp\n\t"
+			"mrsne r0,psp\n\t"
+			"mov r1,lr\n\t"
+			"mov r2,r0\n\t"
+			"push {r1-r2}\n\t"
+			"bl %[PendSV_Handler_c]\n\t"
+			"pop {r1-r2}\n\t"
+			"mov lr,r1\n\t"
+			"cmp	r0,#0\n\t"
+			"bne.n	1f\n\t"
+			"bx lr\n\t"
+			"1:\n\t"
+			"stmfd r2!,{r4-r11}\n\t"
+			"ldr r1,=current\n\t"
+			"ldr r1,[r1]\n\t"
+			"str r2,[r1,#4]\n\t"
+			"ldr r1,=current\n\t"
+			"str r0,[r1,#0]\n\t"
+			"ldr r0,[r0,#4]\n\t"
+			"mov sp,r0\n\t"
+			"ldmfd sp!,{r4-r11}\n\t"
+			"bx lr\n\t"
+			:
+			: [PendSV_Handler_c] "i" (PendSV_Handler_c)
+			: "r0"
+	);
+}
+
+void *PendSV_Handler_c(unsigned long int *save_sp) {
+//	save_context(save_sp);
+	ASSERT(0);
+	return 0;
+}
+
+void  pendSV(void) {
+	*((uint32_t volatile *)0xE000ED04) = 0x10000000; // trigger PendSV
 }
 
 /*
@@ -222,8 +332,6 @@ void __attribute__ (( naked )) SVC_Handler(void) {
 			"bne.n	1f\n\t"
 			"bx lr\n\t"
 			"1:\n\t"
-			"ldr r1,=current\n\t"
-			"str r0,[r1,#0]\n\t"
 			"ldr r0,[r0,#4]\n\t"
 			"mov sp,r0\n\t"
 			"ldmfd sp!,{r4-r11}\n\t"
@@ -284,6 +392,11 @@ void __attribute__ (( naked )) SVC_Handler(void) {
 #define SVC_IO_WRITE	7
 #define SVC_IO_CONTROL	8
 #define SVC_IO_CLOSE	9
+#define SVC_KILL_SELF  10
+
+int svc_kill_self(void);
+
+
 
 void *SVC_Handler_c(unsigned long int *svc_args) {
 	unsigned int svc_number;
@@ -295,47 +408,24 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 
 	svc_number=((char *)svc_args[6])[-2];
 	switch(svc_number) {
-#if 0
-		case SVC_SWITCH_TO: {
-			struct task *n=(struct task *)svc_args[0];
-
-			current->state=2;
-			if(!ready) {
-				ready_last=current;
-				ready=current;
-			} else {
-				ready_last->next=current;
-				ready_last=current;
-			}
-
-			if (save_context()) {
-				return 0;
-			}
-			DEBUGP(DLEV_SCHED,"Create task: name %s, switch out %s\n", n->name, current->name);
-			n->next=0;
-			n->state=1;
-			return n;
-			break;
-		}
-#endif
 		case SVC_CREATE_TASK: {
-			unsigned int fnc=svc_args[0];
-			unsigned int val=svc_args[1];
-			unsigned int stacksz=svc_args[2];
+			unsigned long int fnc=svc_args[0];
+			unsigned long int val=svc_args[1];
+//			unsigned int stacksz=svc_args[2];
 			char *name=(char *)svc_args[3];
 			struct task *t=(struct task *)getSlab_512();
-			unsigned int *stackp;
+			unsigned long int *stackp;
 			__builtin_memset(t,0,512);
-			t->sp=((unsigned int)((unsigned char *)t)+512);
-			stackp=(unsigned int *)t->sp;
+			t->sp=((unsigned long int)((unsigned char *)t)+512);
+			stackp=(unsigned long int *)t->sp;
 			*(--stackp)=0x01000000; 		 // xPSR
-			*(--stackp)=(unsigned int)fnc;    // r15
-			*(--stackp)=0;     // r14
+			*(--stackp)=(unsigned long int)fnc;    // r15
+			*(--stackp)=(unsigned long int)svc_kill_self;     // r14
 			*(--stackp)=0;     // r12
 			*(--stackp)=0;     // r3
 			*(--stackp)=0;     // r2
 			*(--stackp)=0;     // r1
-			*(--stackp)=(unsigned int)val;    // r0
+			*(--stackp)=(unsigned long int)val;    // r0
 ////
 			*(--stackp)=0;     // r4
 			*(--stackp)=0;     // r5
@@ -346,8 +436,8 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			*(--stackp)=0;     // r10
 			*(--stackp)=0;     // r11
 
-			t->sp=(unsigned int) stackp;
-			t->state=0;
+			t->sp=(unsigned long int) stackp;
+			t->state=1;
 			t->name=name;
 			t->next2=troot;
 			troot=t;
@@ -360,20 +450,36 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 				ready_last->next=current;
 				ready_last=current;
 			}
-			ASSERT(ready);
 
 			if (save_context()) {
 				return 0;
 			}
+			current=t;
 
-			DEBUGP(DLEV_SCHED,"Create task: name %s, switch out %s\n", t->name, current->name);
-			t->next=0;
-			t->state=1;
+			DEBUGP(DLEV_SCHED,"Create task: name %s, switch out %s\n", t->name, ready_last->name);
 			return t;
 			break;
 		}
+		case SVC_KILL_SELF: {
+			struct task *n=0;
+			struct task *p=0;
+			if (current->state!=1) return 0;
+
+			current->state=6;
+
+			ASSERT(ready);
+			current=n=ready;
+			ready=ready->next;
+			n->next=0;
+			n->state=1;
+
+			DEBUGP(DLEV_SCHED,"kill self  task: name %s, switch in %s\n", p->name, n->name);
+			switch_context(n,p);
+			return 0;
+		}
 		case SVC_SLEEP: {
 			struct task *n=0;
+			struct task *p=current;
 			struct tq *tout=&tq[(svc_args[0]+tq_tic)%1024];
 			if (current->state!=1) return 0;
 			current->state=3;
@@ -387,11 +493,12 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 
 			ASSERT(ready);
 			n=ready;
+			current=n;
 			ready=ready->next;
 			n->next=0;
 			n->state=1;
-			DEBUGP(DLEV_SCHED,"sleep task: name %s, switch in %s\n", current->name, n->name);
-			switch_context(n);
+			DEBUGP(DLEV_SCHED,"sleep task: name %s, switch in %s\n", p->name, n->name);
+			switch_context(n,p);
 
 			return 0;
 			break;
@@ -401,6 +508,7 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			void *bp=(void *)svc_args[1];
 			int   bsize=svc_args[2];
 			struct task *n=0;
+			struct task *p=current;
 
 			if (current->state!=1) return 0;
 			current->bp=bp;
@@ -416,12 +524,13 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 
 			ASSERT(ready);
 			n=ready;
+			current=ready;
 			ready=ready->next;
 			n->next=0;
 			n->state=1;
 
-			DEBUGP(DLEV_SCHED,"sleepon %s task: name %s, switch in %s\n", so->name,current->name, n->name);
-			switch_context(n);
+			DEBUGP(DLEV_SCHED,"sleepon %s task: name %s, switch in %s\n", so->name,p->name,n->name);
+			switch_context(n,p);
 			return 0;
 			break;
 			
@@ -431,6 +540,7 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			void *bp=(void *)svc_args[1];
 			int   bsize=svc_args[2];
 			struct task *n;
+			struct task *p=current;
 
 			if (current->state!=1) return 0;
 
@@ -447,7 +557,8 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 				ready=current;
 			}
 			ready_last=current;
-			ASSERT(ready);
+//			ASSERT(ready);
+			current=n;
 			n->next=0;
 			n->state=1;
 
@@ -455,41 +566,49 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			if (bp&&bsize) {
 				__builtin_memcpy(n->bp,bp,bsize);
 			} 
-			DEBUGP(DLEV_SCHED,"wakeup %s task: name %s, switch in %s\n",so->name,n->name,current->name);
-			switch_context(n);
+			DEBUGP(DLEV_SCHED,"wakeup %s task: name %s, switch in %s\n",so->name,p->name,n->name);
+			switch_context(n,p);
 		 	return 0;
 			break;
 		}
 		case SVC_IO_OPEN: {
 			char *drvname=(char *)svc_args[0];
+			int  kfd;
 			struct driver *drv=driver_lookup(drvname);
-			int inst;
 			if (!drv) {
 				svc_args[0]=-1;
 				return 0;
 			}
-			inst=drv->open(drv,0);
-			if (inst<0) {
+			kfd=drv->ops->open(drv->instance,0);
+			if (kfd<0) {
 				svc_args[0]=-1;
 				return 0;
 			}
-			svc_args[0]=get_user_fd(drv,inst);
+			svc_args[0]=get_user_fd(drv,kfd);
 			return 0;
 		}
 		case SVC_IO_READ: {
 			int fd=(int)svc_args[0];
 			struct driver *driver=fd_tab[fd].driver;
-			int driver_ix=fd_tab[fd].driver_ix;
+			int kfd=fd_tab[fd].driver_ix;
+			if (!driver) {
+				svc_args[0]=-1;
+				return 0;
+			}
 
-			svc_args[0]=driver->control(driver_ix,RD_CHAR,(void *)svc_args[1],svc_args[2]);
+			svc_args[0]=driver->ops->control(kfd,RD_CHAR,(void *)svc_args[1],svc_args[2]);
 			return 0;
 		}
 		case SVC_IO_WRITE: {
 			int fd=(int)svc_args[0];
 			struct driver *driver=fd_tab[fd].driver;
-			int driver_ix=fd_tab[fd].driver_ix;
+			int kfd=fd_tab[fd].driver_ix;
+			if (!driver) {
+				svc_args[0]=-1;
+				return 0;
+			}
 
-			svc_args[0]=driver->control(driver_ix,WR_CHAR,(void *)svc_args[1],svc_args[2]);
+			svc_args[0]=driver->ops->control(kfd,WR_CHAR,(void *)svc_args[1],svc_args[2]);
 			return 0;
 		}
 		default:
@@ -499,7 +618,7 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 }
 
 
-int __attribute__ (( naked )) save_context(void) {
+int __attribute__ (( naked )) save_context() {
  /*
   */
   
@@ -509,11 +628,11 @@ int __attribute__ (( naked )) save_context(void) {
 			"ldr r0,=current\n\t"
 			"ldr r0,[r0]\n\t"
 			"str sp,[r0,#4]\n\t"
-			"add sp,sp,#56\n"
+			"add sp,sp,#56\n\t"
 			"movs r0,#0\n\t"
 			"bx lr\n\t"
 			:
-			: 
+			:
 			: 
 	);
 	return 0;
@@ -539,32 +658,56 @@ int __attribute__ (( naked )) enter_context(struct task *next) {
 }
 
 
-int __attribute__ (( naked )) switch_context(struct task *next) {
+int __attribute__ (( naked )) switch_context(struct task *next, struct task *old) {
  /*
   */
   
 	asm volatile ( 
 			"stmfd sp!,{r0-r12,r14}\n\t"
-			"ldr r1,=current\n\t"
-			"ldr r1,[r1]\n\t"
-			"str sp,[r1,#4]\n\t"
-                        "ldr r1,=current\n\t"
-                        "str %[next],[r1,#0]\n\t"
-                        "ldr r0,[r0,#4]\n\t"
+			"str sp,[%[old],#4]\n\t"
+                        "ldr r0,[%[next],#4]\n\t"
                         "mov sp,r0\n\t"
                         "ldmfd sp!,{r0-r12,r14}\n\t"
 			"bx lr\n\t"
 			:
-			: [next] "r" (next)
+			: [next] "r" (next), [old] "r" (old)
 			: 
 	);
 	return 0;
 }
 
 
+void *sys_sleep(unsigned int ms) {
+	struct task *n=0;
+	struct task *p=current;
+	struct tq *tout=&tq[((ms/10)+tq_tic)%1024];
+	if (current->state!=1) return 0;
+	current->state=3;
+	if (!tout->tq_out_first) {
+		tout->tq_out_first=current;
+		tout->tq_out_last=current;
+	} else {
+		tout->tq_out_last->next=current;
+		tout->tq_out_last=current;
+	}
 
+	ASSERT(ready);
+	current=n=ready;
+	ready=ready->next;
+	n->next=0;
+	n->state=1;
+	DEBUGP(DLEV_SCHED,"sys_sleep task: name %s, switch in %s\n", p->name, n->name);
+	switch_context(n,p);
+
+	return 0;
+}
+
+/* not to be called from irq, cant sleep */
 void *sys_sleepon(struct sleep_obj *so, void *bp, int bsize) {
 	struct task *n=0;
+	struct task *p=current;
+	
+	if (!ready) return 0;
 	
 	if (current->state!=1) return 0;
 	current->bp=bp;
@@ -581,21 +724,21 @@ void *sys_sleepon(struct sleep_obj *so, void *bp, int bsize) {
 	so->task_list_last=current;
 
 	ASSERT(ready);
-	n=ready;
+	current=n=ready;
 	ready=ready->next;
 	n->next=0;
 	n->state=1;
 
-	DEBUGP(DLEV_SCHED,"sleepon %s task: name %s, switch in %s\n", so->name, current->name, n->name);
-	switch_context(n);
+	DEBUGP(DLEV_SCHED,"sleepon %s task: name %s, switch in %s\n", so->name, p->name, n->name);
+	switch_context(n,p);
 	return n;
 }
 
 void *sys_wakeup(struct sleep_obj *so, void *bp, int bsize) {
 	struct task *n;
 
-	if (!so->task_list) return 0;
 	n=so->task_list;
+	if (!n) return 0;
 	if (n->bsize<bsize) return 0;
 	so->task_list=so->task_list->next;
 	n->next=0;
@@ -609,7 +752,7 @@ void *sys_wakeup(struct sleep_obj *so, void *bp, int bsize) {
 	ready_last=n;
 	ASSERT(ready);
 		
-	DEBUGP(DLEV_SCHED,"wakeup(readying) %s task: name %s, switch in %s\n",so->name,n->name,current->name);
+	DEBUGP(DLEV_SCHED,"wakeup(readying) %s task: name %s, switch in %s\n",so->name,current->name,n->name);
 #if 0
 	current->state=2;
 
@@ -683,6 +826,12 @@ __attribute__ ((noinline)) int svc_create_task(void *fnc, void *val, int stacksz
 }
 
 
+__attribute__ ((noinline)) int svc_kill_self() {
+	svc(SVC_KILL_SELF);
+	return 0;
+}
+
+
 __attribute__ ((noinline)) int svc_sleep(unsigned int ms) {
 	register int rc asm("r0");
 	svc(SVC_SLEEP); 
@@ -735,38 +884,6 @@ __attribute__ ((noinline)) int svc_io_close(int fd) {
 
 int thread_create(void *fnc, void *val, int stacksz, char *name) {
 	return svc_create_task(fnc, val, stacksz, name);
-#if 0
-	struct task *t=(struct task *)getSlab_512();
-	unsigned int *stackp;
-	memset(t,0,512);
-	t->sp=((unsigned int)((unsigned char *)t)+512);
-	stackp=(unsigned int *)t->sp;
-	*(--stackp)=0x01000000; 		 // xPSR
-	*(--stackp)=(unsigned int)fnc;    // r15
-	*(--stackp)=0;     // r14
-	*(--stackp)=0;     // r12
-	*(--stackp)=0;     // r3
-	*(--stackp)=0;     // r2
-	*(--stackp)=0;     // r1
-	*(--stackp)=(unsigned int)val;    // r0
-////
-	*(--stackp)=0;     // r4
-	*(--stackp)=0;     // r5
-	*(--stackp)=0;     // r6
-	*(--stackp)=0;     // r7
-	*(--stackp)=0;     // r8
-	*(--stackp)=0;     // r9
-	*(--stackp)=0;     // r10
-	*(--stackp)=0;     // r11
-
-	t->sp=(unsigned int) stackp;
-	t->state=0;
-	t->name=name;
-	t->next2=troot;
-	troot=t;
-	svc_switch_to(t);
-	return 1;
-#endif
 }
 
 
@@ -789,15 +906,21 @@ int wakeup(struct sleep_obj *so, void *dbuf, int dsize) {
 struct driver *drv_root;
 
 int driver_publish(struct driver *drv) {
-	drv->next=drv_root;	
-	drv_root=drv;
+	struct driver *p=drv_root;
+	while(p&&p!=drv) p=p->next;
+	if (!p) {
+		drv->next=drv_root;	
+		drv_root=drv;
+	}
 	return 0;
 }
 
 int driver_init() {
 	struct driver *d=drv_root;
 	while(d) {
-		if (d->init) d->init();
+		if (d->ops->init) {
+			d->ops->init(d->instance);
+		}
 		d=d->next;
 	}
 	return 0;
@@ -806,7 +929,9 @@ int driver_init() {
 int driver_start() {
 	struct driver *d=drv_root;
 	while(d) {
-		if (d->start) d->start();
+		if (d->ops->start) {
+			d->ops->start(d->instance);
+		}
 		d=d->next;
 	}
 	return 0;
@@ -827,10 +952,12 @@ int driver_unpublish(struct driver *drv) {
 	return -1;
 }
 
-struct driver *driver_lookup(char *name) {
+struct driver  *driver_lookup(char *name) {
 	struct driver *d=drv_root;
 	while(d) {
-		if (strcmp(name,d->name)==0) return d;
+		if (strcmp(name,d->name)==0) {
+			return d;
+		}
 		d=d->next;
 	}
 	return 0;
@@ -960,7 +1087,8 @@ char *argv[16];
 
 void sys_mon(void *dum) {
 	char *buf=getSlab_256();
-	int fd=io_open(USART_DRV);
+	int fd=io_open((char *)dum);
+	if (fd<0) return;
 	io_write(fd,"Starting sys_mon\n",17);
 
 	while(1) {
@@ -992,7 +1120,16 @@ void sys_mon(void *dum) {
 /*  Sys support functions and unecessary stuff                                 */
 /*                                                                             */
 
+extern unsigned long int init_func_begin[];
+extern unsigned long int init_func_end[];
+typedef void (*ifunc)(void);
 void init_sys(void) {
+	unsigned long int *i;
+//	*((unsigned long int *)0xe000ed1c)=0xff000000; /* SHPR2, lower svc prio */
+	for(i=init_func_begin;i<init_func_end;i++) {
+		((ifunc)*i)();
+	}
+	
 #ifdef DRIVERSUPPORT
 	driver_init();
 	driver_start();
@@ -1000,14 +1137,16 @@ void init_sys(void) {
 }
 
 void start_sys(void) {
-	thread_create(sys_mon,0,256,"sys_mon");
+	thread_create(sys_mon,"usart0",256,"sys_mon");
+	thread_create(sys_mon,"stterm0",256,"sys_mon");
 }
 
 #else
 
 void init_sys(void) {
+	*((unsigned long int *)0xe000ed1c)=0xff000000; /* SHPR2, lower svc prio */
 #ifdef DRIVERSUPPORT
-	driver_ini();
+	driver_init();
 	driver_start();
 #endif	
 }
