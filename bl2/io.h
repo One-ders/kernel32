@@ -2,6 +2,7 @@
 
 #define RD_CHAR 1
 #define WR_CHAR 2
+#define WR_POLLED_MODE 3
 
 void init_io(void);
 int io_puts(const char *str);

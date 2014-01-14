@@ -8,79 +8,31 @@
 
 #define ASSERT(a) {while(!(a)) ; }
 
-#define MIN(A,B) (A<B?A:B)
 
-#define TX_BUF_SIZE 1024
-#define TXI_MASK (TX_BUF_SIZE-1)
-
-static char tx_buf[TX_BUF_SIZE];
-static unsigned int tx_out;
-static unsigned int tx_in;
 
 static struct driver *iodrv;
-static int iodrvix;
+static int kfd;
 
 int io_cb_handler(void) {
 	return 0;
 }
 
-#if 0
-void io_push() {
-
-	if (!iodrv) return;
-	while (tx_in-tx_out>0) {
-		int rc =
-		iodrv->control(iodrvix, WR_CHAR, &tx_buf[tx_out%TXI_MASK],1);
-		if (rc==1) {
-			tx_out++;
-		}
-	}
-}
-
-int io_add_c(const char c) {
-	tx_buf[tx_in%TXI_MASK]=c;
-	tx_in++;
-	io_push();
-	return 1;
-}
-
-int io_add_str(const char *str) {
-	unsigned int len=__builtin_strlen(str);
-	if (len>1023) return 0;
-	if (((tx_in%TXI_MASK)+len)>1023) {
-		int l1=len-(1024-(tx_in%TXI_MASK));
-		__builtin_memcpy(&tx_buf[tx_in%TXI_MASK],str,l1);
-		__builtin_memcpy(tx_buf,&str[l1],len-l1);
-	} else {
-		__builtin_memcpy(&tx_buf[tx_in%TXI_MASK],str,len);
-	}
-	tx_in+=len;
-	io_push();
-	return len;
-}
-
-int io_puts(const char *str) {
-	return io_add_str(str);
-}
-
-#endif
-
 void io_push() {
 }
 
 int io_puts(const char *str) {
 	if (!iodrv) return 0;
-	return iodrv->control(iodrvix, WR_CHAR, str, __builtin_strlen(str));
+	return iodrv->ops->control(kfd, WR_CHAR, (char *)str, __builtin_strlen(str));
 }
 
 int io_add_c(const char c) {
 	if (!iodrv) return 0;
-	return iodrv->control(iodrvix, WR_CHAR, &c,1);
+	return iodrv->ops->control(kfd, WR_CHAR, (char *)&c,1);
 }
 
 int io_add_str(const char *str) {
 	if (!iodrv) return 0;
-	return iodrv->control(iodrvix, WR_CHAR, str, __builtin_strlen(str));
+	return iodrv->ops->control(kfd, WR_CHAR, (char *)str, __builtin_strlen(str));
 }
 
 
@@ -232,10 +184,11 @@ int io_printf(const char *fmt, ...) {
 
 
 void init_io(void) {
-	iodrv=driver_lookup(USART_DRV);
-	if (iodrv) {
-		iodrvix=iodrv->open(iodrv, io_cb_handler);
+	iodrv=driver_lookup("usart0");
+	if (!iodrv) {
+		return;
 	}
+	kfd=iodrv->ops->open(iodrv->instance, io_cb_handler);
 	io_push();    /* to force out prints, done before open */
 #if 0
 	thread_create(st_io_r,0,256,"st_io_r");
@@ -269,7 +222,7 @@ int fprintf(int fd, const char *fmt, ...) {
 				}
 				case 'c': {
 					int gruuk=va_arg(ap, int);
-					io_write(fd,&gruuk,1);
+					io_write(fd,(char *)&gruuk,1);
 					break;
 				}
 				case 'd': {
@@ -286,11 +239,11 @@ int fprintf(int fd, const char *fmt, ...) {
 				}
 				default: {
 					io_write(fd,"%",1);
-					io_write(fd,&c,1);
+					io_write(fd,(char *)&c,1);
 				}
 			}
 		} else {
-			io_write(fd,&c,1);
+			io_write(fd,(char *)&c,1);
 		}
 		
 	}

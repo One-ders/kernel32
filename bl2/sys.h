@@ -28,6 +28,10 @@ int thread_create(void *fnc, void *val, int stacksz, char *name);
 int sleep_on(struct sleep_obj *so, void *buf, int blen);
 int wakeup(struct sleep_obj *so, void *dbuf, int dlen);
 
+void *sys_sleep(unsigned int ms);
+void *sys_sleepon(struct sleep_obj *so, void *bp, int bsize);
+void *sys_wakeup(struct sleep_obj *so, void *bp, int bsize);
+
 #ifdef DRIVERSUPPORT
 
 typedef int (*DRV_CBH)(void);
@@ -39,19 +43,35 @@ int io_control(int fd, int cmd, void *b, int size);
 int io_close(int fd);
 
 /*  driver */
+struct driver_ops {
+	int (*open)(void *driver_instance, DRV_CBH drv_cb);
+	int (*close)(int driver_fd);
+	int (*control)(int driver_fd, int cmd, void *, int len);
+	int (*init)(void *driver_instance);
+	int (*start)(void *driver_instance);
+};
+
 struct driver {
 	char *name;
-	int (*open)(struct driver *, DRV_CBH drv_cb);
-	int (*close)(int driver_instance);
-	int (*control)(int driver_instance, int cmd, void *, int len);
-	int (*init)(void);
-	int (*start)(void);
+	void *instance;
+	struct driver_ops *ops;
 	struct driver *next;
 };
 
 int driver_publish(struct driver *);
 int driver_unpublish(struct driver *);
 struct driver *driver_lookup(char *name);
+
+#if 0
+#define INIT_FUNC(a) void *init_func_##a __attribute__((section(".init_funcs"))) = a
+#else
+
+#define ASMLINE(a) #a
+#define INIT_FUNC(fnc) asm(".section	.init_funcs,\"a\",%progbits\n\t");\
+			asm(ASMLINE(.extern fnc\n\t));\
+			asm(ASMLINE(.long fnc\n\t));\
+			asm(".section	.text\n\t")
+#endif
 
 #endif
 
