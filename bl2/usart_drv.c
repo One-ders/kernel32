@@ -69,6 +69,7 @@ void USART3_IRQHandler(void) {
 		if (usart_putc_fnc==usart_putc) {
 			USART3->DR=usart_data0.tx_buf[IX(usart_data0.tx_out)];
 			usart_data0.tx_out++;
+			st&=~USART_SR_TC;	// Dont shut off transmitter if we send some data
 			if ((usart_data0.tx_in-usart_data0.tx_out)==0) {
 				sys_wakeup(&usart_data0.txblocker,0,0);
 			}
@@ -85,7 +86,7 @@ void USART3_IRQHandler(void) {
 
 	if (st&USART_SR_RXNE) {
 		int c=USART3->DR;
-		usart_data0.rx_buf[usart_data0.rx_i%(RX_BSIZE-1)]=c;
+		usart_data0.rx_buf[usart_data0.rx_i%(RX_BSIZE)]=c;
 		usart_data0.rx_i++;
 		sys_wakeup(&usart_data0.rxblocker,0,0);
 	}
@@ -100,7 +101,7 @@ static int (*usart_putc_fnc)(struct usart_data *, int c);
 static int usart_putc(struct usart_data *ud, int c) {
 
 	disable_interrupt();
-	if ((ud->tx_in-ud->tx_out)>TXB_SIZE)  {
+	if ((ud->tx_in-ud->tx_out)>=TXB_SIZE)  {
 		sys_sleepon(&ud->txblocker,0,0);
 	}
 	enable_interrupt();
@@ -119,7 +120,6 @@ static int usart_polled_putc(struct usart_data *ud, int c) {
 		while(!(((volatile short int)USART3->SR)&USART_SR_TXE));
 	} else {
 		ud->txr=1;
-//		USART3->CR1|=(USART_CR1_TXEIE|USART_CR1_TCIE|USART_CR1_TE);
 		USART3->CR1|=(USART_CR1_TE|USART_CR1_TCIE);
 	}
 	USART3->DR=c;
@@ -131,7 +131,7 @@ static int usart_polled_putc(struct usart_data *ud, int c) {
 static int usart_read(struct usart_data *ud, char *buf, int len) {
 	int i=0;
 	while(i<len) {
-		int ix=ud->rx_o%(RX_BSIZE-1);
+		int ix=ud->rx_o%(RX_BSIZE);
 		int ch;
 
 		disable_interrupt();
@@ -192,6 +192,7 @@ static int usart_control(int driver_fd, int cmd, void *arg1, int arg2) {
 				usart_putc_fnc=usart_polled_putc;
 			} else {
 				usart_putc_fnc=usart_putc;
+				USART3->CR1|=(USART_CR1_TXEIE|USART_CR1_TCIE|USART_CR1_TE);
 			}
 			break;
 		}

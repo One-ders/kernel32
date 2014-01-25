@@ -1144,7 +1144,7 @@ int ps_fnc(int argc, char **argv, struct Env *env) {
 	struct task *t=troot;
 	while(t) {
 		fprintf(env->io_fd,"task(%x) %12s, sp=0x%08x, pc=0x%08x, state=%c\n", 
-			t, t->name, t->sp, ((unsigned int *)t->sp)[0], get_state(t));
+			t, t->name, t->sp, (t->state!=1)?((unsigned int *)t->sp)[13]:0xffffffff, get_state(t));
 		t=t->next2;
 	}
 	return 0;
@@ -1236,7 +1236,7 @@ void sys_mon(void *dum) {
 				rc=200;
 			}
 			buf[rc]=0;
-			fprintf(fd,"got %s from st_term, len %d\n",buf,rc);
+			fprintf(fd,"\ngot %s from st_term, len %d\n",buf,rc);
 			rc=argit(buf,rc,argv);
 			if (rc<0) {
 				continue;
@@ -1248,8 +1248,6 @@ void sys_mon(void *dum) {
 				continue;
 			}
 			cmd->fnc(argc,argv,&env);
-		} else {
-			printf("got nothing from st_term\n");
 		}
 		}
 	}
