@@ -53,25 +53,34 @@ struct usart_data {
 
 
 static struct usart_data usart_data0 = {
-.rxblocker = { "rxobj",},
-.txblocker = { "txobj",}
+.rxblocker = { "usart_rxb",},
+.txblocker = { "usart_txb",}
 };
 
 static struct usart_data *udata[4];
+static int (*usart_putc_fnc)(struct usart_data *, int c);
+static int usart_putc(struct usart_data *ud, int c);
 
 void USART3_IRQHandler(void) {
 	unsigned int st=USART3->SR;
 	
 //	io_printf("got usart irq, status %x\n", USART3->SR);
 	if ((st&USART_SR_TXE)&&(usart_data0.tx_in-usart_data0.tx_out)) {
-		USART3->DR=usart_data0.tx_buf[IX(usart_data0.tx_out)];
-		usart_data0.tx_out++;
-		if ((usart_data0.tx_in-usart_data0.tx_out)==0) {
-			sys_wakeup(&usart_data0.txblocker,0,0);
+		if (usart_putc_fnc==usart_putc) {
+			USART3->DR=usart_data0.tx_buf[IX(usart_data0.tx_out)];
+			usart_data0.tx_out++;
+			if ((usart_data0.tx_in-usart_data0.tx_out)==0) {
+				sys_wakeup(&usart_data0.txblocker,0,0);
+			}
 		}
-	} else if((st&USART_SR_TC)) {
-		USART3->CR1&=~(USART_CR1_TE|USART_CR1_TXEIE|USART_CR1_TCIE);
-		usart_data0.txr=0;
+	} 
+	if((st&USART_SR_TC)) {
+		if (usart_putc_fnc==usart_putc) {
+			USART3->CR1&=~(USART_CR1_TE|USART_CR1_TXEIE|USART_CR1_TCIE);
+			usart_data0.txr=0;
+		} else {
+			USART3->CR1&=~(USART_CR1_TXEIE|USART_CR1_TCIE);
+		}
 	}
 
 	if (st&USART_SR_RXNE) {
@@ -80,6 +89,9 @@ void USART3_IRQHandler(void) {
 		usart_data0.rx_i++;
 		sys_wakeup(&usart_data0.rxblocker,0,0);
 	}
+	if (st&USART_SR_ORE) {
+		USART3->DR=USART3->DR;
+	}
 }
 
 
@@ -87,9 +99,11 @@ static int (*usart_putc_fnc)(struct usart_data *, int c);
 
 static int usart_putc(struct usart_data *ud, int c) {
 
-	if ((ud->tx_in-ud->tx_out)>=TXB_SIZE)  {
+	disable_interrupt();
+	if ((ud->tx_in-ud->tx_out)>TXB_SIZE)  {
 		sys_sleepon(&ud->txblocker,0,0);
 	}
+	enable_interrupt();
 	ud->tx_buf[IX(ud->tx_in)]=c;
 	ud->tx_in++;	
 	if (!ud->txr) {
@@ -117,20 +131,22 @@ static int usart_polled_putc(struct usart_data *ud, int c) {
 static int usart_read(struct usart_data *ud, char *buf, int len) {
 	int i=0;
 	while(i<len) {
-		if  ((ud->rx_i-ud->rx_o)>0) {
-			int ix=ud->rx_o%(RX_BSIZE-1);
-			int ch;
-			ud->rx_o++;
-			ch=buf[i++]=ud->rx_buf[ix];
-			if (1) {
-				usart_putc_fnc(ud,ch);
-			}
-//			io_printf("usart read got a char %c(%d), store at index %d\n",ch,ch,i-1);
-			if (ch==0x0d) {
-				return i-1;
-			}
-		} else {
+		int ix=ud->rx_o%(RX_BSIZE-1);
+		int ch;
+
+		disable_interrupt();
+		if (!(ud->rx_i-ud->rx_o)) {
 			sys_sleepon(&ud->rxblocker,0,0);
+		}
+		enable_interrupt();
+		ud->rx_o++;
+		ch=buf[i++]=ud->rx_buf[ix];
+		if (1) {
+			usart_putc_fnc(ud,ch);
+		}
+//		io_printf("usart read got a char %c(%d), store at index %d\n",ch,ch,i-1);
+		if (ch==0x0d) {
+			return i-1;
 		}
 	}
 	return i;
@@ -170,13 +186,15 @@ static int usart_control(int driver_fd, int cmd, void *arg1, int arg2) {
 			return usart_read(ud,arg1,arg2);
 		case WR_CHAR:
 			return usart_write(ud,arg1,arg2);
-		case WR_POLLED_MODE:
-			if (arg1) {
+		case WR_POLLED_MODE: {
+			int enabled=*((unsigned int *)arg1);
+			if (enabled) {
 				usart_putc_fnc=usart_polled_putc;
 			} else {
 				usart_putc_fnc=usart_putc;
 			}
 			break;
+		}
 		default:
 			return -1;
 	}
@@ -199,6 +217,7 @@ static int usart_init(void *instance) {
 	USART3->BRR=0x167;   /* 38400 baud at 8Mhz fpcl */
 	USART3->CR1=USART_CR1_UE;
 	USART3->CR1|=(USART_CR1_TXEIE|USART_CR1_TCIE|USART_CR1_TE|USART_CR1_RE|USART_CR1_RXNEIE);
+	NVIC_SetPriority(USART3_IRQn,0xd);
 	NVIC_EnableIRQ(USART3_IRQn);
 
 	return 0;
