@@ -32,6 +32,16 @@ void *sys_sleep(unsigned int ms);
 void *sys_sleepon(struct sleep_obj *so, void *bp, int bsize);
 void *sys_wakeup(struct sleep_obj *so, void *bp, int bsize);
 
+static inline __attribute__ ((always_inline))
+void disable_interrupt(void) {
+	asm("cpsid i");
+}
+
+static inline __attribute__ ((always_inline))
+void enable_interrupt(void) {
+	asm("cpsie i");
+}
+
 #ifdef DRIVERSUPPORT
 
 typedef int (*DRV_CBH)(void);

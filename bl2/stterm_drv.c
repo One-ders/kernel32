@@ -28,8 +28,8 @@ static char rx_buf[RX_BSIZE];
 static int rx_i;
 static int rx_o;
 
-static struct sleep_obj rxblocker;
-static struct sleep_obj txblocker;
+static struct sleep_obj rxblocker = {"stterm_rxb",};
+static struct sleep_obj txblocker = {"stterm_txb",};
 
 static void stterm_io_r(void *dum) {
         int rerun=0;
@@ -37,7 +37,7 @@ static void stterm_io_r(void *dum) {
                 if (st_term.rx_ready) {
                         int i;
                         for(i=0;i<st_term.rx_ready;i++) {
-				rx_buf[rx_i%(RX_BSIZE-1)]=st_term.rx_buf[i];
+				rx_buf[rx_i%(RX_BSIZE)]=st_term.rx_buf[i];
 				rx_i++;
 #if 0
                                 if (st_term.rx_buf[i]=='\n') {
@@ -67,7 +67,7 @@ static void stterm_io_r(void *dum) {
                 if (rerun) {
                         sleep(20);
                 } else {
-                        sleep(100);
+                        sleep(50);
                 }
         }
 }
@@ -84,18 +84,20 @@ static void stterm_io_t(void *dum) {
                         while(st_term.tx_len) {
                                 sleep(50);
                         }
-                        if (len>TXB_MASK) {
-                                len=TXB_MASK;
-                                tx_out=tx_in-TXB_MASK;
+#if 0
+                        if (len>ST_BSIZE) {
+                                len=ST_BSIZE;
+//                                tx_out=tx_in-ST_BSIZE;
                         }
+#endif
 
                         len=MIN(len,ST_BSIZE);
-                        if (((tx_out%TXB_MASK)+len)>TXB_MASK) {
-                                int len1=TXB_SIZE-(tx_out%TXB_MASK);
-                                __builtin_memcpy(st_term.tx_buf,&tx_buf[tx_out%TXB_MASK],len1);
+                        if (((tx_out%TXB_SIZE)+len)>TXB_MASK) {
+                                int len1=TXB_SIZE-(tx_out%TXB_SIZE);
+                                __builtin_memcpy(st_term.tx_buf,&tx_buf[tx_out%TXB_SIZE],len1);
                                 __builtin_memcpy(&st_term.tx_buf[len1],tx_buf,len-len1);
                         } else {
-                                __builtin_memcpy(st_term.tx_buf,&tx_buf[tx_out%TXB_MASK],len);
+                                __builtin_memcpy(st_term.tx_buf,&tx_buf[tx_out%TXB_SIZE],len);
                         }
                         tx_out+=len;
                         st_term.tx_len=len;
@@ -114,7 +116,7 @@ static int stterm_putc(int c) {
 	if ((tx_in-tx_out)>=TXB_SIZE) {
 		sys_sleepon(&txblocker,0,0);
 	}
-	tx_buf[tx_in]=c;
+	tx_buf[tx_in%TXB_SIZE]=c;
 	tx_in++;
 	return 1;
 }
@@ -123,12 +125,12 @@ static int stterm_read(char *buf, int len) {
 	int i=0;
 	while(i<len) {
 		if ((rx_i-rx_o)>0) {
-			int ix=rx_o%(RX_BSIZE-1);
+			int ix=rx_o%(RX_BSIZE);
 			int ch;
 			rx_o++;
 			ch=buf[i++]=rx_buf[ix];
 			if (1) stterm_putc(ch);
-			if (ch==0x0d) return i-1;
+			if (ch=='\n') return i-1;
 		} else {
 			sys_sleepon(&rxblocker,0,0);
 		}

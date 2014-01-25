@@ -8,6 +8,7 @@ void init_io(void);
 int io_puts(const char *str);
 int io_add_c(const char c);
 int io_printf(const char *format, ...);
+int io_setpolled(int enabled);
 
 int fprintf(int fd, const char *format, ...);
 #define printf(b...) fprintf(0,b)

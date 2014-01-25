@@ -35,6 +35,13 @@ int io_add_str(const char *str) {
 	return iodrv->ops->control(kfd, WR_CHAR, (char *)str, __builtin_strlen(str));
 }
 
+int in_print;
+int io_setpolled(int enabled) {
+	if (!iodrv) return 0;
+	in_print=0;
+	return iodrv->ops->control(kfd, WR_POLLED_MODE, &enabled, sizeof(enabled));
+}
+
 
 char cmap[]={'0','1','2','3','4','5','6','7','8','9',
 		'a','b','c','d','e','f'};
@@ -127,10 +134,16 @@ int parse_fmt(const char *fmt, int *field_width, int *zero_fill) {
 	return i;
 }
 
+
 int io_printf(const char *fmt, ...) {
 	int i=0;
 	va_list ap;
 	char numericbuf[16];
+
+	/* protect against recursion */
+	if (__sync_fetch_and_or(&in_print,1)) {
+		return -1;
+	}
 	
 	va_start(ap,fmt);
 	while(1) {
@@ -179,6 +192,7 @@ int io_printf(const char *fmt, ...) {
 		
 	}
 	va_end(ap);
+	in_print=0;
 	return 0;
 }
 
@@ -190,10 +204,6 @@ void init_io(void) {
 	}
 	kfd=iodrv->ops->open(iodrv->instance, io_cb_handler);
 	io_push();    /* to force out prints, done before open */
-#if 0
-	thread_create(st_io_r,0,256,"st_io_r");
-	thread_create(st_io_t,0,256,"st_io_t");
-#endif
 }
 
 int fprintf(int fd, const char *fmt, ...) {
