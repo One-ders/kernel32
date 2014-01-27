@@ -29,7 +29,7 @@ struct task * volatile ready;
 struct task * volatile ready_last;
 
 
-struct task main_task = { "init_main", (void *)0x20020000, 0, 0, 0, 0,0,512 };
+struct task main_task = { "init_main", (void *)0x20020000, 0, 0, 1, 0,0,512 };
 struct task * volatile current = &main_task;
 struct task *troot =&main_task;
 
@@ -90,12 +90,54 @@ volatile unsigned int tq_tic;
 
 #define LR(a)	((unsigned int *)a)[5]
 #define XPSR(a)	((unsigned int *)a)[7]
+#define TASK_XPSR(a)	((unsigned int *)a)[15]
 
 #define BP(a...) {disable_interrupt();io_setpolled(1); io_printf(a); enable_interrupt();io_setpolled(0);}
 
+
+
+
+
+
+static inline unsigned int  r0() {
+	register unsigned int r0 asm("r0");
+	return r0;
+}
+static inline unsigned int  r1() {
+	register unsigned int r0 asm("r0");
+	__asm__ __volatile__("mov r0,r1"::: "r0");
+	return r0;
+}
+static inline unsigned int  r2() {
+	register unsigned int r0 asm("r0");
+	__asm__ __volatile__("mov r0,r2"::: "r0");
+	return r0;
+}
+static inline unsigned int  r3() {
+	register unsigned int r0 asm("r0");
+	__asm__ __volatile__("mov r0,r3"::: "r0");
+	return r0;
+}
+static inline unsigned int  r12() {
+	register unsigned int r0 asm("r0");
+	__asm__ __volatile__("mov r0,r12"::: "r0");
+	return r0;
+}
+static inline unsigned int  lr() {
+	register unsigned int r0 asm("r0");
+	__asm__ __volatile__("mov r0,lr"::: "r0");
+	return r0;
+}
+static inline unsigned int  pc() {
+	register unsigned int r0 asm("r0");
+	__asm__ __volatile__("mov r0,pc"::: "r0");
+	return r0;
+}
+
+
 static inline unsigned int  xpsr() {
 	register unsigned int r0 asm("r0");
-	__asm__ __volatile__("mrs r0,xpsr":::);
+	__asm__ __volatile__("mrs r0,xpsr"::: "r0");
 	return r0;
 }
 
@@ -109,14 +151,128 @@ void check_stack(struct task *t,struct task *n) {
 		ASSERT(0);
 	}
 
-#if 0
-	if (((unsigned int)n)==0x20000a7c) {
-		io_setpolled(1);
-		io_printf("stack hit on task %x\n", n);
-		io_setpolled(0);
+#endif
+}
+
+/*
+ * PendSV handler
+ */
+void *PendSV_Handler_c(unsigned long int *svc_args);
+
+void __attribute__ (( naked )) PendSV_Handler(void) {
+	asm volatile ( "tst lr,#4\n\t"
+			"ite eq\n\t"
+			"mrseq r0,msp\n\t"
+			"mrsne r0,psp\n\t"
+			"mov r1,lr\n\t"
+			"mov r2,r0\n\t"
+			"push {r1-r2}\n\t"
+			"bl %[PendSV_Handler_c]\n\t"
+			"pop {r1-r2}\n\t"
+			"mov lr,r1\n\t"
+			"cmp	r0,#0\n\t"
+			"bne.n	1f\n\t"
+			"bx lr\n\t"
+			"1:\n\t"
+			"stmfd r2!,{r4-r11}\n\t"
+			"ldr r1,=current\n\t"
+			"ldr r1,[r1]\n\t"
+			"str r2,[r1,#4]\n\t"
+			"ldr r1,=current\n\t"
+			"str r0,[r1,#0]\n\t"
+			"movs r2,#1\n\t"
+			"str r2,[r0,#16]\n\t"
+			"ldr r0,[r0,#4]\n\t"
+			"mov sp,r0\n\t"
+			"ldmfd sp!,{r4-r11}\n\t"
+			"bx lr\n\t"
+			:
+			: [PendSV_Handler_c] "i" (PendSV_Handler_c)
+			: 
+	);
+}
+
+void *PendSV_Handler_c(unsigned long int *save_sp) {
+	struct task *t=ready;	
+	if (!ready) {
+		ASSERT(0);
 	}
-#endif
-#endif
+
+	if (current->state==1) {
+		current->state=2;
+		ready_last->next=current;
+		ready_last=current;
+	}
+	ready=ready->next;
+	t->next=0;
+	if ((TASK_XPSR(t->sp)&0xff)==0xb) {
+		*(save_sp-2)=0xfffffff1;
+	}
+	return t;
+}
+
+void  pendSV(void) {
+	*((uint32_t volatile *)0xE000ED04) = 0x10000000; // trigger PendSV
+}
+
+struct HardFrame {
+	unsigned long int r0;
+	unsigned long int r1;
+	unsigned long int r2;
+	unsigned long int r3;
+	unsigned long int r12;
+	unsigned long int lr;
+	unsigned long int pc;
+	unsigned long int psr;
+};
+
+__attribute__ ((naked)) int do_pendSV(volatile struct HardFrame *hf, void *nlr) {
+	register unsigned long int r0 asm("r0");
+	register unsigned long int lr asm("lr");
+	hf[1].pc=lr;
+	asm volatile ("mov sp,%[hf]\n\t"
+		      "mov lr,%[nlr]\n\t"
+		      "bx lr\n\t"
+			:
+			: [hf] "r" (hf), [nlr] "r" (nlr)
+			: );
+	return r0;
+}
+
+int fake_pendSV(void) {
+	volatile struct HardFrame hf[2];
+	void *nlr=(void *)0xfffffff1;
+
+	hf[1].r0=0xff;
+	hf[1].r1=r1();
+	hf[1].r2=r2();
+	hf[1].r3=r3();
+	hf[1].r12=r3();
+	hf[1].lr=lr();
+	hf[1].psr=xpsr()|0x0100000b;
+
+	hf[0].r0=0;
+	hf[0].r1=0;
+	hf[0].r2=0;
+	hf[0].r3=0;
+	hf[0].r12=0;
+	hf[0].lr=0xfffffff9;
+	hf[0].pc=((unsigned long int)PendSV_Handler)|1;
+	hf[0].psr=(xpsr()&~0xff)|0x0100000e;
+
+	if( (*((volatile unsigned int *)0xe000ed24))&0x400) {
+		ASSERT(0);
+	};
+	(*((volatile unsigned int *)0xe000ed24))|=0x400;
+
+	enable_interrupt();
+
+	do_pendSV(hf,nlr);
+
+	asm volatile ("sub sp,sp,0x40\n\t");
+	(*((volatile unsigned int *)0xe000ed24))=0x80;
+	
+	return 1;
 }
 
 #if 1
@@ -146,36 +302,6 @@ void __attribute__ (( naked )) SysTick_Handler(void) {
 			: "r0"
 	);
   
-#if 0
-	asm volatile ( "tst lr,#4\n\t"
-			"ite eq\n\t"
-			"mrseq r0,msp\n\t"
-			"mrsne r0,psp\n\t"
-			"mov r1,lr\n\t"
-			"mov r2,r0\n\t"
-			"push {r1-r2}\n\t"
-			"bl %[SysTick_Handler_c]\n\t"
-			"pop {r1-r2}\n\t"
-			"mov lr,r1\n\t"
-			"cmp	r0,#0\n\t"
-			"bne.n	1f\n\t"
-			"bx lr\n\t"
-			"1:\n\t"
-			"stmfd r2!,{r4-r11}\n\t"
-			"ldr r1,=current\n\t"
-			"ldr r1,[r1]\n\t"
-			"str r2,[r1,#4]\n\t"
-			"ldr r1,=current\n\t"
-			"str r0,[r1,#0]\n\t"
-			"ldr r0,[r0,#4]\n\t"
-			"mov sp,r0\n\t"
-			"ldmfd sp!,{r4-r11}\n\t"
-			"bx lr\n\t"
-			:
-			: [SysTick_Handler_c] "i" (SysTick_Handler_c)
-			: "r0"
-	);
-#endif
 }
 #endif
 
@@ -236,29 +362,13 @@ void SysTick_Handler_c(void *sp) {
 			ready_last->next=t;
 		}
 		ready_last=tqp->tq_out_last;
-//		ASSERT(ready);
 //		while(t->next) t=t->next;
 		tqp->tq_out_first=tqp->tq_out_last=0;
 	}
 
 	if (ready) {
-		struct task *n=0;
-		struct task *p=0;
-		if (current->state!=1) return;
-		p=ready_last->next=current;
-		ready_last=current;
-		current->state=2;
-
-		current=n=ready;
-		ready=ready->next;
-		n->next=0;
-		n->state=2;
-
-		DEBUGP(DLEV_SCHED,"time slice: switch out %s, switch in %s\n", p->name, n->name);
-		check_stack(p,n);
-		switch_context(n,p);
-		fixup_stack(sp);
-		ASSERT(current==p);
+		DEBUGP(DLEV_SCHED,"time slice: switch out %s, switch in %s\n", current->name, ready->name);
+		pendSV();
 	}
 	return;
 }
@@ -349,56 +459,6 @@ void Error_Handler_c(void *sp_v) {
 	ASSERT(0);
 }
 
-
-/*
- * PendSV handler
- */
-void *PendSV_Handler_c(unsigned long int *svc_args);
-
-void __attribute__ (( naked )) PendSV_Handler(void) {
-	asm volatile ( "tst lr,#4\n\t"
-			"ite eq\n\t"
-			"mrseq r0,msp\n\t"
-			"mrsne r0,psp\n\t"
-			"mov r1,lr\n\t"
-			"mov r2,r0\n\t"
-			"push {r1-r2}\n\t"
-			"bl %[PendSV_Handler_c]\n\t"
-			"pop {r1-r2}\n\t"
-			"mov lr,r1\n\t"
-			"cmp	r0,#0\n\t"
-			"bne.n	1f\n\t"
-			"bx lr\n\t"
-			"1:\n\t"
-			"stmfd r2!,{r4-r11}\n\t"
-			"ldr r1,=current\n\t"
-			"ldr r1,[r1]\n\t"
-			"str r2,[r1,#4]\n\t"
-			"ldr r1,=current\n\t"
-			"str r0,[r1,#0]\n\t"
-			"ldr r0,[r0,#4]\n\t"
-			"mov sp,r0\n\t"
-			"ldmfd sp!,{r4-r11}\n\t"
-			"bx lr\n\t"
-			:
-			: [PendSV_Handler_c] "i" (PendSV_Handler_c)
-			: 
-	);
-}
-
-void *PendSV_Handler_c(unsigned long int *save_sp) {
-//	save_context(save_sp);
-	io_setpolled(1);
-	io_printf("PendSV called\n");
-	io_setpolled(0);
-	ASSERT(0);
-	return 0;
-}
-
-void  pendSV(void) {
-	*((uint32_t volatile *)0xE000ED04) = 0x10000000; // trigger PendSV
-}
-
 /*
  * Define the interrupt handler for the service calls,
  * It will call the C-function after retrieving the
@@ -439,47 +499,6 @@ void __attribute__ (( naked )) SVC_Handler(void) {
 			: 
 	);
 }
-#if 0
-void __attribute__ (( naked )) SVC_Handler(void) {
- /*
-  * Get the pointer to the stack frame which was saved before the SVC
-  * call and use it as first parameter for the C-function (r0)
-  * All relevant registers (r0 to r3, r12 (scratch register), r14 or lr
-  * (link register), r15 or pc (programm counter) and xPSR (program
-  * status register) are saved by hardware.
-  */
-  
-	asm volatile ( "tst lr,#4\n\t"
-			"ite eq\n\t"
-			"mrseq r0,msp\n\t"
-			"mrsne r0,psp\n\t"
-			"mov r1,lr\n\t"
-			"mov r2,r0\n\t"
-			"push {r1-r2}\n\t"
-			"bl %[SVC_Handler_c]\n\t"
-			"pop {r1-r2}\n\t"
-			"mov lr,r1\n\t"
-			"cmp	r0,#0\n\t"
-			"bne.n	1f\n\t"
-			"bx lr\n\t"
-			"1:\n\t"
-			"stmfd r2!,{r4-r11}\n\t"
-			"ldr r1,=current\n\t"
-			"ldr r1,[r1]\n\t"
-			"str r2,[r1,#4]\n\t"
-			"ldr r1,=current\n\t"
-			"str r0,[r1,#0]\n\t"
-			"ldr r0,[r0,#4]\n\t"
-			"mov sp,r0\n\t"
-			"ldmfd sp!,{r4-r11}\n\t"
-			"bx lr\n\t"
-			:
-			: [SVC_Handler_c] "i" (SVC_Handler_c)
-			: "r0"
-	);
-}
-
-#endif
 
 #define SVC_CREATE_TASK 1
 #define SVC_SLEEP	2
@@ -536,28 +555,22 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			*(--stackp)=0;     // r11
 
 			t->sp=(void *) stackp;
-			t->state=1;
+			t->state=2;
 			t->name=name;
 			t->next2=troot;
 			troot=t;
 
-			current->state=2;
 			if(!ready) {
-				ready_last=current;
-				ready=current;
+				ready=t;
 			} else {
-				ready_last->next=current;
-				ready_last=current;
+				ready_last->next=t;
 			}
-
-			if (save_context(12)) {
-				fixup_stack(svc_args);
-				return 0;
-			}
-			current=t;
+			ready_last=t;
 
 			DEBUGP(DLEV_SCHED,"Create task: name %s, switch out %s\n", t->name, ready_last->name);
-			return t;
+			pendSV();
+
+			return 0;
 			break;
 		}
 		case SVC_KILL_SELF: {
@@ -568,24 +581,12 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			current->state=6;
 
 			while(!ready);
-			ASSERT(ready);
-			current=n=ready;
-			ready=ready->next;
-			n->next=0;
-			n->state=2;
 
 			DEBUGP(DLEV_SCHED,"kill self  task: name %s, switch in %s\n", p->name, n->name);
-			ASSERT(n!=p);
-			check_stack(p,n);
-			switch_context(n,p);
-			fixup_stack(svc_args);
-//			Error_Handler_c(current->sp);
-//			ASSERT(0);
+			pendSV();
 			return 0;
 		}
 		case SVC_SLEEP: {
-			struct task *n=0;
-			struct task *p=current;
 			struct tq *tout=&tq[(svc_args[0]+tq_tic)%1024];
 			if (current->state!=1) return 0;
 			current->state=3;
@@ -598,18 +599,8 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			}
 
 			while(!ready);
-			ASSERT(ready);
-			n=ready;
-			current=n;
-			ready=ready->next;
-			n->next=0;
-			n->state=2;
-			DEBUGP(DLEV_SCHED,"sleep task: name %s, switch in %s\n", p->name, n->name);
-			ASSERT(n!=p);
-			check_stack(p,n);
-			switch_context(n,p);
-			fixup_stack(svc_args);
-			ASSERT(current==p);
+			DEBUGP(DLEV_SCHED,"sleep task: name %s, switch in %s\n", current->name, ready->name);
+			pendSV();
 			return 0;
 			break;
 		}
@@ -632,20 +623,8 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			}
 			so->task_list_last=current;
 
-			while(!ready);
-			ASSERT(ready);
-			n=ready;
-			current=ready;
-			ready=ready->next;
-			n->next=0;
-			n->state=2;
-
 			DEBUGP(DLEV_SCHED,"sleepon %s task: name %s, switch in %s\n", so->name,p->name,n->name);
-			ASSERT(n!=p);
-			check_stack(p,n);
-			switch_context(n,p);
-			fixup_stack(svc_args);
-			ASSERT(current==p);
+			pendSV();
 			return 0;
 			break;
 			
@@ -655,7 +634,6 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			void *bp=(void *)svc_args[1];
 			int   bsize=svc_args[2];
 			struct task *n;
-			struct task *p=current;
 
 			if (current->state!=1) return 0;
 
@@ -664,29 +642,19 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			if (n->bsize<bsize) return 0;
 			so->task_list=so->task_list->next;
 
-			current->state=2;
-
 			if(ready) {
-				ready_last->next=current;
+				ready_last->next=n;
 			} else {
-				ready=current;
+				ready=n;
 			}
-			ready_last=current;
-//			ASSERT(ready);
-			current=n;
-			n->next=0;
-			n->state=2;
+			ready_last=n;
 
 			n->bsize=bsize;
 			if (bp&&bsize) {
 				__builtin_memcpy(n->bp,bp,bsize);
 			} 
-			DEBUGP(DLEV_SCHED,"wakeup %s task: name %s, switch in %s\n",so->name,p->name,n->name);
-			ASSERT(n!=p);
-			check_stack(p,n);
-			switch_context(n,p);
-			fixup_stack(svc_args);
-			ASSERT(current==p);
+			DEBUGP(DLEV_SCHED,"wakeup %s task: name %s, switch in %s\n",so->name,current->name,n->name);
+			pendSV();
 		 	return 0;
 			break;
 		}
@@ -716,7 +684,6 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			}
 
 			svc_args[0]=driver->ops->control(kfd,RD_CHAR,(void *)svc_args[1],svc_args[2]);
-			fixup_stack(svc_args);
 			return 0;
 		}
 		case SVC_IO_WRITE: {
@@ -729,7 +696,6 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			}
 
 			svc_args[0]=driver->ops->control(kfd,WR_CHAR,(void *)svc_args[1],svc_args[2]);
-			fixup_stack(svc_args);
 			return 0;
 		}
 		default:
@@ -803,12 +769,10 @@ int __attribute__ (( naked )) switch_context(struct task *next, struct task *old
 
 
 void *sys_sleep(unsigned int ms) {
-	struct task *n=0;
-	struct task *p=current;
 	struct tq *tout=&tq[((ms/10)+tq_tic)%1024];
 	int in_irq=xpsr()&0xff;
 
-	if (in_irq&&(in_irq!=0xb&&in_irq!=0xf)) {
+	if (in_irq&&(in_irq!=0xb)) {
 		return 0;
 	}
 
@@ -822,28 +786,16 @@ void *sys_sleep(unsigned int ms) {
 		tout->tq_out_last=current;
 	}
 
-	while(!ready);
-	ASSERT(ready);
-	current=n=ready;
-	ready=ready->next;
-	n->next=0;
-	n->state=2;
-	DEBUGP(DLEV_SCHED,"sys_sleep task: name %s, switch in %s\n", p->name, n->name);
-	ASSERT(n!=p);
-	check_stack(p,n);
-	switch_context(n,p);
-	ASSERT(current==p);
-
+	DEBUGP(DLEV_SCHED,"sys_sleep task: name %s, switch in %s\n", current->name, ready->name);
+	pendSV();
 	return 0;
 }
 
 /* not to be called from irq, cant sleep */
 void *sys_sleepon(struct sleep_obj *so, void *bp, int bsize) {
-	struct task *n=0;
-	struct task *p=current;
 	int in_irq=xpsr()&0xff;
 	
-	if (in_irq&&(in_irq!=0xb&&in_irq!=0xf)) {
+	if (in_irq&&(in_irq!=0xb)) {
 		return 0;
 	}
 	if (!ready) return 0;
@@ -862,19 +814,9 @@ void *sys_sleepon(struct sleep_obj *so, void *bp, int bsize) {
 	}
 	so->task_list_last=current;
 
-	while(!ready);
-	ASSERT(ready);
-	current=n=ready;
-	ready=ready->next;
-	n->next=0;
-	n->state=2;
-
-	DEBUGP(DLEV_SCHED,"sys sleepon %s task: name %s, switch in %s\n", so->name, p->name, n->name);
-	ASSERT(n!=p);
-	check_stack(p,n);
-	switch_context(n,p);
-	ASSERT(current==p);
-	return n;
+	DEBUGP(DLEV_SCHED,"sys sleepon %s task: name %s, switch in %s\n", so->name, current->name, ready->name);
+	fake_pendSV();
+	return 0;
 }
 
 void *sys_wakeup(struct sleep_obj *so, void *bp, int bsize) {
@@ -893,9 +835,9 @@ void *sys_wakeup(struct sleep_obj *so, void *bp, int bsize) {
 		ready=n;
 	}
 	ready_last=n;
-	ASSERT(ready);
 		
 	DEBUGP(DLEV_SCHED,"wakeup(readying) %s task: name %s, switch in %s\n",so->name,current->name,n->name);
+	pendSV();
  	return 0;
 }
 
@@ -1261,11 +1203,13 @@ void sys_mon(void *dum) {
 extern unsigned long int init_func_begin[];
 extern unsigned long int init_func_end[];
 typedef void (*ifunc)(void);
+
 void init_sys(void) {
 	unsigned long int *i;
 //	*((unsigned long int *)0xe000ed1c)=0xff000000; /* SHPR2, lower svc prio */
-	NVIC_SetPriority(SVCall_IRQn,0xf);
-	NVIC_SetPriority(SysTick_IRQn,0xe);  /* preemptive tics... */
+	NVIC_SetPriority(PendSV_IRQn,0xf);
+	NVIC_SetPriority(SVCall_IRQn,0xe);
+	NVIC_SetPriority(SysTick_IRQn,0xd);  /* preemptive tics... */
 	SCB->CCR|=1;
 	for(i=init_func_begin;i<init_func_end;i++) {
 		((ifunc)*i)();
