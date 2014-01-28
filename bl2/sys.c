@@ -698,6 +698,18 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			svc_args[0]=driver->ops->control(kfd,WR_CHAR,(void *)svc_args[1],svc_args[2]);
 			return 0;
 		}
+		case SVC_IO_CONTROL: {
+			int fd=(int)svc_args[0];
+			struct driver *driver=fd_tab[fd].driver;
+			int kfd=fd_tab[fd].driver_ix;
+			if (!driver) {
+				svc_args[0]=-1;
+				return 0;
+			}
+
+			svc_args[0]=driver->ops->control(kfd,svc_args[1],(void *)svc_args[2],svc_args[3]);
+			return 0;
+		}
 		default:
 			break;
 	}
@@ -1048,7 +1060,7 @@ int io_write(int fd, const char *buf, int size) {
 }
 
 int io_control(int fd, int cmd, void *d, int sz) {
-	return -1;
+	return svc_io_control(fd,cmd,d,sz);
 }
 
 int io_close(int fd) {
@@ -1092,6 +1104,17 @@ int ps_fnc(int argc, char **argv, struct Env *env) {
 	return 0;
 }
 
+int lsdrv_fnc(int argc, char **argv, struct Env *env) {
+	struct driver *d=drv_root;
+	fprintf(env->io_fd,"=========== Installed drivers =============\n");
+	while(d) {
+		fprintf(env->io_fd,"%s\n", d->name);
+		d=d->next;
+	}
+	return 0;
+}
+
+
 int debug_fnc(int argc, char **argv, struct Env *env) {
 	if (argc>0) {
 		dbglev=10;
@@ -1115,6 +1138,7 @@ struct cmd {
 	cmdFunc fnc;
 } cmd_root[] = {{"help",help_fnc},
 		{"ps",ps_fnc},
+		{"lsdrv",lsdrv_fnc},
 		{"debug",debug_fnc},
 		{"reboot",reboot_fnc},
 		{0,0}};
