@@ -3,6 +3,8 @@
 #include "sys.h"
 #include "io.h"
 
+#include "led_drv.h"
+
 #include <string.h>
 
 
@@ -16,38 +18,52 @@ void tic_wait(unsigned int tic) {
 
 
 struct blink_data {
-	unsigned int pin;
+	unsigned int led;
 	unsigned int delay;
 };
 
 
 void blink(struct blink_data *bd) {
+	int fd=io_open(LED_DRV);
+	if (fd<0) return;
 	while(1) {
-		GPIOD->ODR ^= (1 << bd->pin);
+		int led_stat;
+		int rc=io_control(fd,LED_CTRL_STAT,&led_stat,sizeof(led_stat));
+		if (rc<0) return;
+		if (led_stat&bd->led) {
+			rc=io_control(fd,LED_CTRL_DEACTIVATE,&bd->led,sizeof(bd->led));
+		} else {
+			rc=io_control(fd,LED_CTRL_ACTIVATE,&bd->led,sizeof(bd->led));
+		}
+	
 		sleep(bd->delay);
 	}
 }
 
 void blink_loop(struct blink_data *bd) {
+	int fd=io_open(LED_DRV);
+	if (fd<0) return;
 	while(1) {
-		GPIOD->ODR ^= (1 << bd->pin);
+		int led_stat;
+		int rc=io_control(fd,LED_CTRL_STAT,&led_stat,sizeof(led_stat));
+		if (rc<0) return;
+		if (led_stat&bd->led) {
+			rc=io_control(fd,LED_CTRL_DEACTIVATE,&bd->led,sizeof(bd->led));
+		} else {
+			rc=io_control(fd,LED_CTRL_ACTIVATE,&bd->led,sizeof(bd->led));
+		}
 		tic_wait((bd->delay/10)+tq_tic);
 	}
 }
 
 
 int main(void) {
-	struct blink_data green={12,1000};
-	struct blink_data amber={13,500};
-	struct blink_data red={14,750};
-	struct blink_data blue={15,100};
+	struct blink_data green={LED_GREEN,1000};
+	struct blink_data amber={LED_AMBER,500};
+	struct blink_data red={LED_RED,750};
+	struct blink_data blue={LED_BLUE,100};
 
 	SysTick_Config(SystemCoreClock/ 100); // 10 mS tic is 100/Sec
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN; // enable the clock to GPIOD
-	GPIOD->MODER |= (1 << 24); // set pin 12 to be general purpose output
-	GPIOD->MODER |= (1 << 26); // set pin 13 to be general purpose output
-	GPIOD->MODER |= (1 << 28); // set pin 14 to be general purpose output
-	GPIOD->MODER |= (1 << 30); // set pin 15 to be general purpose output
 
 	init_sys();
 	init_io();
