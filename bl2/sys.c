@@ -22,6 +22,7 @@ struct task {
 	void		*bp;		  /* 20-23 */ /* communication buffer for sleeping context */
 	int		bsize;            /* 24-27 */ /* size of the buffer */
 	int		stack_sz;         /* 28-31 */
+	unsigned int    active_tics;	  /* 32-36 */
 };
 
 
@@ -32,11 +33,6 @@ struct task * volatile ready_last;
 struct task main_task = { "init_main", (void *)0x20020000, 0, 0, 1, 0,0,512 };
 struct task * volatile current = &main_task;
 struct task *troot =&main_task;
-
-int save_context(unsigned int);
-int enter_context(struct task *next);
-int switch_context(struct task *next, struct task *prev);
-
 
 struct Slab_256 {
 	unsigned char mem[256];
@@ -349,6 +345,7 @@ void fixup_stack(unsigned long int *sp) {
 
 void SysTick_Handler_c(void *sp) {
 	struct tq *tqp;
+	current->active_tics++;
 	tq_tic++;
 	tqp=&tq[tq_tic%1024];
 
@@ -574,15 +571,13 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			break;
 		}
 		case SVC_KILL_SELF: {
-			struct task *n=0;
-			struct task *p=0;
 			if (current->state!=1) return 0;
 
 			current->state=6;
 
 			while(!ready);
 
-			DEBUGP(DLEV_SCHED,"kill self  task: name %s, switch in %s\n", p->name, n->name);
+			DEBUGP(DLEV_SCHED,"kill self  task: name %s, switch in %s\n", current->name, ready->name);
 			pendSV();
 			return 0;
 		}
@@ -608,8 +603,6 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			struct sleep_obj *so=(struct sleep_obj *)svc_args[0];
 			void *bp=(void *)svc_args[1];
 			int   bsize=svc_args[2];
-			struct task *n=0;
-			struct task *p=current;
 
 			if (current->state!=1) return 0;
 			current->bp=bp;
@@ -622,8 +615,9 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 				so->task_list=current;
 			}
 			so->task_list_last=current;
+			ASSERT(ready);
 
-			DEBUGP(DLEV_SCHED,"sleepon %s task: name %s, switch in %s\n", so->name,p->name,n->name);
+			DEBUGP(DLEV_SCHED,"sleepon %s task: name %s, switch in %s\n", so->name,current->name,ready->name);
 			pendSV();
 			return 0;
 			break;
@@ -717,69 +711,6 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 }
 
 
-int __attribute__ (( naked )) save_context(unsigned int val) {
- /*
-  */
-  
-	asm volatile ( 
-//			"stmfd sp!, {R15}\n\t"
-			"stmfd sp!,{r0-r12,r14}\n\t"
-			"ldr r0,=current\n\t"
-			"ldr r0,[r0]\n\t"
-			"str sp,[r0,#4]\n\t"
-			"add sp,sp,#56\n\t"
-			"movs r0,#0\n\t"
-			"bx lr\n\t"
-			:
-			:
-			: 
-	);
-	return 0;
-}
-
-int __attribute__ (( naked )) enter_context(struct task *next) {
- /*
-  */
-	asm volatile (  
-                        "ldr r1,=current\n\t"
-                        "str %[next],[r1,#0]\n\t"
-                        "ldr r0,[r0,#4]\n\t"
-                        "mov sp,r0\n\t"
-                        "ldmfd sp!,{r0-r12,r14}\n\t"
-			"movs r0,#1\n\t"
-			"bx lr\n\t"
-			:
-			: [next] "r" (next)
-			:
-	);
-
-	return 1;
-}
-
-
-int __attribute__ (( naked )) switch_context(struct task *next, struct task *old) {
- /*
-  */
-  
-	asm volatile ( 
-			"cpsid i\n\t"
-			"stmfd sp!,{r0-r12,r14}\n\t"
-			"str sp,[%[old],#4]\n\t"
-                        "ldr r2,[%[next],#4]\n\t"
-                        "mov sp,r2\n\t"
-			"movs r2,#1\n\t"
-			"str r2,[%[next],#16]\n\t"
-                        "ldmfd sp!,{r0-r12,r14}\n\t"
-			"cpsie i\n\t"
-			"bx lr\n\t"
-			:
-			: [next] "r" (next), [old] "r" (old)
-			: 
-	);
-	return 0;
-}
-
-
 void *sys_sleep(unsigned int ms) {
 	struct tq *tout=&tq[((ms/10)+tq_tic)%1024];
 	int in_irq=xpsr()&0xff;
@@ -798,6 +729,7 @@ void *sys_sleep(unsigned int ms) {
 		tout->tq_out_last=current;
 	}
 
+	ASSERT(ready);
 	DEBUGP(DLEV_SCHED,"sys_sleep task: name %s, switch in %s\n", current->name, ready->name);
 	pendSV();
 	return 0;
@@ -1077,12 +1009,12 @@ struct Env {
 	int io_fd;
 };
 
-int help_fnc(int argc, char **argv, struct Env *env) {
+static int help_fnc(int argc, char **argv, struct Env *env) {
 	fprintf(env->io_fd, "help called with %d args\n", argc);
 	return 0;
 }
 
-int get_state(struct task *t) {
+static int get_state(struct task *t) {
 	switch(t->state) {
 		case 0: return 'i';
 		case 1: return 'r';
@@ -1094,17 +1026,17 @@ int get_state(struct task *t) {
 }
 
 
-int ps_fnc(int argc, char **argv, struct Env *env) {
+static int ps_fnc(int argc, char **argv, struct Env *env) {
 	struct task *t=troot;
 	while(t) {
-		fprintf(env->io_fd,"task(%x) %12s, sp=0x%08x, pc=0x%08x, state=%c\n", 
-			t, t->name, t->sp, (t->state!=1)?((unsigned int *)t->sp)[13]:0xffffffff, get_state(t));
+		fprintf(env->io_fd,"task(%x) %12s, sp=0x%08x, pc=0x%08x, state=%c, atics=%d\n", 
+			t, t->name, t->sp, (t->state!=1)?((unsigned int *)t->sp)[13]:0xffffffff, get_state(t), t->active_tics);
 		t=t->next2;
 	}
 	return 0;
 }
 
-int lsdrv_fnc(int argc, char **argv, struct Env *env) {
+static int lsdrv_fnc(int argc, char **argv, struct Env *env) {
 	struct driver *d=drv_root;
 	fprintf(env->io_fd,"=========== Installed drivers =============\n");
 	while(d) {
@@ -1115,7 +1047,7 @@ int lsdrv_fnc(int argc, char **argv, struct Env *env) {
 }
 
 
-int debug_fnc(int argc, char **argv, struct Env *env) {
+static int debug_fnc(int argc, char **argv, struct Env *env) {
 	if (argc>0) {
 		dbglev=10;
 	} else {
@@ -1124,7 +1056,7 @@ int debug_fnc(int argc, char **argv, struct Env *env) {
 	return 0;
 }
 
-int reboot_fnc(int argc, char **argv, struct Env *env) {
+static int reboot_fnc(int argc, char **argv, struct Env *env) {
 	fprintf(env->io_fd, "Rebooting \n\n\n");
 	sleep(100);
 	NVIC_SystemReset();
@@ -1133,7 +1065,7 @@ int reboot_fnc(int argc, char **argv, struct Env *env) {
 	
 typedef int (*cmdFunc)(int,char **, struct Env *);
 
-struct cmd {
+static struct cmd {
 	char *name;
 	cmdFunc fnc;
 } cmd_root[] = {{"help",help_fnc},
