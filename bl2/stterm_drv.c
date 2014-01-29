@@ -21,15 +21,16 @@ static struct st_term {
 #define RX_BSIZE 16
 
 static char tx_buf[TXB_SIZE];
-static int tx_in;
-static int tx_out;
+static volatile int tx_in;
+static volatile int tx_out;
 
 static char rx_buf[RX_BSIZE];
-static int rx_i;
-static int rx_o;
+static volatile int rx_i;
+static volatile int rx_o;
 
-static struct sleep_obj rxblocker = {"stterm_rxb",};
-static struct sleep_obj txblocker = {"stterm_txb",};
+static struct sleep_obj rxblocker  = {"stterm_rxb",};
+static struct sleep_obj txblocker  = {"stterm_txb",};
+static struct sleep_obj txoblocker = {"stterm_txo",};
 
 static void stterm_io_r(void *dum) {
         int rerun=0;
@@ -59,16 +60,20 @@ static void stterm_io_r(void *dum) {
                         }
                         st_term.rx_ready=0;
 			wakeup(&rxblocker,0,0);
+#if 1
                         rerun=1;
                 } else {
                         rerun=0;
+#endif
                 }
 
+#if 1
                 if (rerun) {
                         sleep(20);
                 } else {
                         sleep(50);
                 }
+#endif
         }
 }
 
@@ -76,21 +81,13 @@ static void stterm_io_r(void *dum) {
 
 
 static void stterm_io_t(void *dum) {
-        int len;
-	int wk=0;
         while(1) {
+		int len;
+		while(st_term.tx_len) {
+			sleep(20);
+		}
+		wakeup(&txblocker,0,0);
                 if ((len=tx_in-tx_out)) {
-			wk=1;
-                        while(st_term.tx_len) {
-                                sleep(50);
-                        }
-#if 0
-                        if (len>ST_BSIZE) {
-                                len=ST_BSIZE;
-//                                tx_out=tx_in-ST_BSIZE;
-                        }
-#endif
-
                         len=MIN(len,ST_BSIZE);
                         if (((tx_out%TXB_SIZE)+len)>TXB_MASK) {
                                 int len1=TXB_SIZE-(tx_out%TXB_SIZE);
@@ -102,11 +99,7 @@ static void stterm_io_t(void *dum) {
                         tx_out+=len;
                         st_term.tx_len=len;
                 } else {
-			if (wk) {
-				wk=0;
-				wakeup(&txblocker,0,0);
-			}
-                        sleep(100);
+			if (tx_in==tx_out) sleep_on(&txoblocker,0,0);
                 }
         }
 
@@ -129,7 +122,10 @@ static int stterm_read(char *buf, int len) {
 			int ch;
 			rx_o++;
 			ch=buf[i++]=rx_buf[ix];
-			if (1) stterm_putc(ch);
+			if (1) {
+				stterm_putc(ch);
+				sys_wakeup(&txoblocker,0,0);
+			}
 			if (ch=='\n') return i-1;
 		} else {
 			sys_sleepon(&rxblocker,0,0);
@@ -143,6 +139,7 @@ static int stterm_write(char *buf, int len) {
 	for(i=0;i<len;i++) {
 		stterm_putc(buf[i]);
 	}
+	sys_wakeup(&txoblocker,0,0);
 	return len;
 }
 
