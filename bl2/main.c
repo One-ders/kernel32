@@ -63,8 +63,6 @@ int main(void) {
 	struct blink_data red={LED_RED,750};
 	struct blink_data blue={LED_BLUE,100};
 
-	SysTick_Config(SystemCoreClock/ 100); // 10 mS tic is 100/Sec
-
 	init_sys();
 	init_io();
 

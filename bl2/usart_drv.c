@@ -38,6 +38,7 @@ typedef struct
 #define RX_BSIZE 16
 
 struct usart_data {
+	int chip_dead;
 	char tx_buf[TXB_SIZE];
 	int tx_in;
 	int tx_out;
@@ -63,6 +64,16 @@ static int usart_putc(struct usart_data *ud, int c);
 
 void USART3_IRQHandler(void) {
 	unsigned int st=USART3->SR;
+
+	if (st&USART_SR_LBD) {
+		usart_data0.chip_dead=1;
+		usart_data0.tx_out=usart_data0.tx_in;
+		while (sys_wakeup(&usart_data0.txblocker,0,0)) ;
+		USART3->SR&=~USART_SR_LBD;	
+		return;
+	} else {
+		usart_data0.chip_dead=0;
+	}
 	
 //	io_printf("got usart irq, status %x\n", USART3->SR);
 	if ((st&USART_SR_TXE)&&(usart_data0.tx_in-usart_data0.tx_out)) {
@@ -93,6 +104,7 @@ void USART3_IRQHandler(void) {
 	if (st&USART_SR_ORE) {
 		USART3->DR=USART3->DR;
 	}
+
 }
 
 
@@ -100,11 +112,13 @@ static int (*usart_putc_fnc)(struct usart_data *, int c);
 
 static int usart_putc(struct usart_data *ud, int c) {
 
+	if (ud->chip_dead) return -1;
 	disable_interrupt();
 	if ((ud->tx_in-ud->tx_out)>=TXB_SIZE)  {
 		sys_sleepon(&ud->txblocker,0,0);
 	}
 	enable_interrupt();
+	if (ud->chip_dead) return -1;
 	ud->tx_buf[IX(ud->tx_in)]=c;
 	ud->tx_in++;	
 	if (!ud->txr) {
@@ -117,7 +131,7 @@ static int usart_putc(struct usart_data *ud, int c) {
 static int usart_polled_putc(struct usart_data *ud, int c) {
 
 	if (ud->txr) {
-		while(!(((volatile short int)USART3->SR)&USART_SR_TXE));
+		while((!ud->chip_dead)&&!(((volatile short int)USART3->SR)&USART_SR_TXE));
 	} else {
 		ud->txr=1;
 		USART3->CR1|=(USART_CR1_TE|USART_CR1_TCIE);
@@ -203,7 +217,7 @@ static int usart_control(int driver_fd, int cmd, void *arg1, int arg2) {
 }
 
 static int usart_init(void *instance) {
-
+	struct usart_data *ud=(struct usart_data *)instance;
 	usart_putc_fnc=usart_putc;
 
 	RCC->APB1ENR|=RCC_APB1ENR_USART3EN;
@@ -217,10 +231,10 @@ static int usart_init(void *instance) {
 	GPIOC->OSPEEDR |= (0x3 << 20); /* set pin 10 output high speed */
 	USART3->BRR=0x167;   /* 38400 baud at 8Mhz fpcl */
 	USART3->CR1=USART_CR1_UE;
+	ud->txr=1;
 	USART3->CR1|=(USART_CR1_TXEIE|USART_CR1_TCIE|USART_CR1_TE|USART_CR1_RE|USART_CR1_RXNEIE);
 	NVIC_SetPriority(USART3_IRQn,0xd);
 	NVIC_EnableIRQ(USART3_IRQn);
-
 	return 0;
 }
 
