@@ -163,11 +163,13 @@ void __attribute__ (( naked )) PendSV_Handler(void) {
 			"mov r1,lr\n\t"
 			"mov r2,r0\n\t"
 			"push {r1-r2}\n\t"
+			"cpsid i\n\t"                           // I need to run this with irq off, usart driver chrashes all when unplugged
 			"bl %[PendSV_Handler_c]\n\t"
 			"pop {r1-r2}\n\t"
 			"mov lr,r1\n\t"
 			"cmp	r0,#0\n\t"
 			"bne.n	1f\n\t"
+			"cpsie i\n\t"
 			"bx lr\n\t"
 			"1:\n\t"
 			"stmfd r2!,{r4-r11}\n\t"
@@ -181,6 +183,7 @@ void __attribute__ (( naked )) PendSV_Handler(void) {
 			"ldr r0,[r0,#4]\n\t"
 			"mov sp,r0\n\t"
 			"ldmfd sp!,{r4-r11}\n\t"
+			"cpsie i\n\t"
 			"bx lr\n\t"
 			:
 			: [PendSV_Handler_c] "i" (PendSV_Handler_c)
@@ -201,8 +204,10 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 	}
 	ready=ready->next;
 	t->next=0;
-	if ((TASK_XPSR(t->sp)&0xff)==0xb) {
+	if ((TASK_XPSR(t->sp)&0x1ff)!=0) {
 		*(save_sp-2)=0xfffffff1;
+	} else {
+		*(save_sp-2)=0xfffffff9;
 	}
 	return t;
 }
@@ -211,63 +216,17 @@ void  pendSV(void) {
 	*((uint32_t volatile *)0xE000ED04) = 0x10000000; // trigger PendSV
 }
 
-struct HardFrame {
-	unsigned long int r0;
-	unsigned long int r1;
-	unsigned long int r2;
-	unsigned long int r3;
-	unsigned long int r12;
-	unsigned long int lr;
-	unsigned long int pc;
-	unsigned long int psr;
-};
-
-__attribute__ ((naked)) int do_pendSV(volatile struct HardFrame *hf, void *nlr) {
-	register unsigned long int r0 asm("r0");
-	register unsigned long int lr asm("lr");
-	hf[1].pc=lr;
-	asm volatile ("mov sp,%[hf]\n\t"
-		      "mov lr,%[nlr]\n\t"
-		      "bx lr\n\t"
-			:
-			: [hf] "r" (hf), [nlr] "r" (nlr)
-			: );
-	return r0;
-}
-
-int fake_pendSV(void) {
-	volatile struct HardFrame hf[2];
-	void *nlr=(void *)0xfffffff1;
-
-	hf[1].r0=0xff;
-	hf[1].r1=r1();
-	hf[1].r2=r2();
-	hf[1].r3=r3();
-	hf[1].r12=r3();
-	hf[1].lr=lr();
-	hf[1].psr=xpsr()|0x0100000b;
-
-	hf[0].r0=0;
-	hf[0].r1=0;
-	hf[0].r2=0;
-	hf[0].r3=0;
-	hf[0].r12=0;
-	hf[0].lr=0xfffffff9;
-	hf[0].pc=((unsigned long int)PendSV_Handler)|1;
-	hf[0].psr=(xpsr()&~0xff)|0x0100000e;
-
-	if( (*((volatile unsigned int *)0xe000ed24))&0x400) {
-		ASSERT(0);
-	};
-	(*((volatile unsigned int *)0xe000ed24))|=0x400;
-
-	enable_interrupt();
-
-	do_pendSV(hf,nlr);
-
-	asm volatile ("sub sp,sp,0x40\n\t");
-	(*((volatile unsigned int *)0xe000ed24))=0x80;
-	
+__attribute__ ((naked)) int fake_pendSV(void) {
+	asm volatile (
+			"mrs r0,psr\n\t"
+			"orr r0,r0,0x01000000\n\t"
+			"stmfd sp!,{r0}\n\t"
+			"push {lr}\n\t"
+			"stmfd sp!,{r0-r3,r12,lr}\n\t"
+			"mvns lr,#0x0e\n\t"
+			"cpsie i\n\t"
+			"b	PendSV_Handler\n\t"
+			:::);
 	return 1;
 }
 
@@ -302,46 +261,6 @@ void __attribute__ (( naked )) SysTick_Handler(void) {
 #endif
 
 void Error_Handler_c(void *sp);
-
-void fixup_stack(unsigned long int *sp) {
-
-	if((*(sp-2)&0xF)==9) {
-		// return to thread
-#if 1
-		if ((XPSR(sp)&0xff)!=0) {
-			BP("fixup stack: returning to thread with nz xpsr\n");
-		}
-#endif
-		if ((xpsr()&0xff)==0xf) {
-//			BP("write: returning to thread with bad xpsr, fixup SHSR %x\n",xpsr());
-			(*((unsigned int *)0xe000ed24))&=~0x80;
-			(*((unsigned int *)0xe000ed24))|=0x800;
-		} else if ((xpsr()&0xff)==0xb) {
-			(*((unsigned int *)0xe000ed24))&=~0x800;
-			(*((unsigned int *)0xe000ed24))|=0x80;
-		} else {
-			BP("fixup stack: returning to thread with weird xpsr %x, shcsr %x\n",xpsr(), *((unsigned int *)0xe000ed24));
-			(*((unsigned int *)0xe000ed24))=0x0;
-		}
-	} else if ((*(sp-2)&0xF)==1) {
-		// return to handler
-		if ((XPSR(sp)&0xff)==0) {
-			BP("fixup: returning to handler with zero xpsr\n");
-		}
-		if ((XPSR(sp)&0xff)==0x37) {
-			BP("fixup: returning to handler with usart xpsr\n");
-		}
-		if ((XPSR(sp)&0xff)==(xpsr()&0xff)) {
-			XPSR(sp)&=0xffffff00;
-			if ((xpsr()&0xff)==0xb) {
-				XPSR(sp)|=0xf;
-			} else {
-				XPSR(sp)|=0xb;
-			}
-			(*((unsigned int *)0xe000ed24))|=0x880;
-		}
-	}
-}
 
 void SysTick_Handler_c(void *sp) {
 	struct tq *tqp;
@@ -713,7 +632,7 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 
 void *sys_sleep(unsigned int ms) {
 	struct tq *tout=&tq[((ms/10)+tq_tic)%1024];
-	int in_irq=xpsr()&0xff;
+	int in_irq=xpsr()&0x1ff;
 
 	if (in_irq&&(in_irq!=0xb)) {
 		return 0;
@@ -737,8 +656,7 @@ void *sys_sleep(unsigned int ms) {
 
 /* not to be called from irq, cant sleep */
 void *sys_sleepon(struct sleep_obj *so, void *bp, int bsize) {
-	int in_irq=xpsr()&0xff;
-	
+	int in_irq=xpsr()&0x1ff;
 	if (in_irq&&(in_irq!=0xb)) {
 		return 0;
 	}
@@ -760,6 +678,8 @@ void *sys_sleepon(struct sleep_obj *so, void *bp, int bsize) {
 
 	DEBUGP(DLEV_SCHED,"sys sleepon %s task: name %s, switch in %s\n", so->name, current->name, ready->name);
 	fake_pendSV();
+
+	*((volatile unsigned int *)0xe000ed24)|=0x80;
 	return 0;
 }
 
@@ -782,7 +702,7 @@ void *sys_wakeup(struct sleep_obj *so, void *bp, int bsize) {
 		
 	DEBUGP(DLEV_SCHED,"wakeup(readying) %s task: name %s, switch in %s\n",so->name,current->name,n->name);
 	pendSV();
- 	return 0;
+ 	return n;
 }
 
 /***********************************************************/
@@ -1166,7 +1086,9 @@ void init_sys(void) {
 	NVIC_SetPriority(PendSV_IRQn,0xf);
 	NVIC_SetPriority(SVCall_IRQn,0xe);
 	NVIC_SetPriority(SysTick_IRQn,0xd);  /* preemptive tics... */
-	SCB->CCR|=1;
+
+	SysTick_Config(SystemCoreClock/100); // 10 mS tic is 100/Sec
+//	SCB->CCR|=1;
 	for(i=init_func_begin;i<init_func_end;i++) {
 		((ifunc)*i)();
 	}
