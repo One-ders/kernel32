@@ -7,7 +7,7 @@ LDFLAGS=-g -Tstm32_flash.ld -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-inte
 
 all: blinky
 
-blinky: init_sect.o main.o sys.o io.o startup_stm32f4xx.o system_stm32f4xx.o usart_drv.o stterm_drv.o led_drv.o end_sect.o
+blinky: init_sect.o main.o sys.o io.o startup_stm32f4xx.o system_stm32f4xx.o usart_drv.o stterm_drv.o led_drv.o usb_core_drv.o usb_serial_drv.o end_sect.o
 	$(CC)  $(LDFLAGS) -o $@ $^
 
 sys.o: sys.h io.h
@@ -16,11 +16,15 @@ io.o: io.h sys.h
 
 main.o: sys.h io.h
 
-usart_drv.o: usart_drv.c usart_drv.h
+usart_drv.o: usart_drv.c usart_drv.h sys.h
 
-stterm_drv.o: stterm_drv.c
+stterm_drv.o: stterm_drv.c sys.h
 
-led_drv.o: led_drv.c led_drv.h
+led_drv.o: led_drv.c led_drv.h sys.h
+
+usb_core_drv.o: usb_core_drv.c usb_core_drv.h sys.h
+
+usb_serial_drv.o: usb_serial_drv.c usb_serial_drv.h usb_core_drv.h sys.h
 
 init_sect.o: sys_init.c
 	$(CC) $(CFLAGS) -c -o $@ -DSECTION_BEGIN $^

@@ -143,7 +143,7 @@ static int stterm_write(char *buf, int len) {
 	return len;
 }
 
-static int stterm_open(void *instance, DRV_CBH cb_handler) {
+static int stterm_open(void *instance, DRV_CBH cb_handler, void *dum) {
         return 0;
 }
 

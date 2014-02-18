@@ -44,7 +44,7 @@ void enable_interrupt(void) {
 
 #ifdef DRIVERSUPPORT
 
-typedef int (*DRV_CBH)(void);
+typedef int (*DRV_CBH)(void *user_ref);
 
 int io_open(const char *name);
 int io_read(int fd, char *buf, int size);
@@ -54,7 +54,7 @@ int io_close(int fd);
 
 /*  driver */
 struct driver_ops {
-	int (*open)(void *driver_instance, DRV_CBH drv_cb);
+	int (*open)(void *driver_instance, DRV_CBH drv_cb, void *usr_ref);
 	int (*close)(int driver_fd);
 	int (*control)(int driver_fd, int cmd, void *, int len);
 	int (*init)(void *driver_instance);

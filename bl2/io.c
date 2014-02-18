@@ -13,7 +13,7 @@
 static struct driver *iodrv;
 static int kfd;
 
-int io_cb_handler(void) {
+int io_cb_handler(void *dum) {
 	return 0;
 }
 
@@ -36,10 +36,13 @@ int io_add_str(const char *str) {
 }
 
 int in_print;
+int pulled;
 int io_setpolled(int enabled) {
 	if (!iodrv) return 0;
 	in_print=0;
-	return iodrv->ops->control(kfd, WR_POLLED_MODE, &enabled, sizeof(enabled));
+	if (enabled) pulled++;
+	else pulled--;
+	return iodrv->ops->control(kfd, WR_POLLED_MODE, &pulled, sizeof(pulled));
 }
 
 
@@ -202,7 +205,7 @@ void init_io(void) {
 	if (!iodrv) {
 		return;
 	}
-	kfd=iodrv->ops->open(iodrv->instance, io_cb_handler);
+	kfd=iodrv->ops->open(iodrv->instance, io_cb_handler, 0);
 	io_push();    /* to force out prints, done before open */
 }
 
