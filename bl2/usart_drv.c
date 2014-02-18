@@ -178,7 +178,7 @@ static int usart_write(struct usart_data *ud, char *buf, int len) {
 }
 
 
-static int usart_open(void * driver_instance, DRV_CBH cb_handler) {
+static int usart_open(void * driver_instance, DRV_CBH cb_handler, void *dum) {
 	int i=0;
 	for(i=0;i<(sizeof(udata)/sizeof(udata[0]));i++) {
 		if (udata[i]==0) break;

@@ -579,7 +579,7 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 				svc_args[0]=-1;
 				return 0;
 			}
-			kfd=drv->ops->open(drv->instance,0);
+			kfd=drv->ops->open(drv->instance,0,0);
 			if (kfd<0) {
 				svc_args[0]=-1;
 				return 0;

@@ -60,7 +60,7 @@ static int led_close(int kfd) {
         return 0;
 }
 
-static int led_open(void *instance, DRV_CBH cb_handler) {
+static int led_open(void *instance, DRV_CBH cb_handler, void *dum) {
         return 0;
 }
 
