@@ -47,6 +47,23 @@
 #define  USB_REQ_SET_INTERFACE                          0x0B
 #define  USB_REQ_SYNCH_FRAME                            0x0C
 
+#define USB_OTG_EP_CONTROL			0
+#define USB_OTG_EP_ISOC				1
+#define USB_OTG_EP_BULK				2
+#define USB_OTG_EP_INT				3
+#define USB_OTG_EP_MASK				3
+
+#define USB_OTG_SPEED_HIGH			0
+#define USB_OTG_SPEED_FULL			1
+
+
+#define  SWAPBYTE(addr)        (((unsigned short int)(*((unsigned char *)(addr)))) + \
+                               (((unsigned short int)(*(((unsigned char *)(addr)) + 1))) << 8))
+#define LOBYTE(x)  ((unsigned char)(x & 0x00FF))
+#define HIBYTE(x)  ((unsigned char)((x & 0xFF00) >>8))
+
+
+
 
 struct usb_setup_req {
 	unsigned char   bmRequest;
@@ -96,3 +113,12 @@ struct usb_dev {
 	struct usbd_class_cb	*class_cb;
 	struct usbd_usr_cb	*usr_cb;
 };
+
+void usbd_get_string(char *desc, unsigned char *unicode, unsigned short *len);
+int dcd_ep_open(void *core, unsigned char ep_addr,
+                        unsigned short int ep_mps, unsigned char ep_type);
+int dcd_ep_prepare_rx(void *core, unsigned char ep_addr,
+                                unsigned char *pbuf, unsigned short int len);
+unsigned short int get_rx_cnt(void *core, int epnum);
+int usbd_ctl_error(void *vcore, struct usb_setup_req *req);
+int dcd_ep_tx(void *core, unsigned char ep_addr, unsigned char *pbuf, unsigned int len);
