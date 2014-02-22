@@ -1102,6 +1102,7 @@ void init_sys(void) {
 void start_sys(void) {
 	thread_create(sys_mon,"usart0",256,"sys_mon");
 	thread_create(sys_mon,"stterm0",256,"sys_mon");
+	thread_create(sys_mon,"usb_serial0",256,"sys_mon");
 }
 
 #else

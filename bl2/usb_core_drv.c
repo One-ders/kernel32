@@ -70,9 +70,6 @@
 #define USB_OTG_SPEED_PARAM_HIGH_IN_FULL 1
 #define USB_OTG_SPEED_PARAM_FULL 3
 
-#define USB_OTG_SPEED_HIGH	0
-#define USB_OTG_SPEED_FULL	1
-
 #define USB_OTG_ULPI_PHY	1
 #define USB_OTG_EMBEDDED_PHY	2
 #define USB_OTG_I2C_PHY		3
@@ -92,13 +89,6 @@
 #define USB_FEATURE_EP_HALT                                0
 #define USB_FEATURE_REMOTE_WAKEUP                          1
 #define USB_FEATURE_TEST_MODE                              2
-
-
-
-#define  SWAPBYTE(addr)        (((unsigned short int)(*((unsigned char *)(addr)))) + \
-                               (((unsigned short int)(*(((unsigned char *)(addr)) + 1))) << 8))
-#define LOBYTE(x)  ((unsigned char)(x & 0x00FF))
-#define HIBYTE(x)  ((unsigned char)((x & 0xFF00) >>8))
 
 
 
@@ -491,13 +481,6 @@ struct usb_otg_ep {
 #define USB_OTG_CONFIGURED                       3
 #define USB_OTG_SUSPENDED                        4
 
-#define USB_OTG_EP_CONTROL                       0
-#define USB_OTG_EP_ISOC                          1
-#define USB_OTG_EP_BULK                          2
-#define USB_OTG_EP_INT                           3
-#define USB_OTG_EP_MASK                          3
-
-
 
 struct usb_dcd_dev {
 
@@ -560,11 +543,37 @@ static void usb_mdelay(unsigned int msec) {
 	usb_udelay(msec*1000);
 }
 
+
+static unsigned char usbd_get_len(char *buf) {
+	unsigned char len=0;
+	while(*buf) {
+		len++;
+		buf++;
+	}
+	return len;
+}
+
+
+void usbd_get_string(char *desc, unsigned char *unicode, unsigned short *len) {
+	unsigned char idx=0;
+	if(desc) {
+		*len=usbd_get_len(desc)*2+2;
+		unicode[idx++]=*len;
+		unicode[idx++]=USB_DESC_TYPE_STRING;
+
+		while(*desc) {
+			unicode[idx++]=*desc++;
+			unicode[idx++]=0x00;
+		}
+	}
+}
+
 /**********************************************************************
  *  dcd functions
  **********************************************************************/
 static int dcd_ep_stall(struct usb_core_data *core, unsigned char epnum) {
 	struct usb_otg_ep *ep;
+	io_printf("dcd_ep_stall epnum%x\n",epnum);
 	if (epnum&0x80) {
 		ep=&core->dev.in_ep[epnum&0x7f];
 	} else {
@@ -595,7 +604,8 @@ static int dcd_ep_clr_stall(struct usb_core_data *core, unsigned char epnum) {
 	return 9;
 }
 
-static int dcd_ep_tx(struct usb_core_data *core, unsigned char ep_addr, unsigned char *pbuf, unsigned int len) {
+int dcd_ep_tx(void *vcore, unsigned char ep_addr, unsigned char *pbuf, unsigned int len) {
+	struct usb_core_data *core=(struct usb_core_data *)vcore;
 	struct usb_otg_ep *ep;
 
 	ep=&core->dev.in_ep[ep_addr&0x7f];
@@ -615,8 +625,9 @@ static int dcd_ep_tx(struct usb_core_data *core, unsigned char ep_addr, unsigned
 	return 0;
 }
 
-static int dcd_ep_open(struct usb_core_data *core, unsigned char ep_addr, 
+int dcd_ep_open(void *vcore, unsigned char ep_addr,
 			unsigned short int ep_mps, unsigned char ep_type) {
+	struct usb_core_data *core=(struct usb_core_data *)vcore;
 	struct usb_otg_ep *ep;
 
 	if (ep_addr&0x80) {
@@ -641,8 +652,14 @@ static int dcd_ep_open(struct usb_core_data *core, unsigned char ep_addr,
 	return 0;
 }
 
-static int dcd_ep_prepare_rx(struct usb_core_data *core, unsigned char ep_addr, 
+unsigned short int get_rx_cnt(void *vcore, int epnum) {
+	struct usb_core_data *core=(struct usb_core_data *)vcore;
+	return core->dev.out_ep[epnum].xfer_count;
+}
+
+int dcd_ep_prepare_rx(void *vcore, unsigned char ep_addr,
 				unsigned char *pbuf, unsigned short int len) {
+	struct usb_core_data *core=(struct usb_core_data *)vcore;
 	struct usb_otg_ep *ep;
 	ep=&core->dev.out_ep[ep_addr&0x7f];
 
@@ -717,7 +734,8 @@ static int usbd_ctl_receive_status(struct usb_core_data *core) {
 	return 0;
 }
 
-static int usbd_ctl_error(struct usb_core_data *core, struct usb_setup_req *req) {
+int usbd_ctl_error(void *vcore, struct usb_setup_req *req) {
+	struct usb_core_data *core=(struct usb_core_data *)vcore;
 
 	if (req->bmRequest&0x80) {
 		dcd_ep_stall(core,0x80);
@@ -1320,8 +1338,6 @@ static int dcd_int_data_in_stage(struct usb_core_data *core, unsigned int epnum)
 					usbd_ctl_receive_status(core);
 				}
 			}
-		} else {
-			io_printf("got unexpected data in on ep0\n");
 		}
 	} else if(core->dev.class_cb->data_in&&
 			(core->dev.dev_status==USB_OTG_CONFIGURED)) {
@@ -1675,8 +1691,10 @@ static unsigned int usb_read_in_ep_irq(struct usb_core_data *core, unsigned char
 	unsigned int v,msk,empty;
 	msk=READ_REG32(&core->regs.dregs->d_in_ep_msk);
 	empty=READ_REG32(&core->regs.dregs->d_in_ep_empty_msk);
+	v=READ_REG32(&core->regs.in_epregs[epnum]->d_in_ep_irq);
+	io_printf("usb_read_in_ep_irq: msk %x, empty %x, irq %x\n", msk, empty, v);
 	msk |= ((empty>>epnum)&0x1)<<7;
-	v=READ_REG32(&core->regs.in_epregs[epnum]->d_in_ep_irq)&msk;
+	v=v&msk;
 	return v;
 }
 
@@ -1700,6 +1718,8 @@ static int dcd_write_empty_tx_fifo(struct usb_core_data *core, unsigned int epnu
 
 	len32b=(len+3)/4;
 	txstatus=READ_REG32(&core->regs.in_epregs[epnum]->d_txfsts);
+
+	io_printf("txstatus=%x, epnum=%x\n",txstatus,epnum);
 
 	while((txstatus&DTXFSTS_TXFSPCAVAIL_MASK)>len32b &&
 		ep->xfer_count < ep->xfer_len &&
@@ -1863,7 +1883,7 @@ void OTG_FS_IRQHandler(void) {
 			handle_otg(core);
 		}
 		if (v&INTMSK_SOFINTR) {
-			io_printf("USB SOF irq\n");
+//			io_printf("USB SOF irq\n");
 			handle_sof_irq(core);
 		}
 	}
@@ -1986,6 +2006,7 @@ static int usb_otg_ep_start_xfer(struct usb_core_data *core, struct usb_otg_ep *
 				deptsiz|=(1<<DEPXFERSIZE_MC_SHIFT);
 			}
 		}
+		io_printf("sending %x bytes and packets\n", deptsiz);
 		WRITE_REG32(&core->regs.in_epregs[ep->num]->d_ieptsiz,deptsiz);
 
 		if (core->cfg.dma_enable) {
