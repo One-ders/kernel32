@@ -516,7 +516,7 @@ static unsigned char class_data_in(void *core, unsigned char epnum) {
 	struct usb_data *ud=&usb_data0;
 	if (ud->tx_in) {
 		int len=MIN(ud->tx_in,64);
-		DCD_EP_Tx(core,0x82,ud->tx_buf,len);
+		DCD_EP_Tx(core,0x82,((unsigned char *)ud->tx_buf),len);
 		ud->tx_in=ud->tx_out=0;
 	} else {
 	   ud->txr=0;
@@ -726,7 +726,7 @@ static int usb_serial_putc(struct usb_data *ud, int c) {
 		int len=ud->tx_in;
 		ud->tx_in=0;
 		ud->txr=1;
-		DCD_EP_Tx(ud->core,0x82,ud->tx_buf,len);
+		DCD_EP_Tx(ud->core,0x82,((unsigned char *)ud->tx_buf),len);
 	}
 	return 1;
 }
