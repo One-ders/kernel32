@@ -2,8 +2,16 @@
 #include "sys.h"
 #include "io.h"
 
-#include "usb_core_drv.h"
-#include "usb_serial_drv.h"
+#include "usbd_core.h"
+#include "usbd_usr.h"
+#include "usbd_req.h"
+#include "usbd_ioreq.h"
+#include "usbd_desc.h"
+#include "usbd_conf.h"
+#include "usb_regs.h"
+
+
+USB_OTG_CORE_HANDLE USB_OTG_dev;
 
 /* Exported define -----------------------------------------------------------*/
 #define USB_DEVICE_DESCRIPTOR_TYPE              0x01
@@ -25,7 +33,7 @@
 #define USB_ENDPOINT_TYPE_INTERRUPT             0x03
 
 #define USB_CONFIG_BUS_POWERED                 0x80
-#define USB_CONFIG_SELF_POWERED                0xC0
+//#define USB_CONFIG_SELF_POWERED                0xC0
 #define USB_CONFIG_POWER_MA(mA)                ((mA)/2)
 
 #define CDC_V1_10 0x0110
@@ -63,23 +71,28 @@
 
 #define USB_SIZ_STRING_LANGID		4
 #define USBD_LANGID_STRING            0x409
-#define USBD_MANUFACTURER_STRING      "FranzBalanz Electronics"
+#define USBD_MANUFACTURER_STRING      ((unsigned char *)"FranzBalanz Electronics")
 
-#define USBD_PRODUCT_FS_STRING		"Köszög board v 1.0"
-#define USBD_PRODUCT_HS_STRING		"HS Njet"
+#define USBD_PRODUCT_FS_STRING		((unsigned char *)"Köszög board v 1.0")
+#define USBD_PRODUCT_HS_STRING		((unsigned char *)"HS Njet")
 
-#define USBD_SERIALNUMBER_FS_STRING	"00000000011C"
-#define USBD_SERIALNUMBER_HS_STRING	"00000000011B"
+#define USBD_SERIALNUMBER_FS_STRING	((unsigned char *)"00000000011C")
+#define USBD_SERIALNUMBER_HS_STRING	((unsigned char *)"00000000011B")
 
 #define USB_MAX_STR_DESC_SIZ       64
 
 
-static unsigned char USBD_StrDesc[USB_MAX_STR_DESC_SIZ];
-
-static struct driver *usb_core;
 static int core_fd;
 
-static unsigned char rx_buf[8][3];
+static unsigned char rx_buf[8][8];
+
+extern unsigned int USBD_OTG_ISR_Handler(USB_OTG_CORE_HANDLE *pdev);
+
+void OTG_FS_IRQHandler(void) {
+	io_setpolled(1);
+	USBD_OTG_ISR_Handler(&USB_OTG_dev);
+	io_setpolled(0);
+}
 
 
 static const unsigned char device_descriptor[] = {
@@ -330,7 +343,7 @@ static const unsigned char Virtual_Com_Port_ConfigDescriptor[] =  {
 };
 
 
-#define TX_BSIZE 256
+#define TX_BSIZE 64
 #define TX_BMASK (TX_BSIZE-1)
 #define IX(a) (a&TX_BMASK)
 
@@ -339,13 +352,15 @@ static const unsigned char Virtual_Com_Port_ConfigDescriptor[] =  {
 
 struct usb_data {
 	char tx_buf[TX_BSIZE];
-	int tx_in;
-	int tx_out;
+	volatile int tx_in;
+	volatile int tx_out;
+	int txr;
 	char rx_buf[RX_BSIZE];
-	int rx_in;
-	int rx_out;
+	volatile int rx_in;
+	volatile int rx_out;
 	struct sleep_obj rxblocker;
 	struct sleep_obj txblocker;
+	USB_OTG_CORE_HANDLE *core;
 };
 
 static struct usb_data usb_data0 = {
@@ -359,17 +374,11 @@ static struct usb_data *udata[8];
 
 static unsigned char *get_device_descriptor(unsigned char speed, unsigned short *len) {
 	io_printf("usb serial: get_device_descriptor, returning descriptor at %x, in len %d\n", device_descriptor,*len);
-#if 0
-	if ((*len)>sizeof(device_descriptor)) {
-#endif
-	   *len=sizeof(device_descriptor);
-#if 0
-	}
-#endif
+	*len=sizeof(device_descriptor);
 	return (unsigned char *)device_descriptor;
 }
 
-static unsigned char USBD_LangIDDesc[USB_SIZ_STRING_LANGID] = {
+unsigned char USBD_LangIDDesc[USB_SIZ_STRING_LANGID] = {
 	USB_SIZ_STRING_LANGID,
 	USB_DESC_TYPE_STRING,
 	LOBYTE(USBD_LANGID_STRING),
@@ -384,16 +393,16 @@ static unsigned char *get_langIdStr_descriptor(unsigned char speed, unsigned sho
 
 static unsigned char *get_manufacturerStr_descriptor(unsigned char speed, unsigned short *len) {
 	io_printf("usb_serial: get manufacturer str descriptor\n");
-	usbd_get_string(USBD_MANUFACTURER_STRING, USBD_StrDesc,len);
+	USBD_GetString(USBD_MANUFACTURER_STRING, USBD_StrDesc,len);
 	return USBD_StrDesc;
 }
 
 static unsigned char *get_productStr_descriptor(unsigned char speed, unsigned short *len) {
 	io_printf("usb_serial: get product str descriptor\n");
 	if(!speed) {
-		usbd_get_string(USBD_PRODUCT_HS_STRING,USBD_StrDesc,len);
+		USBD_GetString(USBD_PRODUCT_HS_STRING,USBD_StrDesc,len);
 	} else {
-		usbd_get_string(USBD_PRODUCT_FS_STRING,USBD_StrDesc,len);
+		USBD_GetString(USBD_PRODUCT_FS_STRING,USBD_StrDesc,len);
 	}
 	return USBD_StrDesc;
 }
@@ -401,9 +410,9 @@ static unsigned char *get_productStr_descriptor(unsigned char speed, unsigned sh
 static unsigned char *get_serialStr_descriptor(unsigned char speed, unsigned short *len) {
 	io_printf("usb_serial: get serial str descriptor\n");
 	if (!speed) {
-		usbd_get_string(USBD_SERIALNUMBER_HS_STRING,USBD_StrDesc,len);
+		USBD_GetString(USBD_SERIALNUMBER_HS_STRING,USBD_StrDesc,len);
 	} else {
-		usbd_get_string(USBD_SERIALNUMBER_FS_STRING,USBD_StrDesc,len);
+		USBD_GetString(USBD_SERIALNUMBER_FS_STRING,USBD_StrDesc,len);
 	}
 	return USBD_StrDesc;
 }
@@ -420,37 +429,38 @@ static unsigned char *get_interfaceStr_descriptor(unsigned char speed, unsigned 
 	return 0;
 }
 
-static struct usbd_device usbd_device = { get_device_descriptor,
-					get_langIdStr_descriptor,
-					get_manufacturerStr_descriptor,
-					get_productStr_descriptor,
-					get_serialStr_descriptor,
-					get_configStr_descriptor,
-					get_interfaceStr_descriptor};
+USBD_DEVICE usbd_device = { get_device_descriptor,
+				get_langIdStr_descriptor,
+				get_manufacturerStr_descriptor,
+				get_productStr_descriptor,
+				get_serialStr_descriptor,
+				get_configStr_descriptor,
+				get_interfaceStr_descriptor};
 
 
 static unsigned char class_init(void *core, unsigned char cfgidx) {
 	io_printf("usb_serial: class init cfgidx=%d\n", cfgidx);
 
 
-	dcd_ep_open(core,
+	DCD_EP_Open(core,
 			USB_ENDPOINT_IN(1),
 			64,
 			USB_OTG_EP_INT);
 
-	dcd_ep_open(core,
+	DCD_EP_Open(core,
 			USB_ENDPOINT_IN(2),
 			CDC_DATA_IN_PACKET_SIZE,
 			USB_OTG_EP_BULK);
 
-	dcd_ep_open(core,
+	DCD_EP_Open(core,
 			USB_ENDPOINT_OUT(2),
 			CDC_DATA_OUT_PACKET_SIZE,
 			USB_OTG_EP_BULK);
 
-	dcd_ep_prepare_rx(core,
+	DCD_EP_Flush(core,0x82);
+	DCD_EP_PrepareRx(core,
 				USB_ENDPOINT_OUT(2),
-				rx_buf[0],
+				rx_buf[2],
 				8);
 
 	return 0;
@@ -485,8 +495,11 @@ static unsigned char class_setup(void *core, struct usb_setup_req *req) {
 			usbd_ctl_error(core,req);
 			return -1;
 #endif
-	usbd_ctl_error(core,req);
-	return -1;
+#if 0
+	USBD_CtlSendStatus(core);
+	USBD_CtlError(core,req);
+#endif
+	return 0;
 }
 
 static unsigned char class_EP0_tx_sent(void *core) {
@@ -500,27 +513,36 @@ static unsigned char class_EP0_rx_ready(void *core) {
 }
 
 static unsigned char class_data_in(void *core, unsigned char epnum) {
-	io_printf("usb_serial: data in, epnum %d\n", epnum);
+	struct usb_data *ud=&usb_data0;
+	if (ud->tx_in) {
+		int len=MIN(ud->tx_in,64);
+		DCD_EP_Tx(core,0x82,ud->tx_buf,len);
+		ud->tx_in=ud->tx_out=0;
+	} else {
+	   ud->txr=0;
+	}
+	sys_wakeup(&usb_data0.txblocker,0,0);
 	return 0;
 }
 
-static int p;
+static int usb_serial_putc(struct usb_data *ud, int c);
+
 static unsigned char class_data_out(void *core, unsigned char epnum) {
+	struct usb_data *ud=&usb_data0;
 	unsigned int rx_cnt;
 	int i;
-	rx_cnt=get_rx_cnt(core,epnum);
+//	rx_cnt=get_rx_cnt(core,epnum);
+	rx_cnt=((USB_OTG_CORE_HANDLE*)core)->dev.out_ep[epnum].xfer_count;
 	rx_buf[epnum][rx_cnt]=0;
 	for(i=0;i<rx_cnt;i++) {
 		usb_data0.rx_buf[usb_data0.rx_in%RX_BSIZE]=rx_buf[epnum][i];
-		if (!p) {
-			p=1;
-			dcd_ep_tx(core,0x82,"hej\n",4);
-		}
+		usb_data0.rx_in++;
+		usb_serial_putc(ud,rx_buf[epnum][i]);
 	}
 	sys_wakeup(&usb_data0.rxblocker,0,0);
 
 
-	dcd_ep_prepare_rx(core,epnum,
+	DCD_EP_PrepareRx(core,epnum,
 				rx_buf[epnum],8);
 
 	return 0;
@@ -544,10 +566,10 @@ static unsigned char class_iso_out_incomplete(void *core) {
 static unsigned char *class_get_config_descriptor(unsigned char speed, unsigned short *len) {
 	io_printf("usb_serial: get_config_descriptor\n");
 	*len=sizeof(Virtual_Com_Port_ConfigDescriptor);
-	return Virtual_Com_Port_ConfigDescriptor;
+	return ((unsigned char *)Virtual_Com_Port_ConfigDescriptor);
 }
 
-static struct usbd_class_cb usbd_class_cb = {
+USBD_Class_cb_TypeDef usbd_class_cb = {
 			class_init,
 			class_deinit,
 			class_setup,
@@ -570,8 +592,11 @@ static void usr_dev_reset(unsigned char speed) {
 	io_printf("usb_serial: usr_dev_reset\n");
 }
 
+unsigned int tx_started;
 static void usr_dev_configured(void) {
 	io_printf("usb_serial: usb_dev_configured\n");
+	tx_started=1;
+	class_data_in(usb_data0.core, 0x82);
 }
 
 static void usr_dev_suspended(void) {
@@ -591,7 +616,7 @@ static void usr_dev_disconnected(void) {
 }
 
 
-struct usbd_usr_cb usbd_usr_cb = {
+USBD_Usr_cb_TypeDef usbd_usr_cb = {
 		usr_init,
 		usr_dev_reset,
 		usr_dev_configured,
@@ -601,11 +626,73 @@ struct usbd_usr_cb usbd_usr_cb = {
 		usr_dev_disconnected
 };
 
+#if 0
 static struct usb_dev usb_dev = {
 		&usbd_device,
 		&usbd_class_cb,
 		&usbd_usr_cb
 };
+#endif
+
+void USB_OTG_BSP_uDelay(unsigned int usec) {
+	unsigned int count=0;
+	unsigned int utime=(120*usec/7);
+	do {
+		if (++count>utime) {
+			return;
+		}
+	} while(1);
+}
+
+void USB_OTG_BSP_mDelay(unsigned int msec) {
+	USB_OTG_BSP_uDelay(msec*1000);
+}
+
+void USB_OTG_BSP_EnableInterrupt(USB_OTG_CORE_HANDLE *pdev) {
+	NVIC_SetPriority(OTG_FS_IRQn,0xc);
+	NVIC_EnableIRQ(OTG_FS_IRQn);
+}
+
+void USB_OTG_BSP_Init(USB_OTG_CORE_HANDLE *pdev) {
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+
+	GPIOA->MODER |= (0x2<<16);      /* Pin 8 to AF */
+	GPIOA->OSPEEDR |= (0x3 << 16);  /* Pin 8 to High speed */
+	GPIOA->OTYPER &= ~(1<<8);       /* Pin 8 to PP */
+	GPIOA->PUPDR  &= ~(0x3<<16);    /* Pin 8 to NoPull */
+
+	GPIOA->MODER |= (0x2<<18);      /* Pin 9 to AF */
+	GPIOA->OSPEEDR |= (0x3 << 18);  /* Pin 9 to High speed */
+	GPIOA->OTYPER &= ~(1<<9);       /* Pin 9 to PP */
+	GPIOA->PUPDR  &= ~(0x3<<18);    /* Pin 9 to NoPull */
+
+	GPIOA->MODER |= (0x2<<22);      /* Pin 11 to AF */
+	GPIOA->OSPEEDR |= (0x3 << 22);  /* Pin 11 to High speed */
+	GPIOA->OTYPER &= ~(1<<11);      /* Pin 11 to PP */
+	GPIOA->PUPDR  &= ~(0x3<<22);    /* Pin 11 to NoPull */
+
+	GPIOA->MODER |= (0x2<<24);      /* Pin 12 to AF */
+	GPIOA->OSPEEDR |= (0x3 << 24);  /* Pin 12 to High speed */
+	GPIOA->OTYPER &= ~(1<<12);      /* Pin 12 to PP */
+	GPIOA->PUPDR  &= ~(0x3<<24);    /* Pin 12 to NoPull */
+
+	GPIOA->AFR[1] |= 0x0000000a;    /* Pin 8 to AF_OTG_FS */
+	GPIOA->AFR[1] |= 0x000000a0;    /* Pin 9 to AF_OTG_FS */
+	GPIOA->AFR[1] |= 0x0000a000;    /* Pin 11 to AF_OTG_FS */
+	GPIOA->AFR[1] |= 0x000a0000;    /* Pin 12 to AF_OTG_FS */
+
+	GPIOA->MODER &= ~(0x3<<20);     /* Pin 10 to input */
+	GPIOA->PUPDR  |= (0x1<<20);     /* Pin 10 to PullUp */
+	GPIOA->AFR[1] |= 0x00000a00;    /* Pin 10 to AF_OTG_FS */
+
+
+	RCC->APB2ENR|=RCC_APB2ENR_SYSCFGEN;
+	RCC->AHB2ENR|=RCC_AHB2ENR_OTGFSEN;
+
+	/* enable the PWR clock */
+	RCC->APB1RSTR|=RCC_APB1RSTR_PWRRST;
+}
+
 
 static int usb_serial_read(struct usb_data *ud, char *buf, int len) {
 	int i=0;
@@ -619,13 +706,42 @@ static int usb_serial_read(struct usb_data *ud, char *buf, int len) {
 		enable_interrupt();
 		ud->rx_out++;
 		ch=buf[i++]=ud->rx_buf[ix];
-//		usb_serial_putc(ud,ch);
 		if(ch==0x0d) {
 			return i-1;
 		}
 	}
 	return i;
 }
+
+static int usb_serial_putc(struct usb_data *ud, int c) {
+	disable_interrupt();
+	if ((ud->tx_in-ud->tx_out)>=TX_BSIZE) {
+		sys_sleepon(&ud->txblocker,0,0);
+	}
+	ud->tx_buf[IX(ud->tx_in)]=c;
+	ud->tx_in++;
+	enable_interrupt();
+	if (!tx_started) return 1;
+	if(!ud->txr) {
+		int len=ud->tx_in;
+		ud->tx_in=0;
+		ud->txr=1;
+		DCD_EP_Tx(ud->core,0x82,ud->tx_buf,len);
+	}
+	return 1;
+}
+
+static int usb_serial_write(struct usb_data *ud, char *buf, int len) {
+	int i;
+	for(i=0;i<len;i++) {
+		usb_serial_putc(ud,buf[i]);
+		if (buf[i]=='\n') {
+			usb_serial_putc(ud,'\r');
+		}
+	}
+	return len;
+}
+
 
 static int usb_serial_open(void *instance, DRV_CBH cb, void *dum) {
 	int i=0;
@@ -646,8 +762,8 @@ static int usb_serial_control(int kfd, int cmd, void *arg, int arg_len) {
 	switch(cmd) {
 		case RD_CHAR:
 			return usb_serial_read(ud,arg,arg_len);
-//		case WR_CHAR:
-//			return usb_serial_write(ud,arg,arg_len);
+		case WR_CHAR:
+			return usb_serial_write(ud,arg,arg_len);
 		default:
 			return -1;
 	}
@@ -659,6 +775,8 @@ static int usb_serial_init(void *instance) {
 }
 
 static int usb_serial_start(void *instance) {
+	struct usb_data *ud=(struct usb_data *)instance;
+#if 0
 	usb_core=driver_lookup("usb_core");
 	if (!usb_core) {
 		io_printf("usb_serial: failed to lookup usb_core\n");
@@ -669,6 +787,13 @@ static int usb_serial_start(void *instance) {
 		io_printf("usb_serial: failed to open usb_cure\n");
 		return -1;
 	}
+#endif
+	ud->core=&USB_OTG_dev;
+	USBD_Init(&USB_OTG_dev,
+			USB_OTG_FS_CORE_ID,
+			&usbd_device,
+			&usbd_class_cb,
+			&usbd_usr_cb);
 	return 0;
 }
 

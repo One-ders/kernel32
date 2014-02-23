@@ -4,8 +4,6 @@
 #include "sys.h"
 #include "io.h"
 
-#include "usart_drv.h"
-
 #define ASSERT(a) {while(!(a)) ; }
 
 

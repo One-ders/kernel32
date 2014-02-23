@@ -1,10 +1,9 @@
 
-#include "stm32f4xx_conf.h"
+//#include "stm32f4xx_conf.h"
+#include "stm32f4xx.h"
 #include "io.h"
 #include "sys.h"
-#include "stm32f407.h"
-
-#include "usart_drv.h"
+//#include "stm32f407.h"
 
 #include <string.h>
 
@@ -12,12 +11,20 @@
 
 int sys_lev;
 
+#define TASK_STATE_IDLE		0
+#define TASK_STATE_RUNNING	1
+#define TASK_STATE_READY	2
+#define TASK_STATE_TIMER	3
+#define TASK_STATE_IO		4
+#define TASK_STATE_DEAD		6
+#define TASK_STATE_BLOCKED	0x80
+
 struct task {
 	char 		*name;            /* 0-3 */
 	void		*sp;               /* 4-7 */
 	
-	struct task 	*next;            /* 8-11 */
-	struct task	*next2;		  /* 12-15 */
+	struct task 	*next;            /* 8-11 */   /* link of task of same state */
+	struct task	*next2;		  /* 12-15 */  /* all tasks chain */
 	int 		state;		  /* 16-19 */
 	void		*bp;		  /* 20-23 */ /* communication buffer for sleeping context */
 	int		bsize;            /* 24-27 */ /* size of the buffer */
@@ -29,6 +36,7 @@ struct task {
 struct task * volatile ready;
 struct task * volatile ready_last;
 
+struct task * volatile blocked;
 
 struct task main_task = { "init_main", (void *)0x20020000, 0, 0, 1, 0,0,512 };
 struct task * volatile current = &main_task;
@@ -54,6 +62,17 @@ void *getSlab_512(void) {
 	return &slab_256[t];
 };
 
+
+struct task *lookup_task_for_name(char *task_name) {
+	struct task *t=troot;
+	while(t) {
+		if (__builtin_strncmp(t->name,task_name,strlen(t->name+1))==0) {
+			return t;
+		}
+		t=t->next2;
+	}
+	return 0;
+}
 
 struct user_fd {
 	struct driver *driver;
@@ -93,42 +112,6 @@ volatile unsigned int tq_tic;
 
 
 
-
-
-static inline unsigned int  r0() {
-	register unsigned int r0 asm("r0");
-	return r0;
-}
-static inline unsigned int  r1() {
-	register unsigned int r0 asm("r0");
-	__asm__ __volatile__("mov r0,r1"::: "r0");
-	return r0;
-}
-static inline unsigned int  r2() {
-	register unsigned int r0 asm("r0");
-	__asm__ __volatile__("mov r0,r2"::: "r0");
-	return r0;
-}
-static inline unsigned int  r3() {
-	register unsigned int r0 asm("r0");
-	__asm__ __volatile__("mov r0,r3"::: "r0");
-	return r0;
-}
-static inline unsigned int  r12() {
-	register unsigned int r0 asm("r0");
-	__asm__ __volatile__("mov r0,r12"::: "r0");
-	return r0;
-}
-static inline unsigned int  lr() {
-	register unsigned int r0 asm("r0");
-	__asm__ __volatile__("mov r0,lr"::: "r0");
-	return r0;
-}
-static inline unsigned int  pc() {
-	register unsigned int r0 asm("r0");
-	__asm__ __volatile__("mov r0,pc"::: "r0");
-	return r0;
-}
 
 
 static inline unsigned int  xpsr() {
@@ -197,8 +180,8 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 		ASSERT(0);
 	}
 
-	if (current->state==1) {
-		current->state=2;
+	if (current->state==TASK_STATE_RUNNING) {
+		current->state=TASK_STATE_READY;
 		ready_last->next=current;
 		ready_last=current;
 	}
@@ -213,7 +196,7 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 }
 
 void  pendSV(void) {
-	*((uint32_t volatile *)0xE000ED04) = 0x10000000; // trigger PendSV
+	*((unsigned int volatile *)0xE000ED04) = 0x10000000; // trigger PendSV
 }
 
 __attribute__ ((naked)) int fake_pendSV(void) {
@@ -271,13 +254,25 @@ void SysTick_Handler_c(void *sp) {
 
 	if (tqp->tq_out_first) {
 		struct task *t=tqp->tq_out_first;
-		t->state=2;
-		if (!ready) {
-			ready=t;
-		} else {
-			ready_last->next=t;
+		while(t) {
+			struct task *tnext=t->next;
+			if (t->state&TASK_STATE_BLOCKED) {
+				t->state=TASK_STATE_READY|TASK_STATE_BLOCKED;
+				t->next=blocked;
+				blocked=t;
+				DEBUGP(DLEV_SCHED,"timer_wakeup: blocking %s\n", t->name);
+			} else {
+				t->state=TASK_STATE_READY;
+				if (!ready) {
+					ready=t;
+				} else {
+					ready_last->next=t;
+				}
+				DEBUGP(DLEV_SCHED,"timer_wakeup: readying %s\n", t->name);
+				ready_last=t;
+			}
+			t=tnext;
 		}
-		ready_last=tqp->tq_out_last;
 //		while(t->next) t=t->next;
 		tqp->tq_out_first=tqp->tq_out_last=0;
 	}
@@ -426,6 +421,8 @@ void __attribute__ (( naked )) SVC_Handler(void) {
 #define SVC_IO_CONTROL	8
 #define SVC_IO_CLOSE	9
 #define SVC_KILL_SELF  10
+#define SVC_BLOCK_TASK	11
+#define SVC_UNBLOCK_TASK 12
 
 int svc_kill_self(void);
 
@@ -471,7 +468,7 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			*(--stackp)=0;     // r11
 
 			t->sp=(void *) stackp;
-			t->state=2;
+			t->state=TASK_STATE_READY;
 			t->name=name;
 			t->next2=troot;
 			troot=t;
@@ -490,9 +487,9 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			break;
 		}
 		case SVC_KILL_SELF: {
-			if (current->state!=1) return 0;
+			if (current->state!=TASK_STATE_RUNNING) return 0;
 
-			current->state=6;
+			current->state=TASK_STATE_DEAD;
 
 			while(!ready);
 
@@ -502,8 +499,8 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 		}
 		case SVC_SLEEP: {
 			struct tq *tout=&tq[(svc_args[0]+tq_tic)%1024];
-			if (current->state!=1) return 0;
-			current->state=3;
+			if (current->state!=TASK_STATE_RUNNING) return 0;
+			current->state=TASK_STATE_TIMER;
 			if (!tout->tq_out_first) {
 				tout->tq_out_first=current;
 				tout->tq_out_last=current;
@@ -523,11 +520,11 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			void *bp=(void *)svc_args[1];
 			int   bsize=svc_args[2];
 
-			if (current->state!=1) return 0;
+			if (current->state!=TASK_STATE_RUNNING) return 0;
 			current->bp=bp;
 			current->bsize=bsize;
 
-			current->state=4;
+			current->state=TASK_STATE_IO;
 			if (so->task_list) {
 				so->task_list_last->next=current;
 			} else {
@@ -548,26 +545,37 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			int   bsize=svc_args[2];
 			struct task *n;
 
-			if (current->state!=1) return 0;
+			if (current->state!=TASK_STATE_RUNNING) return 0;
 
 			if (!so->task_list) return 0;
 			n=so->task_list;
 			if (n->bsize<bsize) return 0;
 			so->task_list=so->task_list->next;
 
-			if(ready) {
-				ready_last->next=n;
-			} else {
-				ready=n;
-			}
-			ready_last=n;
-
 			n->bsize=bsize;
 			if (bp&&bsize) {
 				__builtin_memcpy(n->bp,bp,bsize);
 			} 
-			DEBUGP(DLEV_SCHED,"wakeup %s task: name %s, switch in %s\n",so->name,current->name,n->name);
-			pendSV();
+
+			if (n->state&TASK_STATE_BLOCKED) {
+				n->state=TASK_STATE_READY|TASK_STATE_BLOCKED;
+				n->next=blocked;
+				blocked=n;
+				DEBUGP(DLEV_SCHED,"blocking %s task: name %s, current %s\n",so->name,n->name,current->name);
+			} else {
+				n->state=TASK_STATE_READY;
+				n->next=0;
+				if(ready) {
+					ready_last->next=n;
+				} else {
+					ready=n;
+				}
+				ready_last=n;
+
+				DEBUGP(DLEV_SCHED,"wakeup %s current task: name %s, readying %s\n",so->name,current->name,n->name);
+				pendSV();
+				svc_args[0]=0;
+			}
 		 	return 0;
 			break;
 		}
@@ -623,6 +631,77 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			svc_args[0]=driver->ops->control(kfd,svc_args[1],(void *)svc_args[2],svc_args[3]);
 			return 0;
 		}
+		case SVC_BLOCK_TASK: {
+			char *name=(char *)svc_args[0];
+			struct task *t=lookup_task_for_name(name);
+			if (!t) {
+				svc_args[0]=-1;
+				return 0;
+			}
+			t->state|=TASK_STATE_BLOCKED;
+			if (t==current) {
+				current->next=blocked;
+				blocked=current;
+				t->state=TASK_STATE_BLOCKED|TASK_STATE_READY;
+				DEBUGP(DLEV_SCHED,"blocking current task: name %s, ready %s\n",current->name,ready->name);
+				pendSV();
+			} else {
+				struct task *p=ready;
+				struct task * volatile *p_prev=&ready;
+				while(p) {
+					if (p==t) {
+						(*p_prev)=p->next;
+						p->next=blocked;
+						blocked=p;
+						t->state=TASK_STATE_BLOCKED|TASK_STATE_READY;
+						break;
+					} 
+					p_prev=&p->next;
+					p=p->next;
+				}
+				DEBUGP(DLEV_SCHED,"blocking task: name %s, current %s\n",t->name,current->name);
+			}
+			svc_args[0]=0;
+			return 0;
+		}
+		case SVC_UNBLOCK_TASK: {
+			char *name=(char *)svc_args[0];
+			struct task *b=blocked;
+			struct task * volatile *b_prev=&blocked;
+			struct task *t=lookup_task_for_name(name);
+			if (!t) {
+				svc_args[0]=-1;
+				return 0;
+			}
+			if (!(t->state&TASK_STATE_BLOCKED)) {
+				svc_args[0]=-1;
+				return 0;
+			}
+
+			while(b) {
+				if (b==t) {
+					(*b_prev)=b->next;
+					goto set_ready;
+				}
+				b_prev=&b->next;
+				b=b->next;
+			}
+			svc_args[0]=-1;
+			return 0;
+set_ready:
+			DEBUGP(DLEV_SCHED,"unblocking task: name %s, current %s\n",t->name,current->name);
+			t->state=TASK_STATE_READY;
+			t->next=0;
+			if(ready) {
+				ready_last->next=t;
+			} else {
+				ready=t;
+			}
+			ready_last=t;
+
+			svc_args[0]=0;
+			return 0;
+		}
 		default:
 			break;
 	}
@@ -638,8 +717,8 @@ void *sys_sleep(unsigned int ms) {
 		return 0;
 	}
 
-	if (current->state!=1) return 0;
-	current->state=3;
+	if (current->state!=TASK_STATE_RUNNING) return 0;
+	current->state=TASK_STATE_TIMER;
 	if (!tout->tq_out_first) {
 		tout->tq_out_first=current;
 		tout->tq_out_last=current;
@@ -662,11 +741,11 @@ void *sys_sleepon(struct sleep_obj *so, void *bp, int bsize) {
 	}
 	if (!ready) return 0;
 	
-	if (current->state!=1) return 0;
+	if (current->state!=TASK_STATE_RUNNING) return 0;
 	current->bp=bp;
 	current->bsize=bsize;
 
-	current->state=4;
+	current->state=TASK_STATE_IO;
 
 
 	if (so->task_list) {
@@ -691,17 +770,23 @@ void *sys_wakeup(struct sleep_obj *so, void *bp, int bsize) {
 	if (n->bsize<bsize) return 0;
 	so->task_list=so->task_list->next;
 	n->next=0;
-	n->state=2;
+	if (n->state&TASK_STATE_BLOCKED) {
+		n->state=TASK_STATE_READY|TASK_STATE_BLOCKED;
+		n->next=blocked;
+		blocked=n;
+	} else  {
+		n->state=TASK_STATE_READY;
 
-	if (ready) {
-		ready_last->next=n;
-	} else {
-		ready=n;
-	}
-	ready_last=n;
+		if (ready) {
+			ready_last->next=n;
+		} else {
+			ready=n;
+		}
+		ready_last=n;
 		
-	DEBUGP(DLEV_SCHED,"wakeup(readying) %s task: name %s, switch in %s\n",so->name,current->name,n->name);
-	pendSV();
+		DEBUGP(DLEV_SCHED,"wakeup(readying) %s task: name %s, readying %s\n",so->name,current->name,n->name);
+		pendSV();
+	}
  	return n;
 }
 
@@ -740,6 +825,8 @@ int svc_io_read(int fd, const char *b, int size);
 int svc_io_write(int fd, const char *b, int size);
 int svc_io_control(int fd, int cmd, void *b, int s);
 int svc_io_close(int fd);
+int svc_block_task(char *name);
+int svc_unblock_task(char *name);
 
 #if 0
 __attribute__ ((noinline)) int svc_switch_to(void *task) {
@@ -811,6 +898,20 @@ __attribute__ ((noinline)) int svc_io_close(int fd) {
 	return rc;
 }
 
+__attribute__ ((noinline)) int svc_block_task(char *name) {
+	register int rc asm("r0");
+	svc(SVC_BLOCK_TASK);
+	return rc;
+}
+
+__attribute__ ((noinline)) int svc_unblock_task(char *name) {
+	register int rc asm("r0");
+	svc(SVC_UNBLOCK_TASK);
+	return rc;
+}
+
+
+
 
 int thread_create(void *fnc, void *val, int stacksz, char *name) {
 	return svc_create_task(fnc, val, stacksz, name);
@@ -829,6 +930,14 @@ int sleep_on(struct sleep_obj *so, void *buf, int bsize) {
 
 int wakeup(struct sleep_obj *so, void *dbuf, int dsize) {
 	return svc_wakeup(so,dbuf,dsize);
+}
+
+int block_task(char *name) {
+	return svc_block_task(name);
+}
+
+int unblock_task(char *name) {
+	return svc_unblock_task(name);
 }
 
 #ifdef DRIVERSUPPORT
@@ -929,18 +1038,16 @@ struct Env {
 	int io_fd;
 };
 
-static int help_fnc(int argc, char **argv, struct Env *env) {
-	fprintf(env->io_fd, "help called with %d args\n", argc);
-	return 0;
-}
+static int help_fnc(int argc, char **argv, struct Env *env);
 
 static int get_state(struct task *t) {
-	switch(t->state) {
-		case 0: return 'i';
-		case 1: return 'r';
-		case 2: return 'w';
-		case 3: return 't';
-		case 4: return 'b';
+	unsigned int state=t->state&0x7f;
+	switch(state) {
+		case TASK_STATE_IDLE: return 'i';
+		case TASK_STATE_RUNNING: return 'r';
+		case TASK_STATE_READY: return 'w';
+		case TASK_STATE_TIMER: return 't';
+		case TASK_STATE_IO: return 'b';
 		default: return '?';
 	}
 }
@@ -950,7 +1057,7 @@ static int ps_fnc(int argc, char **argv, struct Env *env) {
 	struct task *t=troot;
 	while(t) {
 		fprintf(env->io_fd,"task(%x) %12s, sp=0x%08x, pc=0x%08x, state=%c, atics=%d\n", 
-			t, t->name, t->sp, (t->state!=1)?((unsigned int *)t->sp)[13]:0xffffffff, get_state(t), t->active_tics);
+			t, t->name, t->sp, (t->state!=TASK_STATE_RUNNING)?((unsigned int *)t->sp)[13]:0xffffffff, get_state(t), t->active_tics);
 		t=t->next2;
 	}
 	return 0;
@@ -982,7 +1089,27 @@ static int reboot_fnc(int argc, char **argv, struct Env *env) {
 	NVIC_SystemReset();
 	return 0;
 }
+
+static int block_fnc(int argc, char **argv, struct Env *env) {
+	int rc;
+	fprintf(env->io_fd, "blocking %s, ", argv[1]);
+	rc=block_task(argv[1]);
+	fprintf(env->io_fd, "returned %d\n", rc);
 	
+	return 0;
+}
+
+static int unblock_fnc(int argc, char **argv, struct Env *env) {
+	int rc;
+	fprintf(env->io_fd, "unblocking %s, ", argv[1]);
+	rc=unblock_task(argv[1]);
+	fprintf(env->io_fd, "returned %d\n", rc);
+	
+	return 0;
+}
+
+
+
 typedef int (*cmdFunc)(int,char **, struct Env *);
 
 static struct cmd {
@@ -993,7 +1120,21 @@ static struct cmd {
 		{"lsdrv",lsdrv_fnc},
 		{"debug",debug_fnc},
 		{"reboot",reboot_fnc},
+		{"block",block_fnc},
+		{"unblock",unblock_fnc},
 		{0,0}};
+
+static int help_fnc(int argc, char **argv, struct Env *env) {
+	struct cmd *cmd=cmd_root;
+	fprintf(env->io_fd, "help called with %d args\n", argc);
+	fprintf(env->io_fd, "available commands: ");
+	while(cmd->name) {
+		fprintf(env->io_fd, "%s, ", cmd->name);
+		cmd++;
+	}
+	fprintf(env->io_fd, "\n");
+	return 0;
+}
 
 struct cmd *lookup_cmd(char *name) {
 	struct cmd *cmd=cmd_root;
