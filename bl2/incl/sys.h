@@ -24,7 +24,7 @@ extern volatile unsigned int tq_tic;
 void init_sys(void);
 void *getSlab_256(void);
 int sleep(unsigned int ms);
-int thread_create(void *fnc, void *val, int stacksz, char *name);
+int thread_create(void *fnc, void *val, int prio, char *name);
 int sleep_on(struct sleep_obj *so, void *buf, int blen);
 int wakeup(struct sleep_obj *so, void *dbuf, int dlen);
 

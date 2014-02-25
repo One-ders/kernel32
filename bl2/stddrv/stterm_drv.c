@@ -164,8 +164,8 @@ static int stterm_control(int kfd, int cmd, void *arg1, int arg2) {
 }
 
 static int stterm_start(void *inst) {
-	thread_create(stterm_io_r,0,256,"stterm_io_r");
-	thread_create(stterm_io_t,0,256,"stterm_io_t");
+	thread_create(stterm_io_r,0,3,"stterm_io_r");
+	thread_create(stterm_io_t,0,3,"stterm_io_t");
 	return 0;
 }
 

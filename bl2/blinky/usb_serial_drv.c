@@ -9,6 +9,7 @@
 #include "usbd_desc.h"
 #include "usbd_conf.h"
 #include "usb_regs.h"
+#include "usbd_cdc_core.h"
 
 
 USB_OTG_CORE_HANDLE USB_OTG_dev;
@@ -66,8 +67,8 @@ USB_OTG_CORE_HANDLE USB_OTG_dev;
  
 //#define STANDARD_ENDPOINT_DESC_SIZE             0x09  // Funny, this is wrong but unused anyway
  
-#define CDC_DATA_IN_PACKET_SIZE                64
-#define CDC_DATA_OUT_PACKET_SIZE               64
+//#define CDC_DATA_IN_PACKET_SIZE                64
+//#define CDC_DATA_OUT_PACKET_SIZE               64
 
 #define USB_SIZ_STRING_LANGID		4
 #define USBD_LANGID_STRING            0x409
@@ -87,6 +88,10 @@ static int core_fd;
 static unsigned char rx_buf[8][8];
 
 extern unsigned int USBD_OTG_ISR_Handler(USB_OTG_CORE_HANDLE *pdev);
+unsigned char CmdBuff[64];
+static unsigned int cdcCmd=0xFF;
+static unsigned int cdcLen=0;
+static volatile unsigned int usbd_cdc_AltSet;
 
 void OTG_FS_IRQHandler(void) {
 	io_setpolled(1);
@@ -472,33 +477,90 @@ static unsigned char class_deinit(void *core, unsigned char cfgidx) {
 }
 
 static unsigned char class_setup(void *core, struct usb_setup_req *req) {
+	unsigned short int len=0;
+	unsigned char *pbuf;
+
 	io_printf("usb_serial: setup called\n");
 	io_printf("bmRequest=%x, bRequest=%x\n", 
 			req->bmRequest, req->bRequest);
 	io_printf("wValue=%x, wIndex=%x, wLength=%x\n",
 		req->wValue,req->wIndex,req->wLength);
 
-#if 0
 	switch(req->bmRequest&USB_REQ_TYPE_MASK) {
 		case USB_REQ_TYPE_CLASS:
 			if (req->wLength) {
 				if (req->bmRequest&0x80) {
-					/* dev to host */
-					goto error;
+					switch (req->bRequest) {
+						case SEND_ENCAPSULATED_COMMAND:
+							io_printf("got SEND_ENCAPSULATED_COMMAND\n");
+							break;
+						case GET_ENCAPSULATED_RESPONSE:
+							io_printf("got GET_ENCAPSULATED_RESPONSE\n");
+							break;
+						case SET_COMM_FEATURE:
+							io_printf("got SET_COMM_FEATURE\n");
+							break;
+						case GET_COMM_FEATURE:
+							io_printf("got GET_COMM_FEATURE\n");
+							break;
+						case SET_LINE_CODING:
+							io_printf("got SET_LINE_CODING\n");
+							break;
+						case GET_LINE_CODING:
+							io_printf("got GET_LINE_CODING\n");
+							break;
+						case SET_CONTROL_LINE_STATE:
+							io_printf("got SET_CONTROL_LINE_STATE\n");
+							break;
+						case SEND_BREAK:
+							io_printf("got SEND_BREAK\n");
+							break;
+						default:
+							io_printf("got unknown cmd %x\n", req->bRequest);
+							break;
+					}
+					USBD_CtlSendData(core, CmdBuff, req->wLength);
+
+					return 0;
+
 				} else {
-					goto error;
+					cdcCmd=req->bRequest;
+					cdcLen=req->wLength;
+					USBD_CtlPrepareRx(core, CmdBuff, req->wLength);
 				}
-			} else {
+			} else { /* no data request */
 			}
 			return 0;
 		default:
-			usbd_ctl_error(core,req);
+			USBD_CtlError (core, req);
 			return -1;
-#endif
-#if 0
-	USBD_CtlSendStatus(core);
-	USBD_CtlError(core,req);
-#endif
+		/* Standard Requests --------------------------------------*/
+		case USB_REQ_TYPE_STANDARD:
+			switch (req->bRequest) {
+				case USB_REQ_GET_DESCRIPTOR:
+					if ((req->wValue>>8)==CDC_DESCRIPTOR_TYPE) {
+						pbuf = Virtual_Com_Port_ConfigDescriptor + 9 + (9 * USBD_ITF_MAX_NUM);
+						len = MIN(USB_CDC_DESC_SIZ , req->wLength);
+					}
+					USBD_CtlSendData (core,
+							pbuf,
+							len);
+					break;
+
+				case USB_REQ_GET_INTERFACE:
+					USBD_CtlSendData (core,
+							(uint8_t *)&usbd_cdc_AltSet,
+							1);
+					break;
+
+				case USB_REQ_SET_INTERFACE:
+					if ((uint8_t)(req->wValue) < USBD_ITF_MAX_NUM) {
+						usbd_cdc_AltSet = (uint8_t)(req->wValue);
+					} else {
+						USBD_CtlError (core, req);
+					}
+			}
+	}
 	return 0;
 }
 
@@ -509,6 +571,9 @@ static unsigned char class_EP0_tx_sent(void *core) {
 
 static unsigned char class_EP0_rx_ready(void *core) {
 	io_printf("usb_serial: EP0_rx_ready\n");
+	if (cdcCmd!=NO_CMD) {
+		cdcCmd=NO_CMD;
+	}
 	return 0;
 }
 
