@@ -12,13 +12,13 @@ all: ../lib/os.o ../lib/init_sect.o ../lib/end_sect.o
 #
 
 ../lib/os.o: os.o
-	mv $^ $@
+	cp $^ $@
 
 ../lib/init_sect.o: init_sect.o
-	mv $^ $@
+	cp $^ $@
 
 ../lib/end_sect.o: end_sect.o
-	mv $^ $@
+	cp $^ $@
 
 os.o: sys.o io.o
 	$(CC) $(LDFLAGS) -r -nostdlib  -o $@ $^

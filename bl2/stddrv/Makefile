@@ -8,7 +8,7 @@ LDFLAGS=-g -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi
 all: ../lib/bsp.o
 
 ../lib/bsp.o: bsp.o
-	mv $^ $@
+	cp $^ $@
 
 #
 #bsp.o:	startup_stm32f4xx.o system_stm32f4xx.o usart_drv.o stterm_drv.o

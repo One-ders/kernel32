@@ -17,28 +17,33 @@ int sys_lev;
 #define TASK_STATE_TIMER	3
 #define TASK_STATE_IO		4
 #define TASK_STATE_DEAD		6
-#define TASK_STATE_BLOCKED	0x80
+
+#define MAX_PRIO		4
+#define GET_PRIO(a)		((a)->prio_flags&0x3)
+#define SET_PRIO(a,b)		((a)->prio_flags=(b)&0xf)
+#define GET_TMARK(a)		((a)->prio_flags&0x10)
+#define SET_TMARK(a)		((a)->prio_flags|=0x10)
+#define CLR_TMARK(a)		((a)->prio_flags&=0xEF)
 
 struct task {
 	char 		*name;            /* 0-3 */
-	void		*sp;               /* 4-7 */
+	void		*sp;              /* 4-7 */
 	
 	struct task 	*next;            /* 8-11 */   /* link of task of same state */
 	struct task	*next2;		  /* 12-15 */  /* all tasks chain */
 	int 		state;		  /* 16-19 */
-	void		*bp;		  /* 20-23 */ /* communication buffer for sleeping context */
-	int		bsize;            /* 24-27 */ /* size of the buffer */
-	int		stack_sz;         /* 28-31 */
-	unsigned int    active_tics;	  /* 32-36 */
+	int		prio_flags;	  /* 20-23 */
+	void		*bp;		  /* 24-27 */ /* communication buffer for sleeping context */
+	int		bsize;            /* 28-31 */ /* size of the buffer */
+	int		stack_sz;         /* 32-35 */
+	unsigned int    active_tics;	  /* 36-39 */
 };
 
 
-struct task * volatile ready;
-struct task * volatile ready_last;
+struct task * volatile ready[5];
+struct task * volatile ready_last[5];
 
-struct task * volatile blocked;
-
-struct task main_task = { "init_main", (void *)0x20020000, 0, 0, 1, 0,0,512 };
+struct task main_task = { "init_main", (void *)0x20020000, 0, 0, 1, 3, 0,0,512 };
 struct task * volatile current = &main_task;
 struct task *troot =&main_task;
 
@@ -146,7 +151,7 @@ void __attribute__ (( naked )) PendSV_Handler(void) {
 			"mov r1,lr\n\t"
 			"mov r2,r0\n\t"
 			"push {r1-r2}\n\t"
-			"cpsid i\n\t"                           // I need to run this with irq off, usart driver chrashes all when unplugged
+			"cpsid i\n\t"    // I need to run this with irq off, usart driver chrashes all when unplugged
 			"bl %[PendSV_Handler_c]\n\t"
 			"pop {r1-r2}\n\t"
 			"mov lr,r1\n\t"
@@ -175,17 +180,31 @@ void __attribute__ (( naked )) PendSV_Handler(void) {
 }
 
 void *PendSV_Handler_c(unsigned long int *save_sp) {
-	struct task *t=ready;	
-	if (!ready) {
+	int i=0;	
+	struct task *t;
+	while(i<MAX_PRIO) {
+		t=ready[i];	
+		if (t) {
+			ready[i]=t->next;
+			break;
+		}
+		i++;
+	}
+	if (!t) {
 		ASSERT(0);
 	}
-
+	/* Have next, move away current if still here, timer and blocker moves it themselves */
 	if (current->state==TASK_STATE_RUNNING) {
+		int prio=current->prio_flags&0xf;
 		current->state=TASK_STATE_READY;
-		ready_last->next=current;
-		ready_last=current;
+		if (prio>4) prio=4;
+		if (ready[prio]) {
+			ready_last[prio]->next=current;
+		} else {
+			ready[prio]=current;
+		}
+		ready_last[prio]=current;
 	}
-	ready=ready->next;
 	t->next=0;
 	if ((TASK_XPSR(t->sp)&0x1ff)!=0) {
 		*(save_sp-2)=0xfffffff1;
@@ -247,6 +266,7 @@ void Error_Handler_c(void *sp);
 
 void SysTick_Handler_c(void *sp) {
 	struct tq *tqp;
+	int p=5;
 	current->active_tics++;
 	tq_tic++;
 	tqp=&tq[tq_tic%1024];
@@ -256,31 +276,36 @@ void SysTick_Handler_c(void *sp) {
 		struct task *t=tqp->tq_out_first;
 		while(t) {
 			struct task *tnext=t->next;
-			if (t->state&TASK_STATE_BLOCKED) {
-				t->state=TASK_STATE_READY|TASK_STATE_BLOCKED;
-				t->next=blocked;
-				blocked=t;
-				DEBUGP(DLEV_SCHED,"timer_wakeup: blocking %s\n", t->name);
+			int prio=t->prio_flags&0xf;
+			if (prio>4) prio=4;
+			t->state=TASK_STATE_READY;
+			t->next=0;
+			if(prio<p) p=prio;
+			if (!ready[prio]) {
+				ready[prio]=t;
 			} else {
-				t->state=TASK_STATE_READY;
-				if (!ready) {
-					ready=t;
-				} else {
-					ready_last->next=t;
-				}
-				DEBUGP(DLEV_SCHED,"timer_wakeup: readying %s\n", t->name);
-				ready_last=t;
+				ready_last[prio]->next=t;
 			}
+			ready_last[prio]=t;
+			DEBUGP(DLEV_SCHED,"timer_wakeup: readying %s\n", t->name);
 			t=tnext;
 		}
 //		while(t->next) t=t->next;
 		tqp->tq_out_first=tqp->tq_out_last=0;
 	}
 
-	if (ready) {
-		DEBUGP(DLEV_SCHED,"time slice: switch out %s, switch in %s\n", current->name, ready->name);
+	if (p<GET_PRIO(current)) {
 		pendSV();
+		return;
 	}
+
+	if (GET_TMARK(current) && ready[GET_PRIO(current)]) {
+		DEBUGP(DLEV_SCHED,"time slice: switch out %s, switch in %s\n", current->name, ready[GET_PRIO(current)]->name);
+		CLR_TMARK(current);
+		pendSV();
+		return;
+	}
+	SET_TMARK(current);
 	return;
 }
 
@@ -444,8 +469,14 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			unsigned long int val=svc_args[1];
 //			unsigned int stacksz=svc_args[2];
 			char *name=(char *)svc_args[3];
+			int prio = svc_args[2];
 			struct task *t=(struct task *)getSlab_512();
 			unsigned long int *stackp;
+
+			if (prio>MAX_PRIO) {
+				svc_args[0]=-1;
+				return 0;
+			}
 			__builtin_memset(t,0,768);
 			t->sp=(void *)(((unsigned char *)t)+768);
 			stackp=(unsigned long int *)t->sp;
@@ -470,19 +501,25 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			t->sp=(void *) stackp;
 			t->state=TASK_STATE_READY;
 			t->name=name;
+			SET_PRIO(t,prio);
 			t->next2=troot;
 			troot=t;
 
-			if(!ready) {
-				ready=t;
+			if(!ready[prio]) {
+				ready[prio]=t;
 			} else {
-				ready_last->next=t;
+				ready_last[prio]->next=t;
 			}
-			ready_last=t;
+			ready_last[prio]=t;
 
-			DEBUGP(DLEV_SCHED,"Create task: name %s, switch out %s\n", t->name, ready_last->name);
-			pendSV();
+			if (prio<GET_PRIO(current)) {
+				DEBUGP(DLEV_SCHED,"Create task: name %s, switch out %s\n", t->name, current->name);
+				pendSV();
+			} else {
+				DEBUGP(DLEV_SCHED,"Create task: name %s\n", t->name);
+			}
 
+			svc_args[0]=0;
 			return 0;
 			break;
 		}
@@ -491,9 +528,7 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 
 			current->state=TASK_STATE_DEAD;
 
-			while(!ready);
-
-			DEBUGP(DLEV_SCHED,"kill self  task: name %s, switch in %s\n", current->name, ready->name);
+			DEBUGP(DLEV_SCHED,"kill self  task: name %s\n", current->name);
 			pendSV();
 			return 0;
 		}
@@ -509,8 +544,7 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 				tout->tq_out_last=current;
 			}
 
-			while(!ready);
-			DEBUGP(DLEV_SCHED,"sleep task: name %s, switch in %s\n", current->name, ready->name);
+			DEBUGP(DLEV_SCHED,"sleep task: name %s\n", current->name);
 			pendSV();
 			return 0;
 			break;
@@ -531,9 +565,8 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 				so->task_list=current;
 			}
 			so->task_list_last=current;
-			ASSERT(ready);
 
-			DEBUGP(DLEV_SCHED,"sleepon %s task: name %s, switch in %s\n", so->name,current->name,ready->name);
+			DEBUGP(DLEV_SCHED,"sleepon %s task: name %s\n", so->name,current->name);
 			pendSV();
 			return 0;
 			break;
@@ -544,6 +577,7 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			void *bp=(void *)svc_args[1];
 			int   bsize=svc_args[2];
 			struct task *n;
+			int prio;
 
 			if (current->state!=TASK_STATE_RUNNING) return 0;
 
@@ -557,25 +591,22 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 				__builtin_memcpy(n->bp,bp,bsize);
 			} 
 
-			if (n->state&TASK_STATE_BLOCKED) {
-				n->state=TASK_STATE_READY|TASK_STATE_BLOCKED;
-				n->next=blocked;
-				blocked=n;
-				DEBUGP(DLEV_SCHED,"blocking %s task: name %s, current %s\n",so->name,n->name,current->name);
+			n->state=TASK_STATE_READY;
+			n->next=0;
+			prio=n->prio_flags&0xf;
+			if (prio>4) prio=4;
+			if(ready[prio]) {
+				ready_last[prio]->next=n;
 			} else {
-				n->state=TASK_STATE_READY;
-				n->next=0;
-				if(ready) {
-					ready_last->next=n;
-				} else {
-					ready=n;
-				}
-				ready_last=n;
-
-				DEBUGP(DLEV_SCHED,"wakeup %s current task: name %s, readying %s\n",so->name,current->name,n->name);
-				pendSV();
-				svc_args[0]=0;
+				ready[prio]=n;
 			}
+			ready_last[prio]=n;
+
+			DEBUGP(DLEV_SCHED,"wakeup %s current task: name %s, readying %s\n",so->name,current->name,n->name);
+			if (prio<GET_PRIO(current)) {
+				pendSV();
+			}
+			svc_args[0]=0;
 		 	return 0;
 			break;
 		}
@@ -638,22 +669,24 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 				svc_args[0]=-1;
 				return 0;
 			}
-			t->state|=TASK_STATE_BLOCKED;
 			if (t==current) {
-				current->next=blocked;
-				blocked=current;
-				t->state=TASK_STATE_BLOCKED|TASK_STATE_READY;
-				DEBUGP(DLEV_SCHED,"blocking current task: name %s, ready %s\n",current->name,ready->name);
+				SET_PRIO(t,t->prio_flags|0x8);
+				DEBUGP(DLEV_SCHED,"blocking current task: name %s\n",current->name);
 				pendSV();
 			} else {
-				struct task *p=ready;
-				struct task * volatile *p_prev=&ready;
+				struct task *p=ready[GET_PRIO(t)];
+				struct task * volatile *p_prev=&ready[GET_PRIO(t)];
+				SET_PRIO(t,t->prio_flags|0x8);
 				while(p) {
 					if (p==t) {
 						(*p_prev)=p->next;
-						p->next=blocked;
-						blocked=p;
-						t->state=TASK_STATE_BLOCKED|TASK_STATE_READY;
+						p->next=0;
+						if (!ready[MAX_PRIO]){
+							ready[MAX_PRIO]=p;
+						} else {
+							ready_last[MAX_PRIO]->next=p;
+						}
+						ready_last[MAX_PRIO]=p;
 						break;
 					} 
 					p_prev=&p->next;
@@ -666,14 +699,17 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 		}
 		case SVC_UNBLOCK_TASK: {
 			char *name=(char *)svc_args[0];
-			struct task *b=blocked;
-			struct task * volatile *b_prev=&blocked;
+			struct task *b=ready[MAX_PRIO];
+			struct task * volatile *b_prev=&ready[MAX_PRIO];
 			struct task *t=lookup_task_for_name(name);
+			int prio;
 			if (!t) {
 				svc_args[0]=-1;
 				return 0;
 			}
-			if (!(t->state&TASK_STATE_BLOCKED)) {
+			prio=t->prio_flags&0xf;
+			if (prio>MAX_PRIO) prio=MAX_PRIO;
+			if (prio<MAX_PRIO) {
 				svc_args[0]=-1;
 				return 0;
 			}
@@ -690,14 +726,14 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			return 0;
 set_ready:
 			DEBUGP(DLEV_SCHED,"unblocking task: name %s, current %s\n",t->name,current->name);
-			t->state=TASK_STATE_READY;
 			t->next=0;
-			if(ready) {
-				ready_last->next=t;
+			SET_PRIO(t,t->prio_flags&3);
+			if(ready[GET_PRIO(t)]) {
+				ready_last[GET_PRIO(t)]->next=t;
 			} else {
-				ready=t;
+				ready[GET_PRIO(t)]=t;
 			}
-			ready_last=t;
+			ready_last[GET_PRIO(t)]=t;
 
 			svc_args[0]=0;
 			return 0;
@@ -727,8 +763,7 @@ void *sys_sleep(unsigned int ms) {
 		tout->tq_out_last=current;
 	}
 
-	ASSERT(ready);
-	DEBUGP(DLEV_SCHED,"sys_sleep task: name %s, switch in %s\n", current->name, ready->name);
+	DEBUGP(DLEV_SCHED,"sys_sleep task: name %s\n", current->name);
 	pendSV();
 	return 0;
 }
@@ -739,14 +774,12 @@ void *sys_sleepon(struct sleep_obj *so, void *bp, int bsize) {
 	if (in_irq&&(in_irq!=0xb)) {
 		return 0;
 	}
-	if (!ready) return 0;
 	
 	if (current->state!=TASK_STATE_RUNNING) return 0;
 	current->bp=bp;
 	current->bsize=bsize;
 
 	current->state=TASK_STATE_IO;
-
 
 	if (so->task_list) {
 		so->task_list_last->next=current;
@@ -755,7 +788,7 @@ void *sys_sleepon(struct sleep_obj *so, void *bp, int bsize) {
 	}
 	so->task_list_last=current;
 
-	DEBUGP(DLEV_SCHED,"sys sleepon %s task: name %s, switch in %s\n", so->name, current->name, ready->name);
+	DEBUGP(DLEV_SCHED,"sys sleepon %s task: name %s\n", so->name, current->name);
 	fake_pendSV();
 
 	*((volatile unsigned int *)0xe000ed24)|=0x80;
@@ -764,26 +797,25 @@ void *sys_sleepon(struct sleep_obj *so, void *bp, int bsize) {
 
 void *sys_wakeup(struct sleep_obj *so, void *bp, int bsize) {
 	struct task *n;
+	int prio;
 
 	n=so->task_list;
 	if (!n) return 0;
 	if (n->bsize<bsize) return 0;
 	so->task_list=so->task_list->next;
 	n->next=0;
-	if (n->state&TASK_STATE_BLOCKED) {
-		n->state=TASK_STATE_READY|TASK_STATE_BLOCKED;
-		n->next=blocked;
-		blocked=n;
-	} else  {
-		n->state=TASK_STATE_READY;
+	n->state=TASK_STATE_READY;
+	prio=n->prio_flags&0xf;
+	if (prio>4) prio=4;
 
-		if (ready) {
-			ready_last->next=n;
-		} else {
-			ready=n;
-		}
-		ready_last=n;
-		
+	if (ready[prio]) {
+		ready_last[prio]->next=n;
+	} else {
+		ready[prio]=n;
+	}
+	ready_last[prio]=n;
+	
+	if (prio<GET_PRIO(current)) {
 		DEBUGP(DLEV_SCHED,"wakeup(readying) %s task: name %s, readying %s\n",so->name,current->name,n->name);
 		pendSV();
 	}
@@ -815,7 +847,7 @@ int dbglev=0;
  */
 
 //int svc_switch_to(void *);
-int svc_create_task(void *fnc, void *val, int stacksz, char *name);
+int svc_create_task(void *fnc, void *val, int prio, char *name);
 int svc_sleep(unsigned int);
 int svc_sleep_on(struct sleep_obj *, void *buf, int size);
 int svc_wakeup(struct sleep_obj *, void *buf, int size);
@@ -836,7 +868,7 @@ __attribute__ ((noinline)) int svc_switch_to(void *task) {
 }
 #endif
 
-__attribute__ ((noinline)) int svc_create_task(void *fnc, void *val, int stacksz, char *name) {
+__attribute__ ((noinline)) int svc_create_task(void *fnc, void *val, int prio, char *name) {
 	register int rc asm("r0");
 	svc(SVC_CREATE_TASK);
 	return rc;
@@ -913,8 +945,8 @@ __attribute__ ((noinline)) int svc_unblock_task(char *name) {
 
 
 
-int thread_create(void *fnc, void *val, int stacksz, char *name) {
-	return svc_create_task(fnc, val, stacksz, name);
+int thread_create(void *fnc, void *val, int prio, char *name) {
+	return svc_create_task(fnc, val, prio, name);
 }
 
 
@@ -1041,7 +1073,7 @@ struct Env {
 static int help_fnc(int argc, char **argv, struct Env *env);
 
 static int get_state(struct task *t) {
-	unsigned int state=t->state&0x7f;
+	unsigned int state=t->state;
 	switch(state) {
 		case TASK_STATE_IDLE: return 'i';
 		case TASK_STATE_RUNNING: return 'r';
@@ -1056,8 +1088,8 @@ static int get_state(struct task *t) {
 static int ps_fnc(int argc, char **argv, struct Env *env) {
 	struct task *t=troot;
 	while(t) {
-		fprintf(env->io_fd,"task(%x) %12s, sp=0x%08x, pc=0x%08x, state=%c, atics=%d\n", 
-			t, t->name, t->sp, (t->state!=TASK_STATE_RUNNING)?((unsigned int *)t->sp)[13]:0xffffffff, get_state(t), t->active_tics);
+		fprintf(env->io_fd,"task(%x) %12s, sp=0x%08x, pc=0x%08x, prio=%x, state=%c, atics=%d\n", 
+			t, t->name, t->sp, (t->state!=TASK_STATE_RUNNING)?((unsigned int *)t->sp)[13]:0xffffffff, t->prio_flags, get_state(t), t->active_tics);
 		t=t->next2;
 	}
 	return 0;
@@ -1241,9 +1273,9 @@ void init_sys(void) {
 }
 
 void start_sys(void) {
-	thread_create(sys_mon,"usart0",256,"sys_mon");
-	thread_create(sys_mon,"stterm0",256,"sys_mon");
-	thread_create(sys_mon,"usb_serial0",256,"sys_mon");
+	thread_create(sys_mon,"usart0",3,"sys_mon");
+	thread_create(sys_mon,"stterm0",3,"sys_mon");
+	thread_create(sys_mon,"usb_serial0",3,"sys_mon");
 }
 
 #else
