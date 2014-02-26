@@ -5,7 +5,10 @@ CFLAGS=-g -O2 -DDEBUG -DDRIVERSUPPORT -DUNECESS -Wall -mlittle-endian -mthumb -m
 LDFLAGS=-g -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi=hard -mfpu=fpv4-sp-d16 -fno-builtin
 
 
-all: ../lib/bsp.o
+all: ../lib ../lib/bsp.o
+
+../lib:
+	mkdir ../lib
 
 ../lib/bsp.o: bsp.o
 	cp $^ $@

@@ -71,7 +71,7 @@ void *getSlab_512(void) {
 struct task *lookup_task_for_name(char *task_name) {
 	struct task *t=troot;
 	while(t) {
-		if (__builtin_strncmp(t->name,task_name,strlen(t->name+1))==0) {
+		if (__builtin_strncmp(t->name,task_name,strlen(t->name)+1)==0) {
 			return t;
 		}
 		t=t->next2;
@@ -277,7 +277,7 @@ void SysTick_Handler_c(void *sp) {
 		while(t) {
 			struct task *tnext=t->next;
 			int prio=t->prio_flags&0xf;
-			if (prio>4) prio=4;
+			if (prio>MAX_PRIO) prio=MAX_PRIO;
 			t->state=TASK_STATE_READY;
 			t->next=0;
 			if(prio<p) p=prio;
@@ -448,6 +448,7 @@ void __attribute__ (( naked )) SVC_Handler(void) {
 #define SVC_KILL_SELF  10
 #define SVC_BLOCK_TASK	11
 #define SVC_UNBLOCK_TASK 12
+#define SVC_SETPRIO_TASK 13
 
 int svc_kill_self(void);
 
@@ -738,6 +739,65 @@ set_ready:
 			svc_args[0]=0;
 			return 0;
 		}
+		case SVC_SETPRIO_TASK: {
+			char *name=(char *)svc_args[0];
+			int prio=svc_args[1];
+			int curr_prio=GET_PRIO(current);
+			struct task *t=lookup_task_for_name(name);
+			if (!t) {
+				svc_args[0]=-1;
+				return 0;
+			}
+			if (prio>MAX_PRIO) {
+				svc_args[0]=-2;
+				return 0;
+			}
+			if (t==current) {
+				SET_PRIO(t,prio);
+				if (curr_prio<prio) { /* degrading prio of current, shall we switch? */
+					int i=0;
+					while(!ready[i]){
+						i++;
+						if (i>=prio) break;
+					}
+					if (i<prio) {
+						DEBUGP(DLEV_SCHED,"degrading current prio task: name %s\n",current->name);
+						pendSV();
+					}
+				}
+			} else {
+				int tprio=((t->prio_flags&0xf)>MAX_PRIO)?MAX_PRIO:(t->prio_flags&0xf);
+				struct task *p=ready[tprio];
+				struct task * volatile *p_prev=&ready[tprio];
+				SET_PRIO(t,prio);
+				while(p) {
+					if (p==t) {
+						(*p_prev)=p->next;
+						p->next=0;
+						if (!ready[prio]){
+							ready[prio]=p;
+						} else {
+							ready_last[prio]->next=p;
+						}
+						ready_last[prio]=p;
+						goto check_resched;
+					} 
+					p_prev=&p->next;
+					p=p->next;
+				}
+				DEBUGP(DLEV_SCHED,"setprio task: name %s prio=%d, current %s\n",t->name,t->prio_flags,current->name);
+			}
+			svc_args[0]=0;
+			return 0;
+check_resched:
+			if (prio<curr_prio) {
+				DEBUGP(DLEV_SCHED,"setprio task: name %s prio=%d, current %s, reschedule\n",t->name,t->prio_flags,current->name);
+				pendSV();
+			}
+			svc_args[0]=0;
+			return 0;
+
+		}
 		default:
 			break;
 	}
@@ -806,7 +866,7 @@ void *sys_wakeup(struct sleep_obj *so, void *bp, int bsize) {
 	n->next=0;
 	n->state=TASK_STATE_READY;
 	prio=n->prio_flags&0xf;
-	if (prio>4) prio=4;
+	if (prio>MAX_PRIO) prio=MAX_PRIO;
 
 	if (ready[prio]) {
 		ready_last[prio]->next=n;
@@ -859,14 +919,8 @@ int svc_io_control(int fd, int cmd, void *b, int s);
 int svc_io_close(int fd);
 int svc_block_task(char *name);
 int svc_unblock_task(char *name);
+int svc_setprio_task(char *name, int prio);
 
-#if 0
-__attribute__ ((noinline)) int svc_switch_to(void *task) {
-	register int rc asm("r0");
-	svc(SVC_SWITCH_TO);
-	return rc;
-}
-#endif
 
 __attribute__ ((noinline)) int svc_create_task(void *fnc, void *val, int prio, char *name) {
 	register int rc asm("r0");
@@ -942,6 +996,13 @@ __attribute__ ((noinline)) int svc_unblock_task(char *name) {
 	return rc;
 }
 
+__attribute__ ((noinline)) int svc_setprio_task(char *name, int prio) {
+	register int rc asm("r0");
+	svc(SVC_SETPRIO_TASK);
+	return rc;
+}
+
+
 
 
 
@@ -971,6 +1032,11 @@ int block_task(char *name) {
 int unblock_task(char *name) {
 	return svc_unblock_task(name);
 }
+
+int setprio_task(char *name,int prio) {
+	return svc_setprio_task(name,prio);
+}
+
 
 #ifdef DRIVERSUPPORT
 
@@ -1140,6 +1206,70 @@ static int unblock_fnc(int argc, char **argv, struct Env *env) {
 	return 0;
 }
 
+unsigned long int strtoul(char *str, char *endp, int base) {
+	char *p=str;
+	int num=0;
+	int mode;
+	unsigned int val=0;
+
+	if (base) {
+		mode=base;
+	} else {
+		if ((p[0]=='0')&&(__builtin_tolower(p[1])=='x')) {
+			mode=16;
+			p=&p[2];
+		} else if (p[0]=='0') {
+			mode=8;
+			p=&p[1];
+		} else {
+			mode=10;
+		}
+	}
+	while(*p) {
+		switch (*p) {
+			case '0':
+			case '1':
+			case '2':
+			case '3':
+			case '4':
+			case '5':
+			case '6':
+			case '7':
+			case '8':
+			case '9':
+				num=(*p)-'0';
+				break;
+			case 'a':
+			case 'b':
+			case 'c':
+			case 'd':
+			case 'e':
+			case 'f':
+				num=__builtin_tolower(*p)-'a';
+				num+=10;
+				break;
+		}
+		val=(val<<mode)|num;
+		p++;
+	}
+	return val;
+}
+
+static int setprio_fnc(int argc, char **argv, struct Env *env) {
+	int rc;
+	int prio=strtoul(argv[2],0,0);
+	if (prio>MAX_PRIO) {
+		fprintf(env->io_fd,"setprio: prio must be between 0-4\n");
+		return 0;
+	}
+	fprintf(env->io_fd, "set prio of %s to %d", argv[1], prio);
+	rc=setprio_task(argv[1],prio);
+	fprintf(env->io_fd, "returned %d\n", rc);
+	
+	return 0;
+}
+
+
 
 
 typedef int (*cmdFunc)(int,char **, struct Env *);
@@ -1154,6 +1284,7 @@ static struct cmd {
 		{"reboot",reboot_fnc},
 		{"block",block_fnc},
 		{"unblock",unblock_fnc},
+		{"setprio",setprio_fnc},
 		{0,0}};
 
 static int help_fnc(int argc, char **argv, struct Env *env) {
@@ -1218,9 +1349,9 @@ void sys_mon(void *dum) {
 	io_write(fd,"Starting sys_mon\n",17);
 
 	while(1) {
+		int rc;
 		fprintf(fd,"\n--->");
-		{
-		int rc=io_read(fd,buf,200);
+		rc=io_read(fd,buf,200);
 		if (rc>0) {
 			struct cmd *cmd;
 			if (rc>200) {
@@ -1239,7 +1370,6 @@ void sys_mon(void *dum) {
 				continue;
 			}
 			cmd->fnc(argc,argv,&env);
-		}
 		}
 	}
 
@@ -1275,7 +1405,7 @@ void init_sys(void) {
 void start_sys(void) {
 	thread_create(sys_mon,"usart0",3,"sys_mon");
 	thread_create(sys_mon,"stterm0",3,"sys_mon");
-	thread_create(sys_mon,"usb_serial0",3,"sys_mon");
+	thread_create(sys_mon,"usb_serial0",2,"sys_mon");
 }
 
 #else

@@ -5,11 +5,14 @@ CFLAGS=-g -O2 -DDEBUG -DDRIVERSUPPORT -DUNECESS -Wall -mlittle-endian -mthumb -m
 LDFLAGS=-g -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi=hard -mfpu=fpv4-sp-d16 -fno-builtin
 
 
-all: ../lib/os.o ../lib/init_sect.o ../lib/end_sect.o
+all: ../lib ../lib/os.o ../lib/init_sect.o ../lib/end_sect.o
 
 #../lib/syslib.a: os.o init_sect.o end_sect.o
 #	ar -cr $@ $^
 #
+
+../lib:
+	mkdir ../lib
 
 ../lib/os.o: os.o
 	cp $^ $@
