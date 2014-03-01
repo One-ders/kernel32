@@ -10,6 +10,7 @@
 #define ASSERT(a) { if (!(a)) {io_setpolled(1); io_printf("assert stuck\n");} while (!(a)) ; }
 
 int sys_lev;
+unsigned int sys_irqs;
 
 #define TASK_STATE_IDLE		0
 #define TASK_STATE_RUNNING	1
@@ -25,6 +26,8 @@ int sys_lev;
 #define SET_TMARK(a)		((a)->prio_flags|=0x10)
 #define CLR_TMARK(a)		((a)->prio_flags&=0xEF)
 
+struct user_fd;
+
 struct task {
 	char 		*name;            /* 0-3 */
 	void		*sp;              /* 4-7 */
@@ -36,6 +39,7 @@ struct task {
 	void		*bp;		  /* 24-27 */ /* communication buffer for sleeping context */
 	int		bsize;            /* 28-31 */ /* size of the buffer */
 	int		stack_sz;         /* 32-35 */
+	struct user_fd  *fd_list;	  /* 36-39 */ /* open driver list */
 	unsigned int    active_tics;	  /* 36-39 */
 };
 
@@ -82,6 +86,7 @@ struct task *lookup_task_for_name(char *task_name) {
 struct user_fd {
 	struct driver *driver;
 	int driver_ix;
+	struct user_fd *next;
 };
 
 #define FDTAB_SIZE 16
@@ -94,6 +99,9 @@ int get_user_fd(struct driver *d, int driver_ix) {
 		if (!fd_tab[i].driver) {
 			fd_tab[i].driver=d;
 			fd_tab[i].driver_ix=driver_ix;
+
+			fd_tab[i].next=current->fd_list;
+			current->fd_list=&fd_tab[i];
 			return i;
 		}
 	}
@@ -182,6 +190,7 @@ void __attribute__ (( naked )) PendSV_Handler(void) {
 void *PendSV_Handler_c(unsigned long int *save_sp) {
 	int i=0;	
 	struct task *t;
+	sys_irqs++;
 	while(i<MAX_PRIO) {
 		t=ready[i];	
 		if (t) {
@@ -197,6 +206,7 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 	if (current->state==TASK_STATE_RUNNING) {
 		int prio=current->prio_flags&0xf;
 		current->state=TASK_STATE_READY;
+		CLR_TMARK(current);
 		if (prio>4) prio=4;
 		if (ready[prio]) {
 			ready_last[prio]->next=current;
@@ -268,6 +278,7 @@ void SysTick_Handler_c(void *sp) {
 	struct tq *tqp;
 	int p=5;
 	current->active_tics++;
+	sys_irqs++;
 	tq_tic++;
 	tqp=&tq[tq_tic%1024];
 
@@ -301,7 +312,6 @@ void SysTick_Handler_c(void *sp) {
 
 	if (GET_TMARK(current) && ready[GET_PRIO(current)]) {
 		DEBUGP(DLEV_SCHED,"time slice: switch out %s, switch in %s\n", current->name, ready[GET_PRIO(current)]->name);
-		CLR_TMARK(current);
 		pendSV();
 		return;
 	}
@@ -452,10 +462,41 @@ void __attribute__ (( naked )) SVC_Handler(void) {
 
 int svc_kill_self(void);
 
+int close_drivers(void) {
+	struct user_fd *fdl=current->fd_list;
 
+	current->fd_list=0;
+	while(fdl) {
+		struct user_fd *fdlnext=fdl->next;
+		fdl->driver->ops->close(fdl->driver_ix);
+		fdl->driver=0;
+		fdl->next=0;
+		fdl=fdlnext;
+	}
+	return 0;
+}
+
+int detach_driver_fd(struct user_fd *fd) {
+	struct user_fd *fdl=current->fd_list;
+	struct user_fd **fdprev=&current->fd_list;
+
+	while(fdl) {
+		if (fdl==fd) {
+			(*fdprev)=fd->next;
+			fd->next=0;
+			fd->driver=0;
+			return 0;
+		}
+		fdprev=&fdl->next;
+		fdl=fdl->next;
+	}
+	return -1;
+}
 
 void *SVC_Handler_c(unsigned long int *svc_args) {
 	unsigned int svc_number;
+
+	sys_irqs++;
 	/*
 	 * Stack contains:
 	 * r0, r1, r2, r3, r12, r14, the return address and xPSR
@@ -527,6 +568,7 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 		case SVC_KILL_SELF: {
 			if (current->state!=TASK_STATE_RUNNING) return 0;
 
+			close_drivers();
 			current->state=TASK_STATE_DEAD;
 
 			DEBUGP(DLEV_SCHED,"kill self  task: name %s\n", current->name);
@@ -536,6 +578,7 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 		case SVC_SLEEP: {
 			struct tq *tout=&tq[(svc_args[0]+tq_tic)%1024];
 			if (current->state!=TASK_STATE_RUNNING) return 0;
+			CLR_TMARK(current);
 			current->state=TASK_STATE_TIMER;
 			if (!tout->tq_out_first) {
 				tout->tq_out_first=current;
@@ -559,6 +602,7 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			current->bp=bp;
 			current->bsize=bsize;
 
+			CLR_TMARK(current);
 			current->state=TASK_STATE_IO;
 			if (so->task_list) {
 				so->task_list_last->next=current;
@@ -661,6 +705,20 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			}
 
 			svc_args[0]=driver->ops->control(kfd,svc_args[1],(void *)svc_args[2],svc_args[3]);
+			return 0;
+		}
+		case SVC_IO_CLOSE: {
+			int fd=(int)svc_args[0];
+			struct driver *driver=fd_tab[fd].driver;
+			int kfd=fd_tab[fd].driver_ix;
+			if (!driver) {
+				svc_args[0]=-1;
+				return 0;
+			}
+
+			detach_driver_fd(&fd_tab[fd]);
+
+			svc_args[0]=driver->ops->close(kfd);
 			return 0;
 		}
 		case SVC_BLOCK_TASK: {
@@ -814,6 +872,7 @@ void *sys_sleep(unsigned int ms) {
 	}
 
 	if (current->state!=TASK_STATE_RUNNING) return 0;
+	CLR_TMARK(current);
 	current->state=TASK_STATE_TIMER;
 	if (!tout->tq_out_first) {
 		tout->tq_out_first=current;
@@ -839,6 +898,7 @@ void *sys_sleepon(struct sleep_obj *so, void *bp, int bsize) {
 	current->bp=bp;
 	current->bsize=bsize;
 
+	CLR_TMARK(current);
 	current->state=TASK_STATE_IO;
 
 	if (so->task_list) {
@@ -1153,6 +1213,7 @@ static int get_state(struct task *t) {
 
 static int ps_fnc(int argc, char **argv, struct Env *env) {
 	struct task *t=troot;
+	fprintf(env->io_fd," sys_irqs %d\n", sys_irqs);
 	while(t) {
 		fprintf(env->io_fd,"task(%x) %12s, sp=0x%08x, pc=0x%08x, prio=%x, state=%c, atics=%d\n", 
 			t, t->name, t->sp, (t->state!=TASK_STATE_RUNNING)?((unsigned int *)t->sp)[13]:0xffffffff, t->prio_flags, get_state(t), t->active_tics);
@@ -1165,9 +1226,22 @@ static int lsdrv_fnc(int argc, char **argv, struct Env *env) {
 	struct driver *d=drv_root;
 	fprintf(env->io_fd,"=========== Installed drivers =============\n");
 	while(d) {
-		fprintf(env->io_fd,"%s\n", d->name);
+		struct task *t=troot;
+		fprintf(env->io_fd,"%s\t\t", d->name);
+		while(t) {
+			struct user_fd *ofd=t->fd_list;
+			while(ofd) {
+				if (ofd->driver==d) {
+					fprintf(env->io_fd,"%s ",t->name);
+				}
+				ofd=ofd->next;
+			}
+			t=t->next2;
+		}
 		d=d->next;
+		fprintf(env->io_fd,"\n");
 	}
+	fprintf(env->io_fd,"=========== End Installed drivers =============\n");
 	return 0;
 }
 
