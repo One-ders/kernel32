@@ -22,6 +22,7 @@ struct sleep_obj {
 extern volatile unsigned int tq_tic;
 
 void init_sys(void);
+void start_sys(void);
 void *getSlab_256(void);
 int sleep(unsigned int ms);
 int thread_create(void *fnc, void *val, int prio, char *name);

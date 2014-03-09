@@ -41,6 +41,7 @@ struct task {
 	int		stack_sz;         /* 32-35 */
 	struct user_fd  *fd_list;	  /* 36-39 */ /* open driver list */
 	unsigned int    active_tics;	  /* 36-39 */
+	struct sleep_obj blocker;
 };
 
 
@@ -65,7 +66,7 @@ void *getSlab_256(void) {
 	return 0;
 }
 
-void *getSlab_512(void) {
+void *getSlab_768(void) {
 	int t=free_slab_256;
 	free_slab_256+=3;
 	return &slab_256[t];
@@ -120,8 +121,9 @@ volatile unsigned int tq_tic;
 #define XPSR(a)	((unsigned int *)a)[7]
 #define TASK_XPSR(a)	((unsigned int *)a)[15]
 
+#if 0
 #define BP(a...) {disable_interrupt();io_setpolled(1); io_printf(a); enable_interrupt();io_setpolled(0);}
-
+#endif
 
 
 
@@ -354,42 +356,6 @@ void __attribute__ (( naked )) HardFault_Handler(void) {
 	);
 }
 
-/*
- * WWDG_IRQHandler
- */
-void __attribute__ (( naked )) WWDG_IRQHandler(void) {
-	io_setpolled(1);
-	io_printf("in wwdg handler\n");
-	ASSERT(0);
-  
-#if 0
-	asm volatile ( "tst lr,#4\n\t"
-			"ite eq\n\t"
-			"mrseq r0,msp\n\t"
-			"mrsne r0,psp\n\t"
-			"mov r1,lr\n\t"
-			"mov r2,r0\n\t"
-			"push {r1-r2}\n\t"
-			"bl %[Error_Handler_c]\n\t"
-			"pop {r1-r2}\n\t"
-			"mov lr,r1\n\t"
-			"cmp	r0,#0\n\t"
-			"bne.n	1f\n\t"
-			"bx lr\n\t"
-			"1:\n\t"
-			"ldr r1,=current\n\t"
-			"str r0,[r1,#0]\n\t"
-			"ldr r0,[r0,#4]\n\t"
-			"mov sp,r0\n\t"
-			"ldmfd sp!,{r4-r11}\n\t"
-			"bx lr\n\t"
-			:
-			: [Error_Handler_c] "i" (Error_Handler_c)
-			: 
-	);
-#endif
-}
-
 void Error_Handler_c(void *sp_v) {
 	unsigned int *sp=(unsigned int *)sp_v;
 	io_setpolled(1);
@@ -493,6 +459,10 @@ int detach_driver_fd(struct user_fd *fd) {
 	return -1;
 }
 
+static int sys_drv_wakeup(void *user_ref) {
+	io_printf("sys_drv_wakeup called for %s\n", current->name);
+}
+
 void *SVC_Handler_c(unsigned long int *svc_args) {
 	unsigned int svc_number;
 
@@ -512,7 +482,7 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 //			unsigned int stacksz=svc_args[2];
 			char *name=(char *)svc_args[3];
 			int prio = svc_args[2];
-			struct task *t=(struct task *)getSlab_512();
+			struct task *t=(struct task *)getSlab_768();
 			unsigned long int *stackp;
 
 			if (prio>MAX_PRIO) {
@@ -663,7 +633,7 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 				svc_args[0]=-1;
 				return 0;
 			}
-			kfd=drv->ops->open(drv->instance,0,0);
+			kfd=drv->ops->open(drv->instance,sys_drv_wakeup,&current->blocker);
 			if (kfd<0) {
 				svc_args[0]=-1;
 				return 0;

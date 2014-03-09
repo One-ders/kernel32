@@ -1,0 +1,19 @@
+
+#define GPIO_DRV "gpio_drv"
+
+#define GPIO_SET_PIN			1
+#define GPIO_GET_PIN			2
+/* PIN map, on Discovery */
+#define PA0					
+
+#define GPIO_SET_INPUT_MODE		3
+#define GPIO_GET_INPUT_MODE		4
+#define GPIO_MODE_INPUT_FLOAT		1
+#define GPIO_MODE_INPUT_PULLUP		2
+#define GPIO_MODE_INPUT_PULLDOWN	3
+
+#define GPIO_SET_OUTPUT_MODE		5
+#define GPIO_GET_OUTPUT_MODE		6
+#define GPIO_MODE_OUTPUT_OPEN_PULLUP	1
+#define GPIO_MODE_OUTPUT_OPEN_PULLDOWN	2
+#define GPIO_MODE_OUTPUT_PUSH_PULL	3
