@@ -18,10 +18,12 @@ int io_cb_handler(void *dum) {
 void io_push() {
 }
 
+#if 0
 int io_puts(const char *str) {
 	if (!iodrv) return 0;
 	return iodrv->ops->control(kfd, WR_CHAR, (char *)str, __builtin_strlen(str));
 }
+#endif
 
 int io_add_c(const char c) {
 	if (!iodrv) return 0;
@@ -32,6 +34,12 @@ int io_add_str(const char *str) {
 	if (!iodrv) return 0;
 	return iodrv->ops->control(kfd, WR_CHAR, (char *)str, __builtin_strlen(str));
 }
+
+int io_add_strn(const char *bytes, int len) {
+	if (!iodrv) return 0;
+	return iodrv->ops->control(kfd, WR_CHAR, (char *)bytes, len);
+}
+
 
 int in_print;
 int pulled;
@@ -140,6 +148,7 @@ int io_printf(const char *fmt, ...) {
 	int i=0;
 	va_list ap;
 	char numericbuf[16];
+	char *ppos=fmt;
 
 	/* protect against recursion */
 	if (__sync_fetch_and_or(&in_print,1)) {
@@ -148,12 +157,24 @@ int io_printf(const char *fmt, ...) {
 	
 	va_start(ap,fmt);
 	while(1) {
-		int c=fmt[i++];
-		if (!c) break;
-		else if (c=='%') {
+		char *cppos;
+		int c;
+		if (!(*ppos)) break;
+		cppos=__builtin_strchr(ppos,'%');
+		if (cppos) {
+			int len=cppos-ppos;
+			if (len) io_add_strn(ppos,len);
+			ppos=cppos;
+			i=0;
+		} else {
+			io_add_str(ppos);
+			break;
+		}
+		c=ppos[i++];
+		if (c=='%') {
 			int prepend_zero=0, prepend_num=0;
-			i+=parse_fmt(&fmt[i],&prepend_num, &prepend_zero);
-			switch((c=fmt[i++])) {
+			i+=parse_fmt(&ppos[i],&prepend_num, &prepend_zero);
+			switch((c=ppos[i++])) {
 				case 's': {
 					char *s=va_arg(ap,char *);
 					int len=io_add_str(s);
@@ -187,9 +208,8 @@ int io_printf(const char *fmt, ...) {
 					io_add_c(c);
 				}
 			}
-		} else {
-			io_add_c(c);
 		}
+		ppos+=i;
 		
 	}
 	va_end(ap);
