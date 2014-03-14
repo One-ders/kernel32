@@ -7,7 +7,7 @@ LDFLAGS=-g -T../incl/stm32_flash.ld -mlittle-endian -mthumb -mcpu=cortex-m4 -mth
 
 all: cec_a1_ctrl
 
-cec_a1_ctrl: main.o cec_drv.o 
+cec_a1_ctrl: main.o cec_drv.o gpio_drv.o
 	$(CC) $(LDFLAGS) -o $@ ../lib/init_sect.o ../lib/led_drv.o ../lib/hr_timer.o ../lib/os.o ../lib/bsp.o $^ ../lib/end_sect.o 
 
 

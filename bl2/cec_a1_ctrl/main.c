@@ -15,8 +15,8 @@ void cec_gw(void *dum) {
 	int fd=io_open(CEC_DRV);
 	if (!fd) return;
 	while(1) {
-		printf("in cec_gw: at sec %d\n", s);
 #if 0
+		printf("in cec_gw: at sec %d\n", s);
 		if (((s-2)%10)==0) {
 			io_control(hr_t2,HR_TIMER_SET,&tout,sizeof(tout));
 		} else if (((s-7)%10)==0) {
