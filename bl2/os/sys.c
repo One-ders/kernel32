@@ -1,13 +1,11 @@
 
-//#include "stm32f4xx_conf.h"
 #include "stm32f4xx.h"
 #include "io.h"
 #include "sys.h"
-//#include "stm32f407.h"
 
 #include <string.h>
 
-#define ASSERT(a) { if (!(a)) {io_setpolled(1); io_printf("assert stuck\n");} while (!(a)) ; }
+#define ASSERT(a) { if (!(a)) {io_setpolled(1); sys_printf("assert stuck\n");} while (!(a)) ; }
 
 int sys_lev;
 unsigned int sys_irqs;
@@ -41,6 +39,7 @@ struct task {
 	int		stack_sz;         /* 32-35 */
 	struct user_fd  *fd_list;	  /* 36-39 */ /* open driver list */
 	unsigned int    active_tics;	  /* 36-39 */
+	struct sel_args *sel_args;
 	struct sleep_obj blocker;
 };
 
@@ -49,8 +48,8 @@ struct task * volatile ready[5];
 struct task * volatile ready_last[5];
 
 struct task main_task = { "init_main", (void *)0x20020000, 0, 0, 1, 3, 0,0,512 };
-struct task * volatile current = &main_task;
 struct task *troot =&main_task;
+struct task * volatile current = &main_task;
 
 struct Slab_256 {
 	unsigned char mem[256];
@@ -72,82 +71,6 @@ void *getSlab_768(void) {
 	return &slab_256[t];
 };
 
-
-struct task *lookup_task_for_name(char *task_name) {
-	struct task *t=troot;
-	while(t) {
-		if (__builtin_strncmp(t->name,task_name,strlen(t->name)+1)==0) {
-			return t;
-		}
-		t=t->next2;
-	}
-	return 0;
-}
-
-struct user_fd {
-	struct driver *driver;
-	int driver_ix;
-	struct user_fd *next;
-};
-
-#define FDTAB_SIZE 16
-
-struct user_fd fd_tab[FDTAB_SIZE];
-
-int get_user_fd(struct driver *d, int driver_ix) {
-	int i;
-	for(i=0;i<FDTAB_SIZE;i++) {
-		if (!fd_tab[i].driver) {
-			fd_tab[i].driver=d;
-			fd_tab[i].driver_ix=driver_ix;
-
-			fd_tab[i].next=current->fd_list;
-			current->fd_list=&fd_tab[i];
-			return i;
-		}
-	}
-	return -1;
-}
-
-struct tq {
-	struct task *tq_out_first;
-	struct task *tq_out_last;
-} tq[1024];
-
-volatile unsigned int tq_tic;
-
-
-#define LR(a)	((unsigned int *)a)[5]
-#define XPSR(a)	((unsigned int *)a)[7]
-#define TASK_XPSR(a)	((unsigned int *)a)[15]
-
-#if 0
-#define BP(a...) {disable_interrupt();io_setpolled(1); io_printf(a); enable_interrupt();io_setpolled(0);}
-#endif
-
-
-
-
-
-static inline unsigned int  xpsr() {
-	register unsigned int r0 asm("r0");
-	__asm__ __volatile__("mrs r0,xpsr"::: "r0");
-	return r0;
-}
-
-void check_stack(struct task *t,struct task *n) {
-#if 1
-	unsigned int stack_size=768-sizeof(*t);
-	unsigned int stack_base=(t==&main_task)?0x20020000:((unsigned int)t)+768;
-	if ((((unsigned int)t->sp)<(stack_base-stack_size))||(((unsigned int)t->sp)>stack_base)) {
-		io_setpolled(1);
-		io_printf("stack corruption on task %x\n", t);
-		ASSERT(0);
-	}
-
-#endif
-}
-
 /*
  * PendSV handler
  */
@@ -162,7 +85,8 @@ void __attribute__ (( naked )) PendSV_Handler(void) {
 			"mov r2,r0\n\t"
 			"push {r1-r2}\n\t"
 			"cpsid i\n\t"    // I need to run this with irq off, usart driver chrashes all when unplugged
-			"bl %[PendSV_Handler_c]\n\t"
+//			"bl %[PendSV_Handler_c]\n\t"
+			"bl PendSV_Handler_c\n\t"
 			"pop {r1-r2}\n\t"
 			"mov lr,r1\n\t"
 			"cmp	r0,#0\n\t"
@@ -171,10 +95,10 @@ void __attribute__ (( naked )) PendSV_Handler(void) {
 			"bx lr\n\t"
 			"1:\n\t"
 			"stmfd r2!,{r4-r11}\n\t"
-			"ldr r1,=current\n\t"
+			"ldr r1,.L1\n\t"
 			"ldr r1,[r1]\n\t"
 			"str r2,[r1,#4]\n\t"
-			"ldr r1,=current\n\t"
+			"ldr r1,.L1\n\t"
 			"str r0,[r1,#0]\n\t"
 			"movs r2,#1\n\t"
 			"str r2,[r0,#16]\n\t"
@@ -183,11 +107,65 @@ void __attribute__ (( naked )) PendSV_Handler(void) {
 			"ldmfd sp!,{r4-r11}\n\t"
 			"cpsie i\n\t"
 			"bx lr\n\t"
+			".L1: .word current\n\t"
 			:
-			: [PendSV_Handler_c] "i" (PendSV_Handler_c)
-			: 
+			:
+//			: [PendSV_Handler_c] "i" (PendSV_Handler_c)
+//			: [current] "m" (current)
+			:
 	);
 }
+
+
+
+struct task *lookup_task_for_name(char *task_name) {
+	struct task *t=troot;
+	while(t) {
+		if (__builtin_strncmp(t->name,task_name,strlen(t->name)+1)==0) {
+			return t;
+		}
+		t=t->next2;
+	}
+	return 0;
+}
+struct tq {
+	struct task *tq_out_first;
+	struct task *tq_out_last;
+} tq[1024];
+
+volatile unsigned int tq_tic;
+
+
+#define LR(a)	((unsigned int *)a)[5]
+#define XPSR(a)	((unsigned int *)a)[7]
+#define TASK_XPSR(a)	((unsigned int *)a)[15]
+
+#if 0
+#define BP(a...) {disable_interrupt();io_setpolled(1); sys_printf(a); enable_interrupt();io_setpolled(0);}
+#endif
+
+
+
+
+
+static inline unsigned int  xpsr() {
+	register unsigned int r0 asm("r0");
+	__asm__ __volatile__("mrs r0,xpsr"::: "r0");
+	return r0;
+}
+
+#if 0
+void check_stack(struct task *t,struct task *n) {
+	unsigned int stack_size=768-sizeof(*t);
+	unsigned int stack_base=(t==&main_task)?0x20020000:((unsigned int)t)+768;
+	if ((((unsigned int)t->sp)<(stack_base-stack_size))||(((unsigned int)t->sp)>stack_base)) {
+		io_setpolled(1);
+		sys_printf("stack corruption on task %x\n", t);
+		ASSERT(0);
+	}
+
+}
+#endif
 
 void *PendSV_Handler_c(unsigned long int *save_sp) {
 	int i=0;	
@@ -244,7 +222,7 @@ __attribute__ ((naked)) int fake_pendSV(void) {
 	return 1;
 }
 
-#if 1
+#if 0
 void SysTick_Handler_c(void *sp);
 
 void __attribute__ (( naked )) SysTick_Handler(void) {
@@ -276,7 +254,10 @@ void __attribute__ (( naked )) SysTick_Handler(void) {
 
 void Error_Handler_c(void *sp);
 
+#if 0
 void SysTick_Handler_c(void *sp) {
+#endif
+void SysTick_Handler(void) {
 	struct tq *tqp;
 	int p=5;
 	current->active_tics++;
@@ -325,7 +306,7 @@ void SysTick_Handler_c(void *sp) {
 
 void __attribute__ (( naked )) UsageFault_Handler(void) {
 	io_setpolled(1);
-	io_printf("in usagefault handler\n");
+	sys_printf("in usagefault handler\n");
 	ASSERT(0);
 }
   
@@ -340,15 +321,6 @@ void __attribute__ (( naked )) HardFault_Handler(void) {
 			"bl %[Error_Handler_c]\n\t"
 			"pop {r1-r2}\n\t"
 			"mov lr,r1\n\t"
-			"cmp	r0,#0\n\t"
-			"bne.n	1f\n\t"
-			"bx lr\n\t"
-			"1:\n\t"
-			"ldr r1,=current\n\t"
-			"str r0,[r1,#0]\n\t"
-			"ldr r0,[r0,#4]\n\t"
-			"mov sp,r0\n\t"
-			"ldmfd sp!,{r4-r11}\n\t"
 			"bx lr\n\t"
 			:
 			: [Error_Handler_c] "i" (Error_Handler_c)
@@ -359,14 +331,14 @@ void __attribute__ (( naked )) HardFault_Handler(void) {
 void Error_Handler_c(void *sp_v) {
 	unsigned int *sp=(unsigned int *)sp_v;
 	io_setpolled(1);
-	io_printf("\nerrorhandler trap, current=%s@0x%08x sp=0x%08x\n",current->name,current,sp);
-	io_printf("Value of CFSR register 0x%08x\n", SCB->CFSR);
-	io_printf("Value of HFSR register 0x%08x\n", SCB->HFSR);
-	io_printf("Value of DFSR register 0x%08x\n", SCB->DFSR);
-	io_printf("Value of MMFAR register 0x%08x\n", SCB->MMFAR);
-	io_printf("Value of BFAR register 0x%08x\n", SCB->BFAR);
-	io_printf("r0 =0x%08x, r1=0x%08x, r2=0x%08x, r3  =0x%08x\n", sp[0], sp[1], sp[2], sp[3]);
-	io_printf("r12=0x%08x, LR=0x%08x, PC=0x%08x, xPSR=0x%08x\n", sp[4], sp[5], sp[6], sp[7]);
+	sys_printf("\nerrorhandler trap, current=%s@0x%08x sp=0x%08x\n",current->name,current,sp);
+	sys_printf("Value of CFSR register 0x%08x\n", SCB->CFSR);
+	sys_printf("Value of HFSR register 0x%08x\n", SCB->HFSR);
+	sys_printf("Value of DFSR register 0x%08x\n", SCB->DFSR);
+	sys_printf("Value of MMFAR register 0x%08x\n", SCB->MMFAR);
+	sys_printf("Value of BFAR register 0x%08x\n", SCB->BFAR);
+	sys_printf("r0 =0x%08x, r1=0x%08x, r2=0x%08x, r3  =0x%08x\n", sp[0], sp[1], sp[2], sp[3]);
+	sys_printf("r12=0x%08x, LR=0x%08x, PC=0x%08x, xPSR=0x%08x\n", sp[4], sp[5], sp[6], sp[7]);
 	
 	ASSERT(0);
 }
@@ -398,13 +370,6 @@ void __attribute__ (( naked )) SVC_Handler(void) {
 			"bl %[SVC_Handler_c]\n\t"
 			"pop {r1-r2}\n\t"
 			"mov lr,r1\n\t"
-			"cmp	r0,#0\n\t"
-			"bne.n	1f\n\t"
-			"bx lr\n\t"
-			"1:\n\t"
-			"ldr r0,[r0,#4]\n\t"
-			"mov sp,r0\n\t"
-			"ldmfd sp!,{r4-r11}\n\t"
 			"bx lr\n\t"
 			:
 			: [SVC_Handler_c] "i" (SVC_Handler_c)
@@ -412,21 +377,34 @@ void __attribute__ (( naked )) SVC_Handler(void) {
 	);
 }
 
-#define SVC_CREATE_TASK 1
-#define SVC_SLEEP	2
-#define SVC_SLEEP_ON    3
-#define SVC_WAKEUP      4
-#define SVC_IO_OPEN	5
-#define SVC_IO_READ	6
-#define SVC_IO_WRITE	7
-#define SVC_IO_CONTROL	8
-#define SVC_IO_CLOSE	9
-#define SVC_KILL_SELF  10
-#define SVC_BLOCK_TASK	11
-#define SVC_UNBLOCK_TASK 12
-#define SVC_SETPRIO_TASK 13
-
 int svc_kill_self(void);
+
+struct user_fd {
+	struct driver *driver;
+	int driver_ix;
+	unsigned int flags;
+	struct user_fd *next;
+};
+
+#define FDTAB_SIZE 16
+
+struct user_fd fd_tab[FDTAB_SIZE];
+
+int get_user_fd(struct driver *d, int driver_ix) {
+	int i;
+	for(i=1;i<FDTAB_SIZE;i++) {
+		if (!fd_tab[i].driver) {
+			fd_tab[i].driver=d;
+			fd_tab[i].driver_ix=driver_ix;
+
+			fd_tab[i].next=current->fd_list;
+			current->fd_list=&fd_tab[i];
+			return i;
+		}
+	}
+	return -1;
+}
+
 
 int close_drivers(void) {
 	struct user_fd *fdl=current->fd_list;
@@ -456,11 +434,24 @@ int detach_driver_fd(struct user_fd *fd) {
 		fdprev=&fdl->next;
 		fdl=fdl->next;
 	}
+
 	return -1;
 }
 
-static int sys_drv_wakeup(void *user_ref) {
-	io_printf("sys_drv_wakeup called for %s\n", current->name);
+static int sys_drv_wakeup(int fd, int ev, void *user_ref) {
+	struct task *task=(struct task *)user_ref;
+	if (ev&EV_READ) {
+		(*task->sel_args->rfds)|=(1<<fd);
+	}
+	if (ev&EV_WRITE) {
+		(*task->sel_args->wfds)|=(1<<fd);
+	}
+	if (ev&EV_STATE) {
+		(*task->sel_args->stfds)|=(1<<fd);
+	}
+	task->sel_args->nfds++;
+	sys_wakeup(&task->blocker,0,0);
+	return 0;
 }
 
 void *SVC_Handler_c(unsigned long int *svc_args) {
@@ -626,54 +617,100 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			break;
 		}
 		case SVC_IO_OPEN: {
+			struct driver *drv;
 			char *drvname=(char *)svc_args[0];
 			int  kfd;
-			struct driver *drv=driver_lookup(drvname);
+			int  ufd;
+			drv=driver_lookup(drvname);
 			if (!drv) {
 				svc_args[0]=-1;
 				return 0;
 			}
-			kfd=drv->ops->open(drv->instance,sys_drv_wakeup,&current->blocker);
-			if (kfd<0) {
+			ufd=get_user_fd(((struct driver *)0xffffffff),0);
+			if (ufd<0) {
 				svc_args[0]=-1;
 				return 0;
 			}
-			svc_args[0]=get_user_fd(drv,kfd);
+			kfd=drv->ops->open(drv->instance,sys_drv_wakeup,current,ufd);
+			if (kfd<0) {
+				detach_driver_fd(&fd_tab[ufd]);
+				svc_args[0]=-1;
+				return 0;
+			}
+			fd_tab[ufd].driver=drv;
+			fd_tab[ufd].driver_ix=kfd;
+			fd_tab[ufd].flags=0;
+			svc_args[0]=ufd;
 			return 0;
 		}
 		case SVC_IO_READ: {
 			int fd=(int)svc_args[0];
-			struct driver *driver=fd_tab[fd].driver;
-			int kfd=fd_tab[fd].driver_ix;
+			int rc;
+			struct user_fd *fdd=&fd_tab[fd];
+			struct driver *driver=fdd->driver;
+			int kfd=fdd->driver_ix;
 			if (!driver) {
 				svc_args[0]=-1;
 				return 0;
 			}
 
-			svc_args[0]=driver->ops->control(kfd,RD_CHAR,(void *)svc_args[1],svc_args[2]);
+			while(1) {
+				rc=driver->ops->control(kfd,RD_CHAR,(void *)svc_args[1],svc_args[2]);
+				if (rc==-DRV_AGAIN&&(!fdd->flags&O_NONBLOCK)) {
+					sys_sleepon(&current->blocker,0,0);
+				} else {
+					break;
+				}
+			}
+			svc_args[0]=rc;
 			return 0;
 		}
 		case SVC_IO_WRITE: {
 			int fd=(int)svc_args[0];
-			struct driver *driver=fd_tab[fd].driver;
-			int kfd=fd_tab[fd].driver_ix;
+			struct user_fd *fdd=&fd_tab[fd];
+			struct driver *driver=fdd->driver;
+			int kfd=fdd->driver_ix;
+			int rc;
 			if (!driver) {
 				svc_args[0]=-1;
 				return 0;
 			}
 
-			svc_args[0]=driver->ops->control(kfd,WR_CHAR,(void *)svc_args[1],svc_args[2]);
+again:
+			rc=driver->ops->control(kfd,WR_CHAR,(void *)svc_args[1],svc_args[2]);
+
+			if (rc==-DRV_AGAIN&&(!(fdd->flags&O_NONBLOCK))) {
+				sys_sleepon(&current->blocker,0,0);
+				goto again;
+			}
+			if (rc==-DRV_INPROGRESS&&(!(fdd->flags&O_NONBLOCK))) {
+				int result;
+				sys_sleepon(&current->blocker,0,0);
+				rc=driver->ops->control(kfd,WR_GET_RESULT,&result,sizeof(result));
+				if (rc<0) {
+					svc_args[0]=rc;
+				} else {
+					svc_args[0]=result;
+				}
+				return 0;
+			}
+			svc_args[0]=rc;
 			return 0;
 		}
 		case SVC_IO_CONTROL: {
 			int fd=(int)svc_args[0];
-			struct driver *driver=fd_tab[fd].driver;
-			int kfd=fd_tab[fd].driver_ix;
+			struct user_fd *fdd=&fd_tab[fd];
+			struct driver *driver=fdd->driver;
+			int kfd=fdd->driver_ix;
 			if (!driver) {
 				svc_args[0]=-1;
 				return 0;
 			}
 
+			if (svc_args[1]==F_SETFL) {
+				fdd->flags=svc_args[2];
+				return 0;
+			}
 			svc_args[0]=driver->ops->control(kfd,svc_args[1],(void *)svc_args[2],svc_args[3]);
 			return 0;
 		}
@@ -689,6 +726,99 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			detach_driver_fd(&fd_tab[fd]);
 
 			svc_args[0]=driver->ops->close(kfd);
+			return 0;
+		}
+		case SVC_IO_SELECT: {
+			struct sel_args *sel_args=(struct sel_args *)svc_args[0];
+			int nfds=sel_args->nfds;
+			fd_set rfds=*sel_args->rfds;
+			fd_set wfds=*sel_args->wfds;
+			fd_set stfds=*sel_args->stfds;
+//			unsigned int *tout=sel_args->tout;
+			int i;
+
+			sel_args->nfds=0;
+			*sel_args->rfds=0;
+			*sel_args->wfds=0;
+			*sel_args->stfds=0;
+
+			for(i=0;i<nfds;i++) {
+				if (wfds&(1<<i)) {
+					struct driver *driver=fd_tab[i].driver;
+					int kfd=fd_tab[i].driver_ix;
+					if (driver) {
+						if (driver->ops->control(kfd,IO_POLL,(void *)EV_WRITE,0)) {
+							*sel_args->wfds=(1<<i);
+							svc_args[0]=1;
+							return 0;
+						}
+					} else {
+						svc_args[0]=-1;
+						return 0;
+					}
+				}
+			}
+
+			for(i=0;i<nfds;i++) {
+				if (rfds&(1<<i)) {
+					struct driver *driver=fd_tab[i].driver;
+					int kfd=fd_tab[i].driver_ix;
+					if (driver) {
+						if (driver->ops->control(kfd,IO_POLL,(void *)EV_READ,0)) {
+							*sel_args->rfds=(1<<i);
+							svc_args[0]=1;
+							return 0;
+						}
+					} else {
+						svc_args[0]=-1;
+						return 0;
+					}
+				}
+			}
+
+			for(i=0;i<nfds;i++) {
+				if (stfds&(1<<i)) {
+					struct driver *driver=fd_tab[i].driver;
+					int kfd=fd_tab[i].driver_ix;
+					if (driver) {
+						if (driver->ops->control(kfd,IO_POLL,(void *)EV_STATE,0)) {
+							*sel_args->stfds=(1<<i);
+							svc_args[0]=1;
+							return 0;
+						}
+					} else {
+						svc_args[0]=-1;
+						return 0;
+					}
+				}
+			}
+#if 0
+			for(i=0;i<nfds;i++) {
+				struct driver *driver=fd_tab[i].driver;
+				int kfd=fd_tab[i].driver_ix;
+				int fdbit=(1<<i);
+				int events=(fdbit&rfds)?EV_READ:0|(fdbit&wfds)?EV_WRITE:0|
+						(fdbit&stfds)?EV_STATE:0;
+				if (driver) {
+					driver->ops->control(kfd,IO_CALL,(void *)events,0);
+				}
+			}
+#endif
+
+			current->sel_args=sel_args;
+			sys_sleepon(&current->blocker,0,0);
+			current->sel_args=0;
+
+#if 0
+			for(i=0;i<nfds;i++) {
+				struct driver *driver=fd_tab[i].driver;
+				int kfd=fd_tab[i].driver_ix;
+				if (driver) {
+					driver->ops->control(kfd,IO_NOCALL,(void *)(EV_READ|EV_WRITE|EV_STATE),0);
+				}
+			}
+#endif
+			svc_args[0]=sel_args->nfds;
 			return 0;
 		}
 		case SVC_BLOCK_TASK: {
@@ -921,154 +1051,13 @@ int dbglev=0;
 #endif
 
 
-/*
- *    Task side library calls
- */
 
-/*
- * Inline assembler helper directive: call SVC with the given immediate
- */
-#define svc(code) asm volatile ("svc %[immediate]\n\t"::[immediate] "I" (code))
- 
-/*
- * Use a normal C function, the compiler will make sure that this is going
- * to be called using the standard C ABI which ends in a correct stack
- * frame for our SVC call
- */
-
-//int svc_switch_to(void *);
-int svc_create_task(void *fnc, void *val, int prio, char *name);
-int svc_sleep(unsigned int);
-int svc_sleep_on(struct sleep_obj *, void *buf, int size);
-int svc_wakeup(struct sleep_obj *, void *buf, int size);
-
-int svc_io_open(const char *);
-int svc_io_read(int fd, const char *b, int size);
-int svc_io_write(int fd, const char *b, int size);
-int svc_io_control(int fd, int cmd, void *b, int s);
-int svc_io_close(int fd);
-int svc_block_task(char *name);
-int svc_unblock_task(char *name);
-int svc_setprio_task(char *name, int prio);
-
-
-__attribute__ ((noinline)) int svc_create_task(void *fnc, void *val, int prio, char *name) {
-	register int rc asm("r0");
-	svc(SVC_CREATE_TASK);
-	return rc;
-}
-
-
-__attribute__ ((noinline)) int svc_kill_self() {
-	svc(SVC_KILL_SELF);
+int install_console(struct driver *d) {
+	fd_tab[0].driver=d;
+	fd_tab[0].driver_ix=0;
 	return 0;
 }
 
-
-__attribute__ ((noinline)) int svc_sleep(unsigned int ms) {
-	register int rc asm("r0");
-	svc(SVC_SLEEP); 
-	return rc;
-}
-
-__attribute__ ((noinline)) int svc_sleep_on(struct sleep_obj *so, void *buf, int bsize) {
-	register int rc asm("r0");
-	svc(SVC_SLEEP_ON);
-	return rc;
-}
-
-__attribute__ ((noinline)) int svc_wakeup(struct sleep_obj *so, void *buf, int bsize) {
-	register int rc asm("r0");
-	svc(SVC_WAKEUP);
-	return rc;
-}
-
-
-__attribute__ ((noinline)) int svc_io_open(const char *name) {
-	register int rc asm("r0");
-	svc(SVC_IO_OPEN);
-	return rc;
-}
-
-__attribute__ ((noinline)) int svc_io_read(int fd, const char *b, int size) {
-	register int rc asm("r0");
-	svc(SVC_IO_READ);
-	return rc;
-}
-
-__attribute__ ((noinline)) int svc_io_write(int fd, const char *b, int size) {
-	register int rc asm("r0");
-	svc(SVC_IO_WRITE);
-	return rc;
-}
-
-__attribute__ ((noinline)) int svc_io_control(int fd, int cmd, void *b, int s) {
-	register int rc asm("r0");
-	svc(SVC_IO_CONTROL);
-	return rc;
-}
-
-__attribute__ ((noinline)) int svc_io_close(int fd) {
-	register int rc asm("r0");
-	svc(SVC_IO_CLOSE);
-	return rc;
-}
-
-__attribute__ ((noinline)) int svc_block_task(char *name) {
-	register int rc asm("r0");
-	svc(SVC_BLOCK_TASK);
-	return rc;
-}
-
-__attribute__ ((noinline)) int svc_unblock_task(char *name) {
-	register int rc asm("r0");
-	svc(SVC_UNBLOCK_TASK);
-	return rc;
-}
-
-__attribute__ ((noinline)) int svc_setprio_task(char *name, int prio) {
-	register int rc asm("r0");
-	svc(SVC_SETPRIO_TASK);
-	return rc;
-}
-
-
-
-
-
-int thread_create(void *fnc, void *val, int prio, char *name) {
-	return svc_create_task(fnc, val, prio, name);
-}
-
-
-int sleep(unsigned int ms) {
-	unsigned int tics=ms/10;
-	return svc_sleep(tics);
-}
-
-int sleep_on(struct sleep_obj *so, void *buf, int bsize) {
-	svc_sleep_on(so,buf,bsize);
-	return current->bsize;
-}
-
-int wakeup(struct sleep_obj *so, void *dbuf, int dsize) {
-	return svc_wakeup(so,dbuf,dsize);
-}
-
-int block_task(char *name) {
-	return svc_block_task(name);
-}
-
-int unblock_task(char *name) {
-	return svc_unblock_task(name);
-}
-
-int setprio_task(char *name,int prio) {
-	return svc_setprio_task(name,prio);
-}
-
-
-#ifdef DRIVERSUPPORT
 
 struct driver *drv_root;
 
@@ -1078,6 +1067,9 @@ int driver_publish(struct driver *drv) {
 	if (!p) {
 		drv->next=drv_root;	
 		drv_root=drv;
+	}
+	if (__builtin_strcmp(drv->name,"usart0")==0) {
+		install_console(drv);
 	}
 	return 0;
 }
@@ -1131,42 +1123,7 @@ struct driver  *driver_lookup(char *name) {
 }
 
 
-
-
-/**********************************************************************/
-/*  Driver service calls                                              */
-
-int io_open(const char *drvname) {
-	return svc_io_open(drvname);
-}
-
-int io_read(int fd, char *buf, int size) {
-	return svc_io_read(fd,buf,size);
-}
-
-int io_write(int fd, const char *buf, int size) {
-	return svc_io_write(fd,buf,size);
-}
-
-int io_control(int fd, int cmd, void *d, int sz) {
-	return svc_io_control(fd,cmd,d,sz);
-}
-
-int io_close(int fd) {
-	return -1;
-}
-
-
-
-#endif
-
-#ifdef UNECESS
-
-struct Env {
-	int io_fd;
-};
-
-static int help_fnc(int argc, char **argv, struct Env *env);
+/*** Sys mon functions ***********/
 
 static int get_state(struct task *t) {
 	unsigned int state=t->state;
@@ -1217,7 +1174,7 @@ static int lsdrv_fnc(int argc, char **argv, struct Env *env) {
 
 
 static int debug_fnc(int argc, char **argv, struct Env *env) {
-	if (argc>0) {
+	if (argc>1) {
 		dbglev=10;
 	} else {
 		dbglev=0;
@@ -1250,55 +1207,6 @@ static int unblock_fnc(int argc, char **argv, struct Env *env) {
 	return 0;
 }
 
-unsigned long int strtoul(char *str, char *endp, int base) {
-	char *p=str;
-	int num=0;
-	int mode;
-	unsigned int val=0;
-
-	if (base) {
-		mode=base;
-	} else {
-		if ((p[0]=='0')&&(__builtin_tolower(p[1])=='x')) {
-			mode=16;
-			p=&p[2];
-		} else if (p[0]=='0') {
-			mode=8;
-			p=&p[1];
-		} else {
-			mode=10;
-		}
-	}
-	while(*p) {
-		switch (*p) {
-			case '0':
-			case '1':
-			case '2':
-			case '3':
-			case '4':
-			case '5':
-			case '6':
-			case '7':
-			case '8':
-			case '9':
-				num=(*p)-'0';
-				break;
-			case 'a':
-			case 'b':
-			case 'c':
-			case 'd':
-			case 'e':
-			case 'f':
-				num=__builtin_tolower(*p)-'a';
-				num+=10;
-				break;
-		}
-		val=(val<<mode)|num;
-		p++;
-	}
-	return val;
-}
-
 static int setprio_fnc(int argc, char **argv, struct Env *env) {
 	int rc;
 	int prio=strtoul(argv[2],0,0);
@@ -1314,14 +1222,8 @@ static int setprio_fnc(int argc, char **argv, struct Env *env) {
 }
 
 
-
-
-typedef int (*cmdFunc)(int,char **, struct Env *);
-
-static struct cmd {
-	char *name;
-	cmdFunc fnc;
-} cmd_root[] = {{"help",help_fnc},
+static struct cmd cmd_root[] = {
+		{"help",generic_help_fnc},
 		{"ps",ps_fnc},
 		{"lsdrv",lsdrv_fnc},
 		{"debug",debug_fnc},
@@ -1329,95 +1231,14 @@ static struct cmd {
 		{"block",block_fnc},
 		{"unblock",unblock_fnc},
 		{"setprio",setprio_fnc},
-		{0,0}};
+		{0,0}
+};
 
-static int help_fnc(int argc, char **argv, struct Env *env) {
-	struct cmd *cmd=cmd_root;
-	fprintf(env->io_fd, "help called with %d args\n", argc);
-	fprintf(env->io_fd, "available commands: ");
-	while(cmd->name) {
-		fprintf(env->io_fd, "%s, ", cmd->name);
-		cmd++;
-	}
-	fprintf(env->io_fd, "\n");
-	return 0;
-}
+struct cmd_node my_cmd_node = {
+	"",
+	cmd_root,
+};
 
-struct cmd *lookup_cmd(char *name) {
-	struct cmd *cmd=cmd_root;
-	while(cmd->name) {
-		if (__builtin_strcmp(cmd->name,name)==0) {
-			return cmd;
-		}
-		cmd++;
-	}
-	return 0;
-}
-
-int argit(char *str, int len, char *argv[16]) {
-	int ac=0;
-	char *p=str;
-	while(1) {
-		while((*p)==' ') {
-			p++;
-			if (p>=(str+len)) {
-				return ac;
-			}
-		}
-		argv[ac]=p;
-		while((*p)!=' ') {
-			p++;
-			if (p>=(str+len)) {
-				return ac;
-			}		
-		}
-		*p=0;
-		p++;
-		ac++;
-		if (ac>=16) {
-			return 0;
-		}
-	}
-	return ac;
-}
-
-int argc;
-char *argv[16];
-
-void sys_mon(void *dum) {
-	char *buf=getSlab_256();
-	int fd=io_open((char *)dum);
-	struct Env env;
-	if (fd<0) return;
-	env.io_fd=fd;
-	io_write(fd,"Starting sys_mon\n",17);
-
-	while(1) {
-		int rc;
-		fprintf(fd,"\n--->");
-		rc=io_read(fd,buf,200);
-		if (rc>0) {
-			struct cmd *cmd;
-			if (rc>200) {
-				rc=200;
-			}
-			buf[rc]=0;
-			fprintf(fd,"\ngot %s from st_term, len %d\n",buf,rc);
-			rc=argit(buf,rc,argv);
-			if (rc<0) {
-				continue;
-			}
-			argc=rc;
-			cmd=lookup_cmd(argv[0]);
-			if (!cmd) {
-				fprintf(fd,"cmd %s, not found\n", argv[0]);
-				continue;
-			}
-			cmd->fnc(argc,argv,&env);
-		}
-	}
-
-}
 
 /*******************************************************************************/
 /*  Sys support functions and unecessary stuff                                 */
@@ -1429,40 +1250,23 @@ typedef void (*ifunc)(void);
 
 void init_sys(void) {
 	unsigned long int *i;
-//	*((unsigned long int *)0xe000ed1c)=0xff000000; /* SHPR2, lower svc prio */
 	NVIC_SetPriority(PendSV_IRQn,0xf);
 	NVIC_SetPriority(SVCall_IRQn,0xe);
 	NVIC_SetPriority(SysTick_IRQn,0xd);  /* preemptive tics... */
 
 	SysTick_Config(SystemCoreClock/100); // 10 mS tic is 100/Sec
-//	SCB->CCR|=1;
 	for(i=init_func_begin;i<init_func_end;i++) {
 		((ifunc)*i)();
 	}
 	
-#ifdef DRIVERSUPPORT
 	driver_init();
 	driver_start();
-#endif	
 }
+
+extern void sys_mon(void *);
 
 void start_sys(void) {
 	thread_create(sys_mon,"usart0",3,"sys_mon");
-	thread_create(sys_mon,"stterm0",3,"sys_mon");
-	thread_create(sys_mon,"usb_serial0",2,"sys_mon");
+//	thread_create(sys_mon,"stterm0",3,"sys_mon");
+//	thread_create(sys_mon,"usb_serial0",2,"sys_mon");
 }
-
-#else
-
-void init_sys(void) {
-//	*((unsigned long int *)0xe000ed1c)=0xff000000; /* SHPR2, lower svc prio */
-#ifdef DRIVERSUPPORT
-	driver_init();
-	driver_start();
-#endif	
-}
-
-void start_sys(void) {
-}
-
-#endif

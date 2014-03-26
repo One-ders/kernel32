@@ -1,0 +1,2 @@
+
+#define USB_REMOTE_WAKEUP	0x10

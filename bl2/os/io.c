@@ -11,7 +11,7 @@
 static struct driver *iodrv;
 static int kfd;
 
-int io_cb_handler(void *dum) {
+int io_cb_handler(int fd, int ev, void *dum) {
 	return 0;
 }
 
@@ -60,7 +60,13 @@ char *itoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_nu
 	int j;
 	int to;
 	char p_char=prepend_zero?'0':' ';	
+	char p_neg=0;
 
+	if (val&0x80000000) {
+		val&=~0x80000000;
+		val=0x80000000-val;
+		p_neg=1;
+	}
 	if (!val) {
 		ASSERT(i<bz);
 		buf[i++]=cmap[0];
@@ -74,6 +80,7 @@ char *itoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_nu
 	}
 	to=prepend_num-i;
 	if (to<0)to=0;
+	if (p_neg) to++;
 	ASSERT(i<bz);
 	for(j=0;j<i/2;j++) {
 		char tmp=buf[j];
@@ -83,6 +90,9 @@ char *itoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_nu
 	ASSERT((i+to)<bz);
 	__builtin_memmove(&buf[to],buf,i);
 	__builtin_memset(buf,p_char,to);
+	if (p_neg) {
+		buf[0]='-';
+	}
 	buf[i+to]=0;
 	
 	return buf;
@@ -121,6 +131,58 @@ char *xtoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_nu
 	return buf;
 }
 
+unsigned long int strtoul(char *str, char *endp, int base) {
+	char *p=str;
+	int num=0;
+	int mode=0;
+	unsigned int val=0;
+
+	if (base) {
+		mode=base;
+	} else {
+		if ((p[0]=='0')&&(__builtin_tolower(p[1])=='x')) {
+			mode=16;
+			p=&p[2];
+		} else if (p[0]=='0') {
+			mode=8;
+			p=&p[1];
+		} else {
+			mode=10;
+		}
+	}
+
+	while(*p) {
+		switch (*p) {
+			case '0':
+			case '1':
+			case '2':
+			case '3':
+			case '4':
+			case '5':
+			case '6':
+			case '7':
+			case '8':
+			case '9':
+				num=(*p)-'0';
+				break;
+			case 'a':
+			case 'b':
+			case 'c':
+			case 'd':
+			case 'e':
+			case 'f':
+				num=__builtin_tolower(*p)-'a';
+				num+=10;
+				break;
+		}
+		val=(val*mode)+num;
+		p++;
+	}
+	return val;
+}
+
+
+
 int parse_fmt(const char *fmt, int *field_width, int *zero_fill) {
 	int i=0;
 	int val=0;
@@ -144,7 +206,7 @@ int parse_fmt(const char *fmt, int *field_width, int *zero_fill) {
 }
 
 
-int io_printf(const char *fmt, ...) {
+int sys_printf(const char *fmt, ...) {
 	int i=0;
 	va_list ap;
 	char numericbuf[16];
@@ -223,7 +285,7 @@ void init_io(void) {
 	if (!iodrv) {
 		return;
 	}
-	kfd=iodrv->ops->open(iodrv->instance, io_cb_handler, 0);
+	kfd=iodrv->ops->open(iodrv->instance, io_cb_handler, 0, 0);
 	io_push();    /* to force out prints, done before open */
 }
 

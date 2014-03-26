@@ -1978,6 +1978,7 @@ void USB_OTG_ActiveRemoteWakeup(USB_OTG_CORE_HANDLE *pdev)
   USB_OTG_DSTS_TypeDef     dsts;
   USB_OTG_PCGCCTL_TypeDef  power;  
   
+  pdev->dev.DevRemoteWakeup=1;    // Fix me, does not get set for some reason
   if (pdev->dev.DevRemoteWakeup) 
   {
     dsts.d32 = USB_OTG_READ_REG32(&pdev->regs.DREGS->DSTS);
