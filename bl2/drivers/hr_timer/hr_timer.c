@@ -34,6 +34,7 @@ static struct Timer *timer9=(struct Timer *)TIMER9_ADDR;
 struct timer_user {
 	DRV_CBH callback;
 	void *userdata;
+	int userfd;
 	unsigned int out_tic;
 	int inuse;
 	struct timer_user *next;
@@ -95,14 +96,14 @@ void TIM1_UP_TIM10_IRQHandler(void) {
 	int i;
 
 	if (TIM10->CNT>0) {
-		io_printf("took %d to get irq\n", TIM10->CNT);
+		sys_printf("took %d to get irq\n", TIM10->CNT);
 	}
 	sys_irqs++;
 
 	current_tic+=tic_step;
 	TIM10->SR=0;
 	if (TIM10->CNT>0) {
-		io_printf("took %d to get irq step 2\n", TIM10->CNT);
+		sys_printf("took %d to get irq step 2\n", TIM10->CNT);
 	}
 
 	if (!t) {
@@ -119,14 +120,14 @@ void TIM1_UP_TIM10_IRQHandler(void) {
 		if ((rc=adj_hwtimer())) {
 			current_tic=rc;
 			TIM10->CNT=0;
-			io_printf("next timeout too close, running now\n");
+			sys_printf("next timeout too close, running now\n");
 			goto run_tout;
 		}
 		goto out;
 	}
 
 	if (TIM10->CNT>2) {
-		io_printf("took %d to get irq step 3\n", TIM10->CNT); /* ~20uS  for print */
+		sys_printf("took %d to get irq step 3\n", TIM10->CNT); /* ~20uS  for print */
 	}
 
 	/* gard against, cnt wrap */
@@ -149,12 +150,12 @@ run_tout:
 	(*tprev)=0;
 
 	if (tout==t) {
-		io_printf("baaad timeout list\n");
+		sys_printf("baaad timeout list\n");
 	}
 #if 0
 	if (tout) {
 		if (tout->out_tic-current_tic<10) {
-			io_printf("close next timeout %d, current %d\n", tout->out_tic,current_tic);
+			sys_printf("close next timeout %d, current %d\n", tout->out_tic,current_tic);
 		}
 	}
 #endif
@@ -162,12 +163,12 @@ run_tout:
 	while(t) {
 		struct timer_user *tnext=t->next;
 		if (t->out_tic>current_tic) {
-			io_printf("bad timeout; %d current_tic %d, tout_tic %d\n", i, current_tic,t->out_tic);
+			sys_printf("bad timeout; %d current_tic %d, tout_tic %d\n", i, current_tic,t->out_tic);
 		}
 		i++;
 		t->out_tic=0;
 		t->next=0;
-		t->callback(t->userdata);
+		t->callback(t->userfd, EV_STATE, t->userdata);
 		t=tnext;
 	}
 
@@ -177,7 +178,7 @@ run_tout:
 		if ((rc=adj_hwtimer())) {
 			current_tic=rc;
 			TIM10->CNT=0;
-//			io_printf("rerunning timeouts, current tic %d, tout->tic %d\n", current_tic,tout->out_tic);
+//			sys_printf("rerunning timeouts, current tic %d, tout->tic %d\n", current_tic,tout->out_tic);
 			goto run_tout;
 		}
 	}
@@ -227,7 +228,7 @@ static int hr_timer_set(struct timer_user *u, int val) {
 		return -1;
 	}
 	if (u->out_tic) {
-		io_printf("setting active timer\n");
+		sys_printf("setting active timer\n");
 		return -1;
 	}
 
@@ -239,7 +240,7 @@ static int hr_timer_set(struct timer_user *u, int val) {
 	if (in_irq) return 0;
 	if (tout==u) {
 		if (adj_hwtimer()) {
-			io_printf("hr_timer_set: should have timeout immideately\n");
+			sys_printf("hr_timer_set: should have timeout immideately\n");
 		}
 	}
 	return 0;
@@ -264,12 +265,13 @@ static int hr_timer_clr(struct timer_user *u) {
 
 /**************** Driver API ********************************************/
 
-static int hr_timer_open(void *inst, DRV_CBH callback, void *uref) {
+static int hr_timer_open(void *inst, DRV_CBH callback, void *uref, int fd) {
 	struct timer_user *tu=0;
 	int ix=get_user(&tu);
 	if (ix<0) return -1;
 	tu->callback=callback;
 	tu->userdata=uref;
+	tu->userfd=fd;
 	return ix;
 }
 
@@ -336,7 +338,7 @@ static struct driver hr_timer = {
 
 
 void init_hr_timer() {
-	io_printf("init_hr_timer");
+	sys_printf("init_hr_timer");
 	driver_publish(&hr_timer);
 }
 

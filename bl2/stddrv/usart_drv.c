@@ -75,7 +75,7 @@ void USART3_IRQHandler(void) {
 		usart_data0.chip_dead=0;
 	}
 	
-//	io_printf("got usart irq, status %x\n", USART3->SR);
+//	sys_printf("got usart irq, status %x\n", USART3->SR);
 	if ((st&USART_SR_TXE)&&(usart_data0.tx_in-usart_data0.tx_out)) {
 		if (usart_putc_fnc==usart_putc) {
 			USART3->DR=usart_data0.tx_buf[IX(usart_data0.tx_out)];
@@ -158,7 +158,7 @@ static int usart_read(struct usart_data *ud, char *buf, int len) {
 		if (1) {
 			usart_putc_fnc(ud,ch);
 		}
-//		io_printf("usart read got a char %c(%d), store at index %d\n",ch,ch,i-1);
+//		sys_printf("usart read got a char %c(%d), store at index %d\n",ch,ch,i-1);
 		if (ch==0x0d) {
 			return i-1;
 		}
@@ -178,7 +178,7 @@ static int usart_write(struct usart_data *ud, char *buf, int len) {
 }
 
 
-static int usart_open(void * driver_instance, DRV_CBH cb_handler, void *dum) {
+static int usart_open(void * driver_instance, DRV_CBH cb_handler, void *dum, int fd) {
 	int i=0;
 	for(i=0;i<(sizeof(udata)/sizeof(udata[0]));i++) {
 		if (udata[i]==0) break;

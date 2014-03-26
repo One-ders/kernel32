@@ -39,7 +39,7 @@ unsigned int blue=LED_BLUE;
 
 static int pin_irq(void *dum) {
 	int pin_stat;
-	io_printf("pin_irq\n");
+	sys_printf("pin_irq\n");
 
 	pindrv->ops->control(pin_fd, GPIO_SENSE_PIN,&pin_stat,sizeof(pin_stat));
 	if (pin_stat) {
@@ -47,7 +47,7 @@ static int pin_irq(void *dum) {
 	} else {
 		pin_stat=1;
 	}
-	pindrv->ops->control(pin_out_fd, GPIO_OUT_PIN,&pin_stat,sizeof(pin_stat));
+	pindrv->ops->control(pin_out_fd, GPIO_SET_PIN,&pin_stat,sizeof(pin_stat));
 	
 	return 0;
 }
@@ -58,11 +58,11 @@ int a1s_timeout(void *dum) {
 	sc++;
 	if (sc==1000) {
 		leddrv->ops->control(led_fd,LED_CTRL_ACTIVATE,&green,sizeof(green));
-		io_printf("lighting up\n");
+		sys_printf("lighting up\n");
 	} else if (sc==2000) {
 		sc=0;
 		leddrv->ops->control(led_fd,LED_CTRL_DEACTIVATE,&green,sizeof(green));
-		io_printf("light out\n");
+		sys_printf("light out\n");
 	}
 	drv->ops->control(a1s_fd, HR_TIMER_SET, &nSec, sizeof(nSec));
 	return 0;
@@ -176,7 +176,7 @@ static int cec_drv_open(void *inst, DRV_CBH cb, void *dum) {
 	pin=GPIO_PIN(PA,0);
 	rc=pindrv->ops->control(pin_fd,GPIO_BIND_PIN,&pin,sizeof(pin));
 	if (rc<0) {
-		io_printf("pin_assignment failed\n");
+		sys_printf("pin_assignment failed\n");
 		return -1;
 	}
 	
@@ -185,14 +185,14 @@ static int cec_drv_open(void *inst, DRV_CBH cb, void *dum) {
 	flags=GPIO_IRQ_ENABLE(flags);
 	rc=pindrv->ops->control(pin_fd,GPIO_SET_FLAGS,&flags,sizeof(flags));
 	if (rc<0) {
-		io_printf("pin_flags update failed\n");
+		sys_printf("pin_flags update failed\n");
 		return -1;
 	}
 
 	pin=GPIO_PIN(PD,5);
 	rc=pindrv->ops->control(pin_out_fd,GPIO_BIND_PIN,&pin,sizeof(pin));
 	if (rc<0) {
-		io_printf("pin_assignment failed\n");
+		sys_printf("pin_assignment failed\n");
 		return -1;
 	}
 	
@@ -200,7 +200,7 @@ static int cec_drv_open(void *inst, DRV_CBH cb, void *dum) {
 	flags=GPIO_DIR(0,GPIO_OUTPUT);
 	flags=GPIO_DRIVE(flags,GPIO_OPENDRAIN);
 	rc=pindrv->ops->control(pin_out_fd,GPIO_SET_FLAGS,&flags,sizeof(flags));
-	rc=pindrv->ops->control(pin_out_fd,GPIO_OUT_PIN,&one,sizeof(one));
+	rc=pindrv->ops->control(pin_out_fd,GPIO_SET_PIN,&one,sizeof(one));
 	
 	return 0;
 }
