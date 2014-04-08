@@ -1,4 +1,35 @@
+/* $FrameWorks: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
+/*
+ * Copyright (c) 2014, Anders Franzen.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holder nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ * @(#)hr_tiemr.c
+ */
 #include <stm32f4xx.h>
 #include <sys.h>
 #include <io.h>
@@ -32,6 +63,7 @@ static struct Timer *timer9=(struct Timer *)TIMER9_ADDR;
 #endif
 
 struct timer_user {
+	struct device_handle dh;
 	DRV_CBH callback;
 	void *userdata;
 	int userfd;
@@ -168,7 +200,7 @@ run_tout:
 		i++;
 		t->out_tic=0;
 		t->next=0;
-		t->callback(t->userfd, EV_STATE, t->userdata);
+		t->callback(&t->dh, EV_STATE, t->userdata);
 		t=tnext;
 	}
 
@@ -265,24 +297,24 @@ static int hr_timer_clr(struct timer_user *u) {
 
 /**************** Driver API ********************************************/
 
-static int hr_timer_open(void *inst, DRV_CBH callback, void *uref, int fd) {
+static struct device_handle *hr_timer_open(void *inst, DRV_CBH callback, void *uref) {
 	struct timer_user *tu=0;
 	int ix=get_user(&tu);
-	if (ix<0) return -1;
+	if (ix<0) return 0;
 	tu->callback=callback;
 	tu->userdata=uref;
-	tu->userfd=fd;
-	return ix;
+	return &tu->dh;
 }
 
-static int hr_timer_close(int fd) {
+static int hr_timer_close(struct device_handle *dh) {
+	struct timer_user *tu=(struct timer_user *)dh;
+	tu->inuse=0;
 	return 0;
 }
 
-static int hr_timer_control(int fd, int cmd, void *arg, int len) {
-	struct timer_user *u=&tu[fd];
-	if (fd>=TIMERS) return -1;
-	
+static int hr_timer_control(struct device_handle *dh, int cmd, void *arg, int len) {
+	struct timer_user *u=(struct timer_user *)dh;
+
 	switch(cmd) {
 		case HR_TIMER_SET:
 			return hr_timer_set(u,*((int *)arg));

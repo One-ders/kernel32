@@ -1,3 +1,35 @@
+/* $FrameWorks: , v1.1 2014/04/07 21:44:00 anders Exp $ */
+
+/*
+ * Copyright (c) 2014, Anders Franzen.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holder nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ * @(#)sys_tasklib.c
+ */
 #include "stm32f4xx.h"
 #include "io.h"
 #include "sys.h"
@@ -19,11 +51,12 @@
  * frame for our SVC call
  */
 
-//int svc_switch_to(void *);
 int svc_create_task(void *fnc, void *val, int prio, char *name);
 int svc_sleep(unsigned int);
+#if 0
 int svc_sleep_on(struct sleep_obj *, void *buf, int size);
 int svc_wakeup(struct sleep_obj *, void *buf, int size);
+#endif
 
 int svc_io_open(const char *);
 int svc_io_read(int fd, const char *b, int size);
@@ -55,6 +88,7 @@ __attribute__ ((noinline)) int svc_sleep(unsigned int ms) {
 	return rc;
 }
 
+#if 0
 __attribute__ ((noinline)) int svc_sleep_on(struct sleep_obj *so, void *buf, int bsize) {
 	register int rc asm("r0");
 	svc(SVC_SLEEP_ON);
@@ -66,6 +100,7 @@ __attribute__ ((noinline)) int svc_wakeup(struct sleep_obj *so, void *buf, int b
 	svc(SVC_WAKEUP);
 	return rc;
 }
+#endif
 
 
 __attribute__ ((noinline)) int svc_io_open(const char *name) {
@@ -136,6 +171,7 @@ int sleep(unsigned int ms) {
 	return svc_sleep(tics);
 }
 
+#if 0
 int sleep_on(struct sleep_obj *so, void *buf, int bsize) {
 	return svc_sleep_on(so,buf,bsize);
 }
@@ -143,6 +179,7 @@ int sleep_on(struct sleep_obj *so, void *buf, int bsize) {
 int wakeup(struct sleep_obj *so, void *dbuf, int dsize) {
 	return svc_wakeup(so,dbuf,dsize);
 }
+#endif
 
 int block_task(char *name) {
 	return svc_block_task(name);

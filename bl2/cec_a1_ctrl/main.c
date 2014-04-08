@@ -1,13 +1,47 @@
+/* $CecA1GW: main.c, v1.1 2014/04/07 21:44:00 anders Exp $ */
 
-#include "stm32f4xx_conf.h"
+/*
+ * Copyright (c) 2014, Anders Franzen.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holder nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ * @(#)main.c
+ */
+
 #include "sys.h"
 #include "io.h"
-#include "hr_timer.h"
 #include "cec_drv.h"
-#include "asynchio.h"
 #include "cec.h"
+#include "a1_drv.h"
+#include "a1.h"
+#include "asynchio.h"
 
 #include <string.h>
+
+#if DEBUG
 
 int cec_debug;
 
@@ -16,6 +50,7 @@ static int set_fnc(int argc, char **argv, struct Env *env);
 static int get_fnc(int argc, char **argv, struct Env *env);
 static int scan_fnc(int argc, char **argv, struct Env *env);
 static int wake_fnc(int argc, char **argv, struct Env *env);
+static int send_a1_fnc(int argc, char **argv, struct Env *env);
 
 static struct cmd cmds[] = {
 	{"help", generic_help_fnc},
@@ -24,6 +59,7 @@ static struct cmd cmds[] = {
 	{"get", get_fnc},
 	{"scan",scan_fnc},
 	{"wake",wake_fnc},
+	{"send_a1",send_a1_fnc},
 	{0,0}
 };
 
@@ -123,131 +159,41 @@ static int wake_fnc(int argc, char **argv, struct Env *env) {
 	return 0;
 }
 
+/* Note the commands are run from the sys_mon task, so dont use 
+ * task specific data like filedescriptors
+ */
+static int send_a1_fnc(int argc, char **argv, struct Env *env) {
+        int myfd=io_open(A1_DRV0);
+        unsigned char buf[argc];
+        int i;
+        int rc;
+        for (i=1;i<argc;i++) {
+                unsigned int val=strtoul(argv[i],0,16);
+                printf("got byte %x\n",val);
+                buf[i-1]=val;
+        }
+        rc=io_write(myfd,(char *)buf,argc-1);
+        printf("a1: write returned %d\n",rc);
+        io_close(myfd);
+        return 0;
+}
 
-#define MAX(a,b)	(a>b)?a:b
+#endif
 
 extern int init_pulse_eight(void);
 
-struct EventInfo {
-	EventHandler rdhandler;
-	void *rduref;
-	EventHandler wrhandler;
-	void *wruref;
-	EventHandler sthandler;
-	void *sturef;
-};
-
-static struct EventInfo fds[32];
-static fd_set rfds;
-static fd_set wfds;
-static fd_set stfds;
-static unsigned int nfds;
-
-
-int register_event(int fd, int event,
-			EventHandler handler,
-			void *uref) {
-	int i;
-	struct EventInfo *ei=&fds[fd];
-	if (handler) { /* register */
-		if (event&EV_READ) {
-			ei->rdhandler=handler;
-			ei->rduref=uref;
-			FD_SET(fd,&rfds);
-			if (fd>nfds) {
-				nfds=fd;
-			}
-		}
-		if (event&EV_WRITE) {
-			ei->wrhandler=handler;
-			ei->wruref=uref;
-			FD_SET(fd,&wfds);
-			if (fd>nfds) {
-				nfds=fd;
-			}
-		}
-		if (event&EV_STATE) {
-			ei->sthandler=handler;
-			ei->sturef=uref;
-			FD_SET(fd,&stfds);
-			if (fd>nfds) {
-				nfds=fd;
-			}
-		}
-	} else { /* deregister */
-		if (event&EV_READ) {
-			ei->rdhandler=0;
-			FD_CLR(fd,&rfds);
-		}
-		if (event&EV_WRITE) {
-			ei->wrhandler=0;
-			FD_CLR(fd,&wfds);
-		}
-		if (event&EV_STATE) {
-			ei->sthandler=0;
-			FD_CLR(fd,&stfds);
-		}
-		if (fd==nfds) {
-			nfds=0;
-			for(i=0;i<fd;i++) {
-				if (fds[i].rdhandler||
-				    fds[i].wrhandler||
-				    fds[i].sthandler) {
-					nfds=i;
-				}
-			}
-		}
-	}
-	return 0;
-}
-
-static int do_eventloop(void) {
-	int i;
-	fd_set lrfds=rfds;
-	fd_set lwfds=wfds;
-	fd_set lstfds=stfds;
-
-	int rc=io_select(nfds+1,&lrfds,&lwfds,&lstfds,0);
-	if (rc<0) return rc;
-	for(i=0;i<nfds+1;i++) {
-		if (FD_ISSET(i,&lwfds)) {
-			if (fds[i].wrhandler) {
-				fds[i].wrhandler(i,EV_WRITE,fds[i].wruref);
-				rc--;
-				if (!rc) return 0;
-			}
-		}
-		if (!rc) return 0;
-		if (FD_ISSET(i,&lstfds)) {
-			if (fds[i].sthandler) {
-				fds[i].sthandler(i,EV_STATE,fds[i].sturef);
-				rc--;
-				if (!rc) return 0;
-			}
-		}
-		if (FD_ISSET(i,&lrfds)) {
-			if (fds[i].rdhandler) {
-				fds[i].rdhandler(i,EV_READ,fds[i].rduref);
-				rc--;
-				if (!rc) return 0;
-			}
-		}
-	}
-	return 0;
-}
-
 void cec_gw(void *dum) {
 
+	a1_init_a1();
 	cec_init_cec();
 	init_pulse_eight();
 
 	install_cmd_node(&cmn,root_cmd_node);
 
-	while(1) do_eventloop();
+	while(1) do_event();
 }
 
 int main(void) {
-//	struct app_data app_data;
 
 	/* initialize the executive */
 	init_sys();

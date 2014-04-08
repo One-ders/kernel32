@@ -1,4 +1,35 @@
+/* $FrameWorks: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
+/*
+ * Copyright (c) 2014, Anders Franzen.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holder nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ * @(#)usb_serial_drv.c
+ */
 #include "sys.h"
 #include "io.h"
 
@@ -366,17 +397,45 @@ struct usb_data {
 	char rx_buf[RX_BSIZE];
 	volatile int rx_in;
 	volatile int rx_out;
-	void *userdata;
-	int userfd;
-	DRV_CBH	callback;
-	int ev_flags;
 	USB_OTG_CORE_HANDLE *core;
 };
 
 static struct usb_data usb_data0;
 
+struct user_data {
+	struct device_handle dh;
+	struct usb_data *usb_data;
+	void 		*userdata;
+	DRV_CBH		callback;
+	int		ev_flags;
+};
 
-static struct usb_data *udata[8];
+
+#define MAX_USERS 4
+static struct user_data udata[MAX_USERS];
+
+static struct user_data *get_user_data() {
+	int i;
+	for(i=0;i<MAX_USERS;i++) {
+		if (!udata[i].usb_data) {
+			return &udata[i];
+		}
+	}
+	return 0;
+}
+
+static void wakeup_users(unsigned int ev) {
+	int i;
+
+	for(i=0;i<MAX_USERS;i++) {
+		unsigned int rev;
+		if ((udata[i].usb_data)&&
+			(udata[i].callback) &&
+			(rev=udata[i].ev_flags&ev)) {
+			udata[i].callback(&udata[i].dh,rev,udata[i].userdata);
+		}
+	}
+}
 
 
 static unsigned char *get_device_descriptor(unsigned char speed, unsigned short *len) {
@@ -584,15 +643,13 @@ static unsigned char class_data_in(void *core, unsigned char epnum) {
 	} else {
 	   ud->txr=0;
 	}
-	if (usb_data0.ev_flags&EV_WRITE) {
-		usb_data0.ev_flags&=~EV_WRITE;
-		usb_data0.callback(usb_data0.userfd,EV_WRITE,usb_data0.userdata);
-	}
+
+	wakeup_users(EV_WRITE);
 
 	return 0;
 }
 
-static int usb_serial_putc(struct usb_data *ud, int c);
+static int usb_serial_putc(struct user_data *ud, int c);
 
 static unsigned char class_data_out(void *core, unsigned char epnum) {
 	unsigned int rx_cnt;
@@ -613,10 +670,7 @@ static unsigned char class_data_out(void *core, unsigned char epnum) {
 	DCD_EP_PrepareRx(core,epnum,
 				rx_buf[epnum],8);
 
-	if (usb_data0.ev_flags&EV_READ) {
-		usb_data0.ev_flags&=~EV_READ;
-		usb_data0.callback(usb_data0.userfd,EV_READ,usb_data0.userdata);
-	}
+	wakeup_users(EV_READ);
 
 	return 0;
 }
@@ -770,43 +824,45 @@ void USB_OTG_BSP_Init(USB_OTG_CORE_HANDLE *pdev) {
 }
 
 
-static int usb_serial_read(struct usb_data *ud, char *buf, int len) {
+static int usb_serial_read(struct user_data *ud, char *buf, int len) {
+	struct usb_data *usb_data=ud->usb_data;
 	int i=0;
 	while(i<len) {
-		int ix=ud->rx_out%RX_BSIZE;
-		if (!(ud->rx_in-ud->rx_out)) {
+		int ix=usb_data->rx_out%RX_BSIZE;
+		if (!(usb_data->rx_in-usb_data->rx_out)) {
 			if (!i) {
-				usb_data0.ev_flags|=EV_READ;
+				ud->ev_flags|=EV_READ;
 				return -DRV_AGAIN;
 			} else return i;
 		}
-		buf[i++]=ud->rx_buf[ix];
-		ud->rx_out++;
+		buf[i++]=usb_data->rx_buf[ix];
+		usb_data->rx_out++;
 	}
 	return i;
 }
 
-static int usb_serial_putc(struct usb_data *ud, int c) {
+static int usb_serial_putc(struct user_data *ud, int c) {
+	struct usb_data *usb_data=ud->usb_data;
 	disable_interrupt();
-	if ((ud->tx_in-ud->tx_out)>=TX_BSIZE) {
-		usb_data0.ev_flags|=EV_WRITE;
+	if ((usb_data->tx_in-usb_data->tx_out)>=TX_BSIZE) {
+		ud->ev_flags|=EV_WRITE;
 		enable_interrupt();
 		return -DRV_AGAIN;
 	}
-	ud->tx_buf[IX(ud->tx_in)]=c;
-	ud->tx_in++;
+	usb_data->tx_buf[IX(usb_data->tx_in)]=c;
+	usb_data->tx_in++;
 	enable_interrupt();
 	if (!tx_started) return 1;
-	if(!ud->txr) {
-		int len=ud->tx_in;
-		ud->tx_in=0;
-		ud->txr=1;
-		DCD_EP_Tx(ud->core,0x82,((unsigned char *)ud->tx_buf),len);
+	if(!usb_data->txr) {
+		int len=usb_data->tx_in;
+		usb_data->tx_in=0;
+		usb_data->txr=1;
+		DCD_EP_Tx(usb_data->core,0x82,((unsigned char *)usb_data->tx_buf),len);
 	}
 	return 1;
 }
 
-static int usb_serial_write(struct usb_data *ud, char *buf, int len) {
+static int usb_serial_write(struct user_data *ud, char *buf, int len) {
 	int i;
 	for(i=0;i<len;i++) {
 		usb_serial_putc(ud,buf[i]);
@@ -815,51 +871,58 @@ static int usb_serial_write(struct usb_data *ud, char *buf, int len) {
 }
 
 
-static int usb_serial_open(void *instance, DRV_CBH cb, void *dum, int fd) {
-	int i=0;
-	for(i=0;i<(sizeof(udata)/sizeof(udata[0]));i++) {
-		if (udata[i]==0) break;
-	}
-	if (i==sizeof(udata)) return -1;
-	udata[i]=instance;
-	udata[i]->callback=cb;
-	udata[i]->userdata=dum;
-	udata[i]->userfd=fd;
-	return i;
+static struct device_handle *usb_serial_open(void *instance, DRV_CBH cb, void *dum) {
+	struct user_data *ud=get_user_data();
+	if (!ud) return 0;
+
+	ud->usb_data=instance;
+	ud->callback=cb;
+	ud->userdata=dum;
+	ud->ev_flags=0;
+	return &ud->dh;
 }
 
-static int usb_serial_close(int kfd) {
+static int usb_serial_close(struct device_handle *dh) {
+	struct user_data *ud=(struct user_data *)dh;
+	ud->usb_data=0;
 	return 0;
 }
 
-static int usb_serial_control(int kfd, int cmd, void *arg, int arg_len) {
-	struct usb_data *ud=udata[kfd];
+static int usb_serial_control(struct device_handle *dh, int cmd, void *arg, int arg_len) {
+	struct user_data *ud=(struct user_data *)dh;
+	struct usb_data *usb_data=ud->usb_data;
 	switch(cmd) {
-		case RD_CHAR:
-			return usb_serial_read(ud,arg,arg_len);
-		case WR_CHAR:
-			return usb_serial_write(ud,arg,arg_len);
+		case RD_CHAR: {
+			int rc=usb_serial_read(ud,arg,arg_len);
+			return rc;
+		}
+		case WR_CHAR: {
+			int rc=usb_serial_write(ud,arg,arg_len);
+			return rc;
+		}
 		case IO_POLL: {
 			unsigned int events=(unsigned int)arg;
 			unsigned int revents=0;
 			if (events&EV_WRITE) {
-				if ((ud->tx_in-ud->tx_out)<TX_BSIZE) {
+				if ((usb_data->tx_in-usb_data->tx_out)<TX_BSIZE) {
 					revents|=EV_WRITE;
+					ud->ev_flags&=~EV_WRITE;
 				} else {
-					usb_data0.ev_flags|=EV_WRITE;
+					ud->ev_flags|=EV_WRITE;
 				}
 			}
 			if (events&EV_READ) {
-				if ((ud->rx_in-ud->rx_out)) {
+				if ((usb_data->rx_in-usb_data->rx_out)) {
 					revents|=EV_READ;
+					ud->ev_flags&=~EV_READ;
 				} else {
-					usb_data0.ev_flags|=EV_READ;
+					ud->ev_flags|=EV_READ;
 				}
 			}
 			return revents;
 		}
 		case USB_REMOTE_WAKEUP: {
-			USB_OTG_ActiveRemoteWakeup((USB_OTG_CORE_HANDLE *)ud->core);
+			USB_OTG_ActiveRemoteWakeup((USB_OTG_CORE_HANDLE *)usb_data->core);
 			return 0;
 			break;
 		}

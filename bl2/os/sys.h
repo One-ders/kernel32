@@ -1,4 +1,44 @@
+/* $FrameWorks: , v1.1 2014/04/07 21:44:00 anders Exp $ */
+
+/*
+ * Copyright (c) 2014, Anders Franzen.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holder nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ * @(#)sys.h
+ */
+
 #include "io.h"
+
+
+#define offsetof(st, m) __builtin_offsetof(st, m)
+
+#define container_of(ptr, type, member) ({ \
+		const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+		(type *)( (char *)__mptr - offsetof(type,member) );})
 
 
 #ifdef DEBUG
@@ -10,15 +50,35 @@ extern int sys_printf(const char *format, ...);
 #define DEBUGP(lev,a ...)
 #endif
 
-extern int sys_lev;
-struct task;
+#define ASSERT(a) { if (!(a)) {io_setpolled(1); sys_printf("assert stuck\n");} while (!(a)) ; }
 
-struct sleep_obj {
-	char *name;
-	struct task *task_list;
-	struct task *task_list_last;
+extern int sys_lev;
+
+struct blocker {
+	struct blocker *next;
+	struct blocker *next2;
+	unsigned int events;
+	unsigned int wakeup_tic;
 };
 
+struct task {
+	char            *name;            /* 0-3 */
+	void            *sp;              /* 4-7 */
+
+	struct task     *next;            /* 8-11 */   /* link of task of same state */
+	struct task     *next2;           /* 12-15 */  /* all tasks chain */
+	int             state;            /* 16-19 */
+	int             prio_flags;       /* 20-23 */
+	void            *bp;              /* 24-27 */ /* communication buffer for sleeping context */
+	int             bsize;            /* 28-31 */ /* size of the buffer */
+	int             stack_sz;         /* 32-35 */
+	struct user_fd  *fd_list;         /* 36-39 */ /* open driver list */
+	unsigned int    active_tics;      /* 36-39 */
+	struct sel_args *sel_args;
+	struct blocker  blocker;
+};
+
+extern struct task * volatile current;
 extern volatile unsigned int tq_tic;
 
 void init_sys(void);
@@ -28,15 +88,15 @@ void *getSlab_256(void);
 
 int thread_create(void *fnc, void *val, int prio, char *name);
 int sleep(unsigned int ms);
-int sleep_on(struct sleep_obj *so, void *buf, int blen);
-int wakeup(struct sleep_obj *so, void *dbuf, int dlen);
 int block_task(char *name);
 int unblock_task(char *name);
 int setprio_task(char *name,int prio);
 
 void *sys_sleep(unsigned int ms);
-void *sys_sleepon(struct sleep_obj *so, void *bp, int bsize);
-void *sys_wakeup(struct sleep_obj *so, void *bp, int bsize);
+void *sys_sleepon(struct blocker *so, void *bp, int bsize, unsigned int *ms_sleep);
+void *sys_wakeup(struct blocker *so, void *bp, int bsize);
+
+int sleepable(void);
 
 static inline __attribute__ ((always_inline))
 void disable_interrupt(void) {
@@ -52,7 +112,13 @@ void enable_interrupt(void) {
 #define EV_READ  1
 #define EV_WRITE 2
 #define EV_STATE 4
-typedef int (*DRV_CBH)(int ufd, int event, void *user_ref);
+
+struct device_handle {
+	unsigned int user_data1;
+	struct blocker *blocker;
+};
+
+typedef int (*DRV_CBH)(struct device_handle *, int event, void *user_ref);
 
 #define RD_CHAR 1
 #define WR_CHAR	2
@@ -105,9 +171,9 @@ struct sel_args {
 
 /*  driver */
 struct driver_ops {
-	int (*open)(void *driver_instance, DRV_CBH drv_cb, void *usr_ref, int user_fd);
-	int (*close)(int driver_fd);
-	int (*control)(int driver_fd, int cmd, void *, int len);
+	struct device_handle *(*open)(void *driver_instance, DRV_CBH drv_cb, void *usr_ref);
+	int (*close)(struct device_handle *);
+	int (*control)(struct device_handle *, int cmd, void *, int len);
 	int (*init)(void *driver_instance);
 	int (*start)(void *driver_instance);
 };
