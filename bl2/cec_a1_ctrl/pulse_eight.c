@@ -1,3 +1,36 @@
+/* $CecA1GW: , v1.1 2014/04/07 21:44:00 anders Exp $ */
+
+/*
+ * Copyright (c) 2014, Anders Franzen.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holder nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ * @(#)pulse_eight.c
+ */
+
 #include "io.h"
 #include "sys.h"
 
@@ -45,7 +78,7 @@ static int send_accepted(int fd) {
 	unsigned char buf[3] = { 0xff,CMD_ACCEPTED,0xfe };
 	int rc=io_write(fd,(char *)buf,3);
 	if (rc!=3) {
-		printf("send_accepted: got rc %d insted of 3\n", rc);
+		DPRINTF("send_accepted: got rc %d insted of 3\n", rc);
 	}
 	return rc;
 }
@@ -54,36 +87,30 @@ static int send_reject(int fd) {
 	unsigned char buf[3] = { 0xff,CMD_REJECTED,0xfe };
 	int rc=io_write(fd,(char *)buf,3);
 	if (rc!=3) {
-		printf("send_accepted: got rc %d insted of 3\n", rc);
+		DPRINTF("send_accepted: got rc %d insted of 3\n", rc);
 	}
 	return rc;
 }
 
 
 static int handle_ping(int fd) {
-	if (cec_debug) {
-		printf("received ping\n");
-	}
+	DPRINTF("received ping\n");
 	return send_accepted(fd);
 }
 
 static int handle_get_fw_version(int fd) {
 	unsigned char buf[]= { 0xff, CMD_GET_FW_VER, 0x0, 0x2, 0xfe };
-	if (cec_debug) {
-		printf("handle_get_fw_version\n");
-	}
+	DPRINTF("handle_get_fw_version\n");
 	int rc=io_write(fd,(char *)buf,sizeof(buf));
 	if (rc!=sizeof(buf)) {
-		printf("send_fw_version: got rc %d insted of %d\n", rc,sizeof(buf));
+		DPRINTF("send_fw_version: got rc %d insted of %d\n", rc,sizeof(buf));
 	}
 	return rc;
 }
 
 static int handle_set_controlled(int fd, unsigned char *buf, int len) {
-	if (cec_debug) {
-		printf("handle_set_controlled: %d, len %d\n",
+	DPRINTF("handle_set_controlled: %d, len %d\n",
 				buf[2], len);
-	}
 	if (buf[2]) {
 		cec_set_rec(1);
 	} else {
@@ -94,54 +121,44 @@ static int handle_set_controlled(int fd, unsigned char *buf, int len) {
 
 static int handle_get_builddate(int fd, unsigned char *buf, int len) {
 	unsigned char sbuf[] = { 0xff, CMD_GET_BUILDDATE, 0x50, 0x09, 0xf0, 0xa3, 0xfe };
-	if (cec_debug) {
-		printf("handle_get_builddate: %d, len %d\n",
+	DPRINTF("handle_get_builddate: %d, len %d\n",
 				buf[2], len);
-	}
 	int rc=io_write(fd,(char *)sbuf,sizeof(sbuf));
 	if (rc!=sizeof(sbuf)) {
-		printf("send_get_builddate: got rc %d insted of %d\n", rc,sizeof(sbuf));
+		DPRINTF("send_get_builddate: got rc %d insted of %d\n", rc,sizeof(sbuf));
 	}
 	return rc;
 }
 
 static int handle_get_adapter_type(int fd) {
 	unsigned char sbuf[] = { 0xff, CMD_GET_ADAPTER_TYPE, 0x1, 0xfe };
-	if (cec_debug) {
-		printf("handle_get_adpter_type\n");
-	}
+	DPRINTF("handle_get_adpter_type\n");
 	int rc=io_write(fd,(char *)sbuf,sizeof(sbuf));
 	if (rc!=sizeof(sbuf)) {
-		printf("send_adapter_type: got rc %d insted of %d\n", rc,sizeof(sbuf));
+		DPRINTF("send_adapter_type: got rc %d insted of %d\n", rc,sizeof(sbuf));
 	}
 	return rc;
 }
 
 static int handle_set_txidle_time(int fd, unsigned char *buf, int len) {
-	if (cec_debug) {
-		printf("handle_set_txidle_time: %d, len %d\n",
+	DPRINTF("handle_set_txidle_time: %d, len %d\n",
 				buf[2], len);
-	}
 	return send_accepted(fd);
 }
 
 static int handle_set_ack_polarity(int fd, unsigned char *buf, int len) {
-	if (cec_debug) {
-		printf("handle_set_ack_polarity: %d, len %d\n",
+	DPRINTF("handle_set_ack_polarity: %d, len %d\n",
 				buf[2], len);
-	}
 	tbix=0;
 	return send_accepted(fd);
 }
 
 
 static int handle_tx(int fd, unsigned char *buf, int len) {
-	if (cec_debug) {
-		if (tbix) {
-			printf(", %x",buf[2]);
-		} else {
-			printf("Sending to Cec dev: %x", buf[2]);
-		}
+	if (tbix) {
+		DPRINTF(", %x",buf[2]);
+	} else {
+		DPRINTF("Sending to Cec dev: %x", buf[2]);
 	}
 	
 	tbuf[tbix++]=buf[2];
@@ -150,24 +167,21 @@ static int handle_tx(int fd, unsigned char *buf, int len) {
 
 static int send_tx_success(int fd) {
 	unsigned char sbuf[] = { 0xff, CMD_TX_SUCCESS, 0xfe };
-	if (cec_debug) {
-		printf("reply: tx_success\n");
-	}
-	int rc=io_write(fd,(char *)sbuf,sizeof(sbuf));
+	int rc;
+	DPRINTF("reply: tx_success\n");
+	rc=io_write(fd,(char *)sbuf,sizeof(sbuf));
 	if (rc!=sizeof(sbuf)) {
-		printf("tx_success: got rc %d instead of %d\n", rc,sizeof(sbuf));
+		DPRINTF("tx_success: got rc %d instead of %d\n", rc,sizeof(sbuf));
 	}
 	return rc;
 }
 
 static int send_tx_ack_failed(int fd) {
 	unsigned char sbuf[] = { 0xff, CMD_TX_NO_ACK, 0xfe };
-	if (cec_debug) {
-		printf("reply: tx_failed\n");
-	}
+	DPRINTF("reply: tx_failed\n");
 	int rc=io_write(fd,(char *)sbuf,sizeof(sbuf));
 	if (rc!=sizeof(sbuf)) {
-		printf("tx_failed: got rc %d instead of %d\n", rc,sizeof(sbuf));
+		DPRINTF("tx_failed: got rc %d instead of %d\n", rc,sizeof(sbuf));
 	}
 	return rc;
 }
@@ -176,17 +190,15 @@ static int send_tx_ack_failed(int fd) {
 
 static int handle_tx_eom(int fd, unsigned char *buf, int len) {
 	int rc;
-	if (cec_debug) {
-		if (tbix) {
-			printf(", %x\n",buf[2]);
-		} else {
-			printf("Sending to Cec dev: %x\n", buf[2]);
-		}
+	if (tbix) {
+		DPRINTF(", %x\n",buf[2]);
+	} else {
+		DPRINTF("Sending to Cec dev: %x\n", buf[2]);
 	}
 	
 	tbuf[tbix++]=buf[2];
 	send_accepted(fd);
-	rc=cec_send(tbuf,tbix);
+	rc=cec_send(USB_BUS,tbuf,tbix);
 	tbix=0;
 	if (rc<0) {
 		send_tx_ack_failed(fd);
@@ -196,47 +208,56 @@ static int handle_tx_eom(int fd, unsigned char *buf, int len) {
 	return 0;
 }
 
+static int pe_data_in(unsigned char *buf, int len);
+static int prev_ack_mask;
+
 static int handle_set_ack_mask(int fd, unsigned char *buf, int len) {
-	int ackmask=(buf[2]<<8)|buf[3];
-	if (cec_debug) {
-		printf("set_ack_mask: %x\n",ackmask);
+	int ack_mask=(buf[2]<<8)|buf[3];
+	DPRINTF("set_ack_mask: %x\n",ack_mask);
+	if (ack_mask!=prev_ack_mask) {
+		int i;
+		for(i=0;i<15;i++) {
+			if ((ack_mask&(1<<i)) ^
+				(prev_ack_mask&(1<<i))) {
+				if (ack_mask&(1<<i)) {
+					cec_attach(USB_BUS,i,pe_data_in);
+				}
+				if (prev_ack_mask&(1<<i)) {
+					cec_detach(i);
+				}
+			}
+		}
+		prev_ack_mask=ack_mask;
 	}
-	cec_set_ackmask(ackmask);
 	return send_accepted(fd);
 }
 
 static int handle_get_auto_enabled(int fd,unsigned char *buf, int len) {
 	unsigned char sbuf[] = { 0xff, CMD_GET_AUTO_ENABLED, 1, 0xfe };
-	if (cec_debug) {
-		printf("reply: get auto enabled\n");
-	}
+	DPRINTF("reply: get auto enabled\n");
 	int rc=io_write(fd,(char *)sbuf,sizeof(sbuf));
 	if (rc!=sizeof(sbuf)) {
-		printf("tx_failed: got rc %d instead of %d\n", rc,sizeof(sbuf));
+		DPRINTF("tx_failed: got rc %d instead of %d\n", rc,sizeof(sbuf));
 	}
 	return rc;
 }
 
 static int handle_get_hdmi_version(int fd,unsigned char *buf, int len) {
 	unsigned char sbuf[] = { 0xff, CMD_GET_HDMI_VERSION, 5, 0xfe };
-	if (cec_debug) {
-		printf("reply: get hdmi version 5\n");
-	}
+	DPRINTF("reply: get hdmi version 5\n");
 	int rc=io_write(fd,(char *)sbuf,sizeof(sbuf));
 	if (rc!=sizeof(sbuf)) {
-		printf("tx_failed: got rc %d instead of %d\n", rc,sizeof(sbuf));
+		DPRINTF("tx_failed: got rc %d instead of %d\n", rc,sizeof(sbuf));
 	}
 	return rc;
 }
 
 static int handle_get_dflt_la(int fd,unsigned char *buf, int len) {
 	unsigned char sbuf[] = { 0xff, CMD_GET_DFLT_LA, 4, 0xfe };
-	if (cec_debug) {
-		printf("reply: get default logical address 4\n");
-	}
+	DPRINTF("reply: get default logical address 4\n");
 	int rc=io_write(fd,(char *)sbuf,sizeof(sbuf));
 	if (rc!=sizeof(sbuf)) {
-		printf("tx_failed: got rc %d instead of %d\n", rc,sizeof(sbuf));
+		DPRINTF("tx_failed: got rc %d instead of %d\n", rc,sizeof(sbuf));
 	}
 	return rc;
 }
@@ -244,24 +265,20 @@ static int handle_get_dflt_la(int fd,unsigned char *buf, int len) {
 
 static int handle_get_device_type(int fd,unsigned char *buf, int len) {
 	unsigned char sbuf[] = { 0xff, CMD_GET_DEVICE_TYPE, 4, 0xfe };
-	if (cec_debug) {
-		printf("reply: get device type 4\n");
-	}
+	DPRINTF("reply: get device type 4\n");
 	int rc=io_write(fd,(char *)sbuf,sizeof(sbuf));
 	if (rc!=sizeof(sbuf)) {
-		printf("tx_failed: got rc %d instead of %d\n", rc,sizeof(sbuf));
+		DPRINTF("tx_failed: got rc %d instead of %d\n", rc,sizeof(sbuf));
 	}
 	return rc;
 }
 
 static int handle_get_la_mask(int fd,unsigned char *buf, int len) {
 	unsigned char sbuf[] = { 0xff, CMD_GET_LA_MASK, 0, 0x10 , 0xfe };
-	if (cec_debug) {
-		printf("reply: get la_mask 2\n");
-	}
+	DPRINTF("reply: get la_mask 2\n");
 	int rc=io_write(fd,(char *)sbuf,sizeof(sbuf));
 	if (rc!=sizeof(sbuf)) {
-		printf("tx_failed: got rc %d instead of %d\n", rc,sizeof(sbuf));
+		DPRINTF("tx_failed: got rc %d instead of %d\n", rc,sizeof(sbuf));
 	}
 	return rc;
 }
@@ -269,24 +286,20 @@ static int handle_get_la_mask(int fd,unsigned char *buf, int len) {
 
 static int handle_get_osd_name(int fd,unsigned char *buf, int len) {
 	unsigned char sbuf[] = { 0xff, CMD_GET_OSD_NAME, 0x41, 0x42, 0x43, 0x44 , 0xfe };
-	if (cec_debug) {
-		printf("reply: OSD name abcd\n");
-	}
+	DPRINTF("reply: OSD name abcd\n");
 	int rc=io_write(fd,(char *)sbuf,sizeof(sbuf));
 	if (rc!=sizeof(sbuf)) {
-		printf("tx_failed: got rc %d instead of %d\n", rc,sizeof(sbuf));
+		DPRINTF("tx_failed: got rc %d instead of %d\n", rc,sizeof(sbuf));
 	}
 	return rc;
 }
 
 static int handle_get_pa(int fd,unsigned char *buf, int len) {
 	unsigned char sbuf[] = { 0xff, CMD_GET_PA, 0x20, 0x00, 0xfe };
-	if (cec_debug) {
-		printf("reply: get_pa 0x2000\n");
-	}
+	DPRINTF("reply: get_pa 0x2000\n");
 	int rc=io_write(fd,(char *)sbuf,sizeof(sbuf));
 	if (rc!=sizeof(sbuf)) {
-		printf("tx_failed: got rc %d instead of %d\n", rc,sizeof(sbuf));
+		DPRINTF("tx_failed: got rc %d instead of %d\n", rc,sizeof(sbuf));
 	}
 	return rc;
 }
@@ -360,7 +373,7 @@ static int handle_pe_cmd(int fd,unsigned char *buf, int len) {
 			handle_get_pa(fd,buf,len);
 			break;
 		default:
-			printf("got unhandled pe command: %d\n", buf[1]);
+			DPRINTF("got unhandled pe command: %d\n", buf[1]);
 			send_reject(fd);
 			break;
 	}
@@ -392,14 +405,15 @@ static int  handle_read_event(int fd, int ev, void *dum) {
 	return 0;
 }
 
-int pe_data_in(unsigned char *buf, int len) {
+static int pe_data_in(unsigned char *buf, int len) {
 	int i;
 	int rc;
 	unsigned char sbuf[] = { 0xff, 0x05, 0, 0xfe };
 	if ((len<1)||(len>16)) {
-		printf("pe_data_in: got weird message len %d\n", len);
+		DPRINTF("pe_data_in: got weird message len %d\n", len);
 		return -1;
 	}
+#if DEBUG
 	if (cec_debug) {
 		printf("got data on cec: %x",buf[0]);
 		for(i=1;i<len;i++) {
@@ -407,12 +421,13 @@ int pe_data_in(unsigned char *buf, int len) {
 		}
 		printf(" ---> USB\n");
 	}
+#endif
 
 	if (len==1) sbuf[1]|=0x80;
 	sbuf[2]=buf[0];
 	rc=io_write(fd,(char *)sbuf,sizeof(sbuf));
 	if (rc!=sizeof(sbuf)) {
-		printf("pe_data_in: failed to write data on usb bus, rc=%d\n", rc);
+		DPRINTF("pe_data_in: failed to write data on usb bus, rc=%d\n", rc);
 		return 0;
 	}
 	sbuf[1]=0x06;
@@ -423,7 +438,7 @@ int pe_data_in(unsigned char *buf, int len) {
 		sbuf[2]=buf[i];
 		rc=io_write(fd,(char *)sbuf,sizeof(sbuf));
 		if (rc!=sizeof(sbuf)) {
-			printf("pe_data_in: failed to write data on usb bus, rc=%d\n", rc);
+			DPRINTF("pe_data_in: failed to write data on usb bus, rc=%d\n", rc);
 			return 0;
 		}
 	}
@@ -432,9 +447,7 @@ int pe_data_in(unsigned char *buf, int len) {
 
 int wakeup_usb_dev() {
 	int rc=io_control(fd,USB_REMOTE_WAKEUP,0,0);
-	if (cec_debug) {
-		printf("remote wakeup returned %d\n",rc);
-	}
+	DPRINTF("remote wakeup returned %d\n",rc);
 	return 0;
 }
 
@@ -442,6 +455,7 @@ int init_pulse_eight(void) {
 	fd=io_open("usb_serial0");
 	if (fd<0) return -1;
 
+	printf("init_pulse_eight: have usb descriptor %d\n", fd);
 	io_control(fd,F_SETFL,(void *)O_NONBLOCK,0);
 
 	register_event(fd,EV_READ,handle_read_event,0);

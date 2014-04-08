@@ -1,4 +1,35 @@
+/* $FrameWorks: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
+/*
+ * Copyright (c) 2014, Anders Franzen.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holder nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ * @(#)gpio_drv.c
+ */
 #include <stm32f4xx.h>
 #include <sys.h>
 #include <io.h>
@@ -26,12 +57,12 @@ static unsigned short int pinmap[GPIO_X];
 #define PIN_FLAGS_ASSIGNED	0x40000000
 #define PIN_FLAGS_IN_USE	0x80000000
 struct pin_data {
+	struct device_handle dh;
 	unsigned int pin_flags;
 	unsigned int bus;
 	unsigned int bpin;
 	/*=======================*/
 	void		*userdata;
-	int 		fd;
 	DRV_CBH 	callback;
 };
 
@@ -71,7 +102,7 @@ static unsigned int get_user(struct pin_data **pdpptr) {
 void EXTI0_IRQHandler(void) {
 	if (exti2pd[0]) {
 		if (exti2pd[0]->callback) {
-			exti2pd[0]->callback(exti2pd[0]->fd,EV_STATE,exti2pd[0]->userdata);
+			exti2pd[0]->callback(&exti2pd[0]->dh,EV_STATE,exti2pd[0]->userdata);
 		}
 	}
 	exti_regs->pr=(1<<0);
@@ -80,7 +111,7 @@ void EXTI0_IRQHandler(void) {
 void EXTI1_IRQHandler(void) {
 	if (exti2pd[1]) {
 		if (exti2pd[1]->callback) {
-			exti2pd[1]->callback(exti2pd[1]->fd,EV_STATE,exti2pd[1]->userdata);
+			exti2pd[1]->callback(&exti2pd[1]->dh,EV_STATE,exti2pd[1]->userdata);
 		}
 	}
 	exti_regs->pr=(1<<1);
@@ -89,7 +120,7 @@ void EXTI1_IRQHandler(void) {
 void EXTI2_IRQHandler(void) {
 	if (exti2pd[2]) {
 		if (exti2pd[2]->callback) {
-			exti2pd[2]->callback(exti2pd[2]->fd,EV_STATE,exti2pd[2]->userdata);
+			exti2pd[2]->callback(&exti2pd[2]->dh,EV_STATE,exti2pd[2]->userdata);
 		}
 	}
 	exti_regs->pr=(1<<2);
@@ -98,7 +129,7 @@ void EXTI2_IRQHandler(void) {
 void EXTI3_IRQHandler(void) {
 	if (exti2pd[3]) {
 		if (exti2pd[3]->callback) {
-			exti2pd[3]->callback(exti2pd[3]->fd,EV_STATE,exti2pd[3]->userdata);
+			exti2pd[3]->callback(&exti2pd[3]->dh,EV_STATE,exti2pd[3]->userdata);
 		}
 	}
 	exti_regs->pr=(1<<3);
@@ -107,7 +138,7 @@ void EXTI3_IRQHandler(void) {
 void EXTI4_IRQHandler(void) {
 	if (exti2pd[4]) {
 		if (exti2pd[4]->callback) {
-			exti2pd[4]->callback(exti2pd[4]->fd,EV_STATE,exti2pd[4]->userdata);
+			exti2pd[4]->callback(&exti2pd[4]->dh,EV_STATE,exti2pd[4]->userdata);
 		}
 	}
 	exti_regs->pr=(1<<4);
@@ -282,31 +313,27 @@ static int clr_flags(struct pin_data *pdp, unsigned int flags) {
 
 /**********************************************************/
 
-static int gpio_open(void *instance, DRV_CBH callback, void *userdata,int fd) {
+static struct device_handle *gpio_open(void *instance, DRV_CBH callback, void *userdata) {
 	struct pin_data *pd=0;
 	int ix=get_user(&pd);
 	sys_printf("gpio_open\n");
-	if (ix<0) return -1;
+	if (ix<0) return 0;
 	pd->userdata=userdata;
-	pd->fd=fd;
 	pd->callback=callback;
-	return ix;
+	return &pd->dh;
 }
 
-static int gpio_close(int fd) {
+static int gpio_close(struct device_handle *dh) {
+	struct pin_data *pd=(struct pin_data *)dh;
 	sys_printf("gpio_close\n");
-	if (pd[fd].pin_flags) {
-		pd[fd].pin_flags=0;
+	if (pd->pin_flags) {
+		pd->pin_flags=0;
 	}
 	return 0;
 }
 
-static int gpio_control(int fd, int cmd, void *arg1, int arg2) {
-	struct pin_data *pdp;
-	if (fd>MAX_USERS||fd<0) {
-		return -1;
-	}
-	pdp=&pd[fd];
+static int gpio_control(struct device_handle *dh, int cmd, void *arg1, int arg2) {
+	struct pin_data *pdp=(struct pin_data *)dh;
 	if (!(pdp->pin_flags&PIN_FLAGS_IN_USE)) return -1;
 	switch(cmd) {
 		case GPIO_BIND_PIN: {

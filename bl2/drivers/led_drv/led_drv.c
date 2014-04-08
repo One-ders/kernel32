@@ -1,11 +1,44 @@
+/* $FrameWorks: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
+/*
+ * Copyright (c) 2014, Anders Franzen.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holder nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ * @(#)led_drv.c
+ */
 #include "stm32f4xx_conf.h"
 #include "sys.h"
 #include "led_drv.h"
 
+static struct device_handle my_dh;
+
 /*************************  Led driver ***************************/
 
-static int led_control(int kfd, int cmd, void *arg1, int arg2) {
+static int led_control(struct device_handle *dh, int cmd, void *arg1, int arg2) {
         switch(cmd) {
                 case LED_CTRL_STAT:
 			if (arg2<4) return -1;
@@ -27,12 +60,12 @@ static int led_control(int kfd, int cmd, void *arg1, int arg2) {
         return 0;
 }
 
-static int led_close(int kfd) {
+static int led_close(struct device_handle *dh) {
         return 0;
 }
 
-static int led_open(void *instance, DRV_CBH cb_handler, void *dum, int fd) {
-        return 0;
+static struct device_handle *led_open(void *instance, DRV_CBH cb_handler, void *dum) {
+        return &my_dh;
 }
 
 

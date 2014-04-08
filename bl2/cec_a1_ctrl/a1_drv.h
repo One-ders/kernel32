@@ -1,4 +1,4 @@
-/* $FrameWorks: , v1.1 2014/04/07 21:44:00 anders Exp $ */
+/* $CecA1GW: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
 /*
  * Copyright (c) 2014, Anders Franzen.
@@ -28,15 +28,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- * @(#)led_drv.h
+ * @(#)a1_drv.h
  */
-#define LED_DRV "led_drv"
-
-#define LED_CTRL_STAT		0x01
-#define LED_CTRL_ACTIVATE	0x02
-#define LED_CTRL_DEACTIVATE	0x03
-
-#define LED_GREEN	(1<<12)
-#define LED_AMBER	(1<<13)
-#define LED_RED		(1<<14)
-#define LED_BLUE	(1<<15)
+#define A1_DRV0	"a1_drv0"

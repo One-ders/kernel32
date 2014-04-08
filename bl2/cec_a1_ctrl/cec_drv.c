@@ -1,4 +1,35 @@
+/* $CecA1GW: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
+/*
+ * Copyright (c) 2014, Anders Franzen.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holder nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ * @(#)cec_drv.c
+ */
 #include <sys.h>
 #include <io.h>
 #include <led_drv.h>
@@ -10,8 +41,8 @@
 #define MIN(a,b)	(a<b?a:b)
 
 struct user_fd {
+	struct device_handle dh;
 	DRV_CBH callback;
-	int userfd;
 	void *userdata;
 	int events;
 	int in_use;
@@ -31,16 +62,14 @@ static struct user_fd *get_user_fd() {
 	return 0;
 }
 
-static int get_fd(struct user_fd *data) {
-	return data-user_fd;
-}
-
 static int wakeup_users(int ev) {
 	int i;
 	for(i=0;i<MAX_USERS;i++) {
-		if ((user_fd[i].in_use)&&(user_fd[i].events&ev)) {
+		int rev;
+		if ((user_fd[i].in_use)&&
+			(rev=user_fd[i].events&ev)) {
 			if (user_fd[i].callback) {
-				user_fd[i].callback(user_fd[i].userfd, ev,user_fd[i].userdata);
+				user_fd[i].callback(&user_fd[i].dh, rev,user_fd[i].userdata);
 			}
 			user_fd[i].events&=~ev;
 		}
@@ -48,13 +77,13 @@ static int wakeup_users(int ev) {
 	return 0;
 }
 
-static int cec_timer_fd;
+static struct device_handle *cec_timer_dh;
 static struct driver *timerdrv;
 
-static int led_fd;
+static struct device_handle *led_dh;
 static struct driver *leddrv;
 
-static int pin_fd;
+static struct device_handle *pin_dh;
 static struct driver *pindrv;
 
 unsigned int blue=LED_BLUE;
@@ -136,8 +165,8 @@ static int start_r_sync(int pstate) {
 	cecr_flags=0;
 	cec_state=CEC_R_INIT;
 	cec_sub_state=CEC_RSYNC_LOW;
-	timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
-	leddrv->ops->control(led_fd,LED_CTRL_ACTIVATE,&blue,sizeof(blue));
+	timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
+	leddrv->ops->control(led_dh,LED_CTRL_ACTIVATE,&blue,sizeof(blue));
 	return 0;
 }
 
@@ -151,8 +180,8 @@ static int handle_r_init(int pstate) {
 			sys_printf("Start Bit Failed in substate %d pin irq\n", cec_sub_state);
 			cec_state=CEC_IDLE;
 			cec_sub_state=CEC_RSYNC_IDLE;
-			timerdrv->ops->control(cec_timer_fd, HR_TIMER_CANCEL, 0, 0);
-			leddrv->ops->control(led_fd,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
+			timerdrv->ops->control(cec_timer_dh, HR_TIMER_CANCEL, 0, 0);
+			leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
 			wakeup_users(EV_WRITE);
 			break;
 		}
@@ -163,16 +192,16 @@ static int handle_r_init(int pstate) {
 				sys_printf("Start Bit Failed in substate RSYNC_TOH\n");
 				cec_state=CEC_IDLE;
 				cec_sub_state=CEC_RSYNC_IDLE;
-				timerdrv->ops->control(cec_timer_fd, HR_TIMER_CANCEL, 0, 0);
-				leddrv->ops->control(led_fd,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
+				timerdrv->ops->control(cec_timer_dh, HR_TIMER_CANCEL, 0, 0);
+				leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
 			wakeup_users(EV_WRITE);
 			}
 			break;
 		case	CEC_RSYNC_TOL:
 			if (!pstate)  {  /* verify that line is low */
 				int uSec=1050;
-				timerdrv->ops->control(cec_timer_fd, HR_TIMER_CANCEL, 0, 0);
-				timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+				timerdrv->ops->control(cec_timer_dh, HR_TIMER_CANCEL, 0, 0);
+				timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 				cec_state=CEC_REC;
 				cec_sub_state=CEC_REC_PLB_I;
 				cec_rbi=8;
@@ -183,8 +212,8 @@ static int handle_r_init(int pstate) {
 				sys_printf("Start Bit Failed in substate RSYNC_TOL\n");
 				cec_state=CEC_IDLE;
 				cec_sub_state=CEC_RSYNC_IDLE;
-				timerdrv->ops->control(cec_timer_fd, HR_TIMER_CANCEL, 0, 0);
-				leddrv->ops->control(led_fd,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
+				timerdrv->ops->control(cec_timer_dh, HR_TIMER_CANCEL, 0, 0);
+				leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
 			wakeup_users(EV_WRITE);
 			}
 			break;
@@ -201,25 +230,25 @@ static void handle_r_sync_tout() {
 			sys_printf("Start Bit Failed in substate %d tout\n", cec_sub_state);
 			cec_state=CEC_IDLE;
 			cec_sub_state=CEC_RSYNC_IDLE;
-			leddrv->ops->control(led_fd,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
+			leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
 			wakeup_users(EV_WRITE);
 			break;
 		case CEC_RSYNC_LOW: {
 			int uSec=600;
 			cec_sub_state=CEC_RSYNC_TOH;
-			timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+			timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 			break;
 		}
 		case CEC_RSYNC_HI1: {
 			int uSec=200;
 			cec_sub_state=CEC_RSYNC_HI2;
-			timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+			timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 			break;
 		}
 		case CEC_RSYNC_HI2: {
 			int uSec=600;
 			cec_sub_state=CEC_RSYNC_TOL;
-			timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+			timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 			break;
 		}
 	}
@@ -231,8 +260,8 @@ static void handle_r_sync_tout() {
 static void cec_set_probe(void) {
 	int uSec=1050;
 
-	timerdrv->ops->control(cec_timer_fd, HR_TIMER_CANCEL, 0, 0);
-	timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+	timerdrv->ops->control(cec_timer_dh, HR_TIMER_CANCEL, 0, 0);
+	timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 	if (!cec_rbi) {
 		cec_sub_state=CEC_REC_EOM_I;
 	} else {
@@ -242,12 +271,12 @@ static void cec_set_probe(void) {
 
 /* Setup timeout for next bit probe if passive ack, if active ack, sink bus */
 static void cec_set_ack(void) {
-	timerdrv->ops->control(cec_timer_fd, HR_TIMER_CANCEL, 0, 0);
+	timerdrv->ops->control(cec_timer_dh, HR_TIMER_CANCEL, 0, 0);
 	if (cec_state==CEC_REC_A) {  /* Active ack */
 		int uSec=1500;
 		/* sink bus line */
-		timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
-		pindrv->ops->control(pin_fd,GPIO_SINK_PIN,0,0);
+		timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
+		pindrv->ops->control(pin_dh,GPIO_SINK_PIN,0,0);
 		cec_sub_state=CEC_REC_ACK_E;
 		cecr_flags|=CECR_BYTE_READY;
 		if (cecr_flags&CECR_EOM) {
@@ -259,7 +288,7 @@ static void cec_set_ack(void) {
 		}
 	} else { 
 		int uSec=1050;
-		timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+		timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 		cec_sub_state=CEC_REC_ACK_I;
 	}
 }
@@ -280,7 +309,7 @@ static void handle_cec_rec(int pstat) {
 			sys_printf("Rec Failed in substate %d, on pinirq\n", cec_sub_state);
 			cec_state=CEC_IDLE;
 			cec_sub_state=0;
-			leddrv->ops->control(led_fd,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
+			leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
 			wakeup_users(EV_WRITE);
 			break;
 		case CEC_REC_PLB_N:
@@ -298,7 +327,7 @@ static void cec_get_bit(void) {
 	int pin_stat;
 
 	cec_rx_tmp<<=1;
-	pindrv->ops->control(pin_fd, GPIO_SENSE_PIN,&pin_stat,sizeof(pin_stat));
+	pindrv->ops->control(pin_dh, GPIO_SENSE_PIN,&pin_stat,sizeof(pin_stat));
 
 	if (pin_stat) { /* a one bit */
 		cec_rx_tmp|=1;
@@ -332,7 +361,7 @@ static void cec_get_bit(void) {
 		}
 	}
 	uSec=750;
-	timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+	timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 	cec_sub_state=CEC_REC_PLB_E;
 }
 
@@ -341,7 +370,7 @@ static void cec_get_eom(void) {
 	int uSec;
 	int pin_stat;
 	
-	pindrv->ops->control(pin_fd, GPIO_SENSE_PIN,&pin_stat,sizeof(pin_stat));
+	pindrv->ops->control(pin_dh, GPIO_SENSE_PIN,&pin_stat,sizeof(pin_stat));
 	if (pin_stat) {
 		cecr_flags|=CECR_EOM;
 	} else {
@@ -349,7 +378,7 @@ static void cec_get_eom(void) {
 	}
 
 	uSec=700;
-	timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+	timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 	cec_sub_state=CEC_REC_EOM_E;
 }
 
@@ -357,11 +386,11 @@ static void cec_get_ack(void) {
 	int pin_stat;
 	int uSec;
 
-	pindrv->ops->control(pin_fd, GPIO_SENSE_PIN,&pin_stat,sizeof(pin_stat));
+	pindrv->ops->control(pin_dh, GPIO_SENSE_PIN,&pin_stat,sizeof(pin_stat));
 	if (!pin_stat) { /*Ack is active low, some body else acked */
 		cecr_flags|=CECR_ACK;
 		uSec=700;
-		timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+		timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 		if (cec_state==CEC_REC) {
 			cec_state=CEC_REC_P;
 		}
@@ -370,7 +399,7 @@ static void cec_get_ack(void) {
 	} else {
 		cecr_flags&=~CECR_ACK;
 		uSec=700;
-		timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+		timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 		cec_sub_state=CEC_REC_ACK_E;
 		cecr_flags|=CECR_BYTE_READY;
 	}
@@ -394,7 +423,7 @@ static void handle_rec_tout(void) {
 			sys_printf("Rec Failed in substate %d on tout\n", cec_sub_state);
 			cec_state=CEC_IDLE;
 			cec_sub_state=0;
-			leddrv->ops->control(led_fd,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
+			leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
 			wakeup_users(EV_WRITE);
 			break;
 		case CEC_REC_PLB_I:
@@ -403,7 +432,7 @@ static void handle_rec_tout(void) {
 		case CEC_REC_PLB_E: {  /* verify line is high at end of bit */
 			int pin_stat;
 			int uSec=1000;
-			pindrv->ops->control(pin_fd, GPIO_SENSE_PIN,&pin_stat,sizeof(pin_stat));
+			pindrv->ops->control(pin_dh, GPIO_SENSE_PIN,&pin_stat,sizeof(pin_stat));
 			if (!pin_stat) {
 				sys_printf("Rec Failed in substate REC_PLB_E on tout\n");
 				cec_state=CEC_IDLE;
@@ -411,7 +440,7 @@ static void handle_rec_tout(void) {
 				wakeup_users(EV_WRITE);
 				break;
 			}
-			timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+			timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 			cec_sub_state=CEC_REC_PLB_N;
 			break;
 		}
@@ -421,16 +450,16 @@ static void handle_rec_tout(void) {
 		case CEC_REC_EOM_E: { /* verify line is high at end of bit */
 			int pin_stat;
 			int uSec=1000;
-			pindrv->ops->control(pin_fd, GPIO_SENSE_PIN,&pin_stat,sizeof(pin_stat));
+			pindrv->ops->control(pin_dh, GPIO_SENSE_PIN,&pin_stat,sizeof(pin_stat));
 			if (!pin_stat) {
 				sys_printf("Rec Failed in substate REC_EOM_E on timeout\n");
 				cec_state=CEC_IDLE;
 				cec_sub_state=0;
-				leddrv->ops->control(led_fd,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
+				leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
 				wakeup_users(EV_WRITE);
 				break;
 			}
-			timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+			timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 			cec_sub_state=CEC_REC_EOM_N;      /* wait for line to get low for ack */
 			break;
 		}
@@ -442,38 +471,37 @@ static void handle_rec_tout(void) {
 			/* release pin if held for active ack */
 			if (cec_state==CEC_REC_A) {
 				prev_pin_stat=1;   /* to ignore the irq, from pin going high */
-				pindrv->ops->control(pin_fd,GPIO_RELEASE_PIN,0,0);
+				pindrv->ops->control(pin_dh,GPIO_RELEASE_PIN,0,0);
 			}
 			if (cecr_flags&CECR_EOM) {
 				cec_state=CEC_IDLE;
 				cec_sub_state=0;
-				leddrv->ops->control(led_fd,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
+				leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
 				wakeup_users(EV_READ|EV_WRITE);
 				break;
 			}
 			uSec=1200;
-			timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+			timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 			cec_sub_state=CEC_REC_PLB_N;
 			break;
 		}
 	}
-		
 }
 
 /********************* Pin irq and Timer *****************************/
 
 static void handle_tx_tout(void);
-static int pin_irq(int fd, int ev, void *dum) {
+static int pin_irq(struct device_handle *dh, int ev, void *dum) {
 	int pin_stat;
-	pindrv->ops->control(pin_fd, GPIO_SENSE_PIN,&pin_stat,sizeof(pin_stat));
+	pindrv->ops->control(pin_dh, GPIO_SENSE_PIN,&pin_stat,sizeof(pin_stat));
 	if (pin_stat==prev_pin_stat) {
-		return 0;
+		goto pin_out;
 	}
 	prev_pin_stat=pin_stat;
 
 	switch(cec_state) {
 		case CEC_TX_GUARD:
-			timerdrv->ops->control(cec_timer_fd, HR_TIMER_CANCEL, 0, 0);
+			timerdrv->ops->control(cec_timer_dh, HR_TIMER_CANCEL, 0, 0);
 		case CEC_IDLE:
 			start_r_sync(pin_stat);
 			break;
@@ -489,11 +517,11 @@ static int pin_irq(int fd, int ev, void *dum) {
 			sys_printf("bad cec state in pin irq\n");
 			break;
 	}
-			
+pin_out:
 	return 0;
 }
 
-int cec_timeout(int fd, int ev, void *dum) {
+int cec_timeout(struct device_handle *dh, int ev, void *dum) {
 	switch(cec_state) {
 		case CEC_IDLE:
 			break;
@@ -575,11 +603,11 @@ static void handle_tx_tout(void) {
 			int uSec=2400*7;
 			cec_sub_state=0;
 			cec_state=CEC_TX_GUARD;
-			leddrv->ops->control(led_fd,LED_CTRL_DEACTIVATE,&green,sizeof(green));
+			leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&green,sizeof(green));
 			wakeup_users(EV_WRITE);
 			flags=GPIO_IRQ_ENABLE(0);
-			pindrv->ops->control(pin_fd,GPIO_SET_FLAGS,&flags,sizeof(flags));
-			timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+			pindrv->ops->control(pin_dh,GPIO_SET_FLAGS,&flags,sizeof(flags));
+			timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 			break;
 		}
 	}
@@ -588,23 +616,23 @@ static void handle_tx_tout(void) {
 
 static int cec_tx_init_hi(void) {
 	unsigned int uSec=800;
-	timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
-	pindrv->ops->control(pin_fd,GPIO_RELEASE_PIN,0,0);
+	timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
+	pindrv->ops->control(pin_dh,GPIO_RELEASE_PIN,0,0);
 	cec_sub_state=CEC_TX_INIT_HI;
 	return 0;
 }
 
 static int cec_send_bit(void) {
 	/* Init done, sink the bus for a while */
-	pindrv->ops->control(pin_fd,GPIO_SINK_PIN,0,0);
+	pindrv->ops->control(pin_dh,GPIO_SINK_PIN,0,0);
 	if (!cec_bi) { /* all bits sent, send eom */
 		if (olen==(cec_oix+1))  { /* we have just sent the last byte */
 			unsigned int uSec=600;
-			timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+			timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 			cec_sub_state=CEC_TX_EOM_LO_1;
 		} else {
 			unsigned int uSec=1500;
-			timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+			timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 			cec_sub_state=CEC_TX_EOM_LO_0;
 		}
 		return 0;
@@ -612,11 +640,11 @@ static int cec_send_bit(void) {
 
 	if (cec_byte_out&0x80) { /* keep line low for 600 uS */
 		unsigned int uSec=600;
-		timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+		timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 		cec_sub_state=CEC_TX_OUT_LO_1;
 	} else {                 /* keep line low for 1500 uS */
 		unsigned int uSec=1500;
-		timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+		timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 		cec_sub_state=CEC_TX_OUT_LO_0;
 	}
 	cec_bi--;
@@ -626,48 +654,48 @@ static int cec_send_bit(void) {
 
 static int cec_tx_out_0_toh(void) {
 	unsigned int uSec=900;
-	pindrv->ops->control(pin_fd,GPIO_RELEASE_PIN,0,0);
-	timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+	pindrv->ops->control(pin_dh,GPIO_RELEASE_PIN,0,0);
+	timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 	cec_sub_state=CEC_TX_OUT_NEXT;
 	return 0;
 }
 
 static int cec_tx_out_1_toh(void) {
 	unsigned int uSec=1800;
-	pindrv->ops->control(pin_fd,GPIO_RELEASE_PIN,0,0);
-	timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+	pindrv->ops->control(pin_dh,GPIO_RELEASE_PIN,0,0);
+	timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 	cec_sub_state=CEC_TX_OUT_NEXT;
 	return 0;
 }
 
 static int cec_tx_eom_0_toh(void) {
 	unsigned int uSec=900;
-	pindrv->ops->control(pin_fd,GPIO_RELEASE_PIN,0,0);
-	timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+	pindrv->ops->control(pin_dh,GPIO_RELEASE_PIN,0,0);
+	timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 	cec_sub_state=CEC_TX_ACK_NEXT;
 	return 0;
 }
 
 static int cec_tx_eom_1_toh(void) {
 	unsigned int uSec=1800;
-	pindrv->ops->control(pin_fd,GPIO_RELEASE_PIN,0,0);
-	timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+	pindrv->ops->control(pin_dh,GPIO_RELEASE_PIN,0,0);
+	timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 	cec_sub_state=CEC_TX_ACK_NEXT;
 	return 0;
 }
 
 static int cec_tx_get_ack_1(void) {
 	unsigned int uSec=600;
-	pindrv->ops->control(pin_fd,GPIO_SINK_PIN,0,0);
-	timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+	pindrv->ops->control(pin_dh,GPIO_SINK_PIN,0,0);
+	timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 	cec_sub_state=CEC_TX_ACK_1;
 	return 0;
 }
 
 static int cec_tx_get_ack_2(void) {
 	unsigned int uSec=450;
-	pindrv->ops->control(pin_fd,GPIO_RELEASE_PIN,0,0);
-	timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+	pindrv->ops->control(pin_dh,GPIO_RELEASE_PIN,0,0);
+	timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 	cec_sub_state=CEC_TX_ACK_2;
 	return 0;
 }
@@ -675,7 +703,7 @@ static int cec_tx_get_ack_2(void) {
 static int cec_tx_get_ack_3(void) {
 	unsigned int uSec=1350;  /* should be 1400, but compensate for previous state */
 	int pin_stat;
-	pindrv->ops->control(pin_fd, GPIO_SENSE_PIN,&pin_stat,sizeof(pin_stat));
+	pindrv->ops->control(pin_dh, GPIO_SENSE_PIN,&pin_stat,sizeof(pin_stat));
 
 	if (cect_flags&CEC_TX_CHECK_ACK) {
 		if (pin_stat) goto no_ack;
@@ -684,13 +712,13 @@ static int cec_tx_get_ack_3(void) {
 	}
 
 	cec_oix++;
-	if (cec_oix==olen) {               /* already received all bytes, change state to done */
+	if (cec_oix==olen) {               /* already send all bytes, change state to done */
 		cec_sub_state=CEC_TX_DONE;    
-		timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+		timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 		return 0;
 	}
 	cec_sub_state=CEC_TX_OUT_NEXT;     /* state for starting receiving next byte */
-	timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+	timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 
 	cec_byte_out=cec_tx_buf[cec_oix];
 	cec_bi=8;
@@ -701,7 +729,7 @@ no_ack:
 got_nack:
 	cect_flags|=CEC_TX_NO_ACK;
 	cec_sub_state=CEC_TX_DONE;
-	timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
+	timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 	return 0;
 }
 
@@ -718,9 +746,9 @@ static int send_cec(struct user_fd *u, unsigned char *data, int len) {
 		return -DRV_AGAIN;
 	}
 
-	leddrv->ops->control(led_fd,LED_CTRL_ACTIVATE,&green,sizeof(green));
+	leddrv->ops->control(led_dh,LED_CTRL_ACTIVATE,&green,sizeof(green));
 	flags=GPIO_IRQ_ENABLE(0);
-	pindrv->ops->control(pin_fd,GPIO_CLR_FLAGS,&flags,sizeof(flags));
+	pindrv->ops->control(pin_dh,GPIO_CLR_FLAGS,&flags,sizeof(flags));
 	cect_flags=0;
 
 	if ((addr&0xf)==0xf) { /* broadcast */
@@ -739,28 +767,26 @@ static int send_cec(struct user_fd *u, unsigned char *data, int len) {
 	cec_sub_state=CEC_TX_INIT_LO;
 
 	uSec=3700;
-	timerdrv->ops->control(cec_timer_fd, HR_TIMER_SET, &uSec, sizeof(uSec));
-	pindrv->ops->control(pin_fd,GPIO_SINK_PIN,0,0);
+	timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
+	pindrv->ops->control(pin_dh,GPIO_SINK_PIN,0,0);
 	u->events|=EV_WRITE;
 	return -DRV_INPROGRESS;
 }
 
 /**** Driver API ********************/
 
-static int cec_drv_open(void *inst, DRV_CBH cb, void *udata, int ufd) {
+static struct device_handle *cec_drv_open(void *inst, DRV_CBH cb, void *udata) {
 	struct user_fd *user_fd=get_user_fd();
-	int kfd;
 
+	if (!user_fd) return 0;
 	user_fd->callback=cb;
 	user_fd->userdata=udata;
-	user_fd->userfd=ufd;
 	user_fd->events=0;
-	kfd=get_fd(user_fd);
-	return kfd;
+	return &user_fd->dh;
 }
 
-static int cec_drv_close(int fd) {
-	struct user_fd *u=&user_fd[fd];
+static int cec_drv_close(struct device_handle *dh) {
+	struct user_fd *u=(struct user_fd *)dh;
 
 	if (u)  {
 		u->in_use=0;
@@ -768,8 +794,8 @@ static int cec_drv_close(int fd) {
 	return 0;
 }
 
-static int cec_drv_control(int fd, int cmd, void *arg1, int size) {
-	struct user_fd *u=&user_fd[fd];
+static int cec_drv_control(struct device_handle *dh, int cmd, void *arg1, int size) {
+	struct user_fd *u=(struct user_fd *)dh;
 	if (!u) return -1;
 	switch(cmd) {
 		case RD_CHAR: {
@@ -860,26 +886,26 @@ static int cec_drv_start(void *inst) {
 
 	leddrv=driver_lookup(LED_DRV);
 	if (!leddrv) return 0;
-	led_fd=leddrv->ops->open(leddrv->instance,0,0,0);
-	if (led_fd<0) return -1;
+	led_dh=leddrv->ops->open(leddrv->instance,0,0);
+	if (!led_dh) return -1;
 
 	pindrv=driver_lookup(GPIO_DRV);
 	if (!pindrv) return 0;
-	pin_fd=pindrv->ops->open(pindrv->instance,pin_irq,0,0);
-	if (pin_fd<0) return -1;
+	pin_dh=pindrv->ops->open(pindrv->instance,pin_irq,0);
+	if (!pin_dh) return -1;
 
 	timerdrv=driver_lookup(HR_TIMER);
 	if (!timerdrv) return 0;
 
-	cec_timer_fd=timerdrv->ops->open(timerdrv->instance,cec_timeout,0,0);
-	if (cec_timer_fd<0) {
+	cec_timer_dh=timerdrv->ops->open(timerdrv->instance,cec_timeout,0);
+	if (!cec_timer_dh) {
 		timerdrv=0;
 		return -1;
 	}
 	/* */
 			/*PC4 pin for CEC */
 	pin=GPIO_PIN(PC,4);
-	rc=pindrv->ops->control(pin_fd,GPIO_BIND_PIN,&pin,sizeof(pin));
+	rc=pindrv->ops->control(pin_dh,GPIO_BIND_PIN,&pin,sizeof(pin));
 	if (rc<0) {
 		sys_printf("pin_assignment failed\n");
 		return -1;
@@ -889,7 +915,7 @@ static int cec_drv_start(void *inst) {
 	flags=GPIO_DRIVE(flags,GPIO_PULLUP); 
 	flags=GPIO_SPEED(flags,GPIO_SPEED_MEDIUM);
 	flags=GPIO_IRQ_ENABLE(flags);
-	rc=pindrv->ops->control(pin_fd,GPIO_SET_FLAGS,&flags,sizeof(flags));
+	rc=pindrv->ops->control(pin_dh,GPIO_SET_FLAGS,&flags,sizeof(flags));
 	if (rc<0) {
 		sys_printf("pin_flags update failed\n");
 		return -1;
