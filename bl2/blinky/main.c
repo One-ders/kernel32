@@ -12,7 +12,7 @@ void tic_wait(unsigned int tic) {
 	while(1) {
 		if ((((int)tic)-((int)tq_tic))<=0)  {
 			return;
-		}	
+		}
 	}
 }
 
@@ -35,7 +35,7 @@ void blink(struct blink_data *bd) {
 		} else {
 			rc=io_control(fd,LED_CTRL_ACTIVATE,&bd->led,sizeof(bd->led));
 		}
-	
+
 		sleep(bd->delay);
 	}
 }

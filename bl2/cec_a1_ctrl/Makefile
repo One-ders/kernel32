@@ -8,7 +8,7 @@ LDFLAGS=-g -T../incl/stm32_flash.ld -mlittle-endian -mthumb -mcpu=cortex-m4 -mth
 all: cec_a1_ctrl
 
 cec_a1_ctrl: main.o asynchio.o pulse_eight.o cec.o cec_drv.o a1_drv.o a1.o
-	$(CC) $(LDFLAGS) -o $@ ../lib/init_sect.o ../lib/led_drv.o ../lib/hr_timer.o ../lib/os.o ../lib/bsp.o ../lib/usb_serial_drv.o ../stmusb/stm_usb_drv.o $^ ../lib/end_sect.o 
+	$(CC) $(LDFLAGS) -o $@ ../lib/init_sect.o ../lib/led_drv.o ../lib/hr_timer.o ../lib/os.o ../lib/bsp.o ../lib/usb_serial_drv.o ../stmusb/stm_usb_drv.o $^ ../lib/end_sect.o
 
 
 main.o: main.c
@@ -25,6 +25,5 @@ cec.o: cec.c cec.h
 
 a1.o: a1.c a1.h
 
-clean: 
+clean:
 	rm -rf *.o  cec_a1_ctrl
-

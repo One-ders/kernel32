@@ -134,12 +134,12 @@ static int a1_start_tx(struct a1_data *a1);
 
 static int pin_irq(struct device_handle *dh, int ev, void *dum) {
 	int pin_stat;
-	struct a1_data *a1=(struct a1_data *)dum;	
+	struct a1_data *a1=(struct a1_data *)dum;
 
 	pindrv->ops->control(a1->pin_dh,GPIO_SENSE_PIN,&pin_stat,sizeof(pin_stat));
 	if (pin_stat==a1->prev_pin_stat) return 0;
 	a1->prev_pin_stat=pin_stat;
-	
+
 	switch(a1->state) {
 		case A1_STATE_IDLE:
 			handle_rx_start(a1,pin_stat);
@@ -158,7 +158,6 @@ static int pin_irq(struct device_handle *dh, int ev, void *dum) {
 			break;
 		default:
 			sys_printf("Sony A1 protocol: bad state in pin irq\n");
-		
 	};
 	return 0;
 }
@@ -216,7 +215,7 @@ static int a1_timeout(struct device_handle *dh, int ev, void *dum) {
 				if (a1->txIn-a1->txOut)  {
 					a1_start_tx(a1);
 				} else {
-					wakeup_users(a1,EV_WRITE);	
+					wakeup_users(a1,EV_WRITE);
 				}
 				return 0;
 			}
@@ -233,7 +232,6 @@ static int a1_timeout(struct device_handle *dh, int ev, void *dum) {
 		default:
 			sys_printf("got timeout in state %d\n", a1->state);
 			break;
-		
 	}
 
 	return 0;
@@ -344,7 +342,7 @@ static int handle_rx_data0(struct a1_data *a1,int pin_lev) {
 	}
 	a1->state=A1_STATE_RX_DATA1;
 	timerdrv->ops->control(a1->timer_dh,HR_TIMER_SET,&uSec,sizeof(uSec));
-	return 0;	
+	return 0;
 }
 
 /* A1 RX DATA 1:  */
@@ -380,7 +378,7 @@ int a1_send_bit(struct a1_data *a1) {
 		if (a1->txIn-a1->txOut)  {
 			a1_start_tx(a1);
 		} else {
-			wakeup_users(a1,EV_WRITE);	
+			wakeup_users(a1,EV_WRITE);
 		}
 		return 0;
 	}
@@ -418,7 +416,7 @@ static int a1_start_tx(struct a1_data *a1) {
 	a1->tx_oix=0;
 	a1->txbyte=a1->txbuf[(a1->tx_oix+a1->txOut+1)&TXB_MASK];
 	a1->txbi=8;
-	
+
 	timerdrv->ops->control(a1->timer_dh,HR_TIMER_SET,&uSec,sizeof(uSec));
 	pindrv->ops->control(a1->pin_dh,GPIO_SINK_PIN,0,0);
 
@@ -430,7 +428,7 @@ static int a1_start_tx(struct a1_data *a1) {
 
 static struct device_handle *a1_drv_open(void *inst, DRV_CBH cb, void *udata) {
 	struct user_data *u=get_user_data();
-	
+
 	if (!u) return 0;
 	u->a1_data=(struct a1_data *)inst;
 	u->callback=cb;
@@ -459,7 +457,7 @@ static int a1_drv_control(struct device_handle *dh, int cmd, void *arg, int size
 		return -1;
 	}
 	a1=u->a1_data;
-	
+
 	switch(cmd) {
 		case RD_CHAR: {
 			int len,i;

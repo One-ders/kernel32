@@ -17,5 +17,3 @@ clean:	$(SUBDIRS)
 
 $(SUBDIRS):
 	@$(MAKE) -C $@ $(MAKECMDGOALS)
-	
-

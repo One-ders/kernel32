@@ -175,7 +175,7 @@ int cec_bus_send(unsigned char *buf, int len) {
 
 static int handle_cec_data(int fd,int ev, void *dum) {
 	int rc;
-	
+
 	rc=io_read(fd,(char *)cec_rbuf,sizeof(cec_rbuf));
 	if (rc<0) {
 		return rc;
@@ -201,7 +201,7 @@ int distribute_msg(int itf, unsigned char *buf, int len) {
 	int rc=0;
 	int rc1=0;
 	int found=0;
-	
+
 	DUMP_DATA(itf, "distribute msg", buf,len);
 	if (to==0xf) { // Broadcast
 		int i;

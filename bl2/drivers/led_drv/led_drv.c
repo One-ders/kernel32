@@ -82,7 +82,7 @@ static int led_start(void *inst) {
 	return 0;
 }
 
-static struct driver_ops led_drv_ops = { 
+static struct driver_ops led_drv_ops = {
         led_open,
         led_close,
         led_control,
@@ -95,7 +95,7 @@ static struct driver led_drv = {
 	0,
 	&led_drv_ops,
 };
- 
+
 void init_led_drv(void) {
 	driver_publish(&led_drv);
 }

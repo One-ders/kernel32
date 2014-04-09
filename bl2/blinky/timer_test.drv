@@ -48,7 +48,7 @@ static int pin_irq(void *dum) {
 		pin_stat=1;
 	}
 	pindrv->ops->control(pin_out_fd, GPIO_SET_PIN,&pin_stat,sizeof(pin_stat));
-	
+
 	return 0;
 }
 
@@ -134,7 +134,7 @@ static int cec_drv_open(void *inst, DRV_CBH cb, void *dum) {
 	drv=driver_lookup(HR_TIMER);
 	if (!drv) return 0;
 
-		
+
 
 #if 0
 	nSec=1000;
@@ -179,9 +179,9 @@ static int cec_drv_open(void *inst, DRV_CBH cb, void *dum) {
 		sys_printf("pin_assignment failed\n");
 		return -1;
 	}
-	
+
 	flags=GPIO_DIR(0,GPIO_INPUT);
-	flags=GPIO_DRIVE(flags,GPIO_FLOAT); 
+	flags=GPIO_DRIVE(flags,GPIO_FLOAT);
 	flags=GPIO_IRQ_ENABLE(flags);
 	rc=pindrv->ops->control(pin_fd,GPIO_SET_FLAGS,&flags,sizeof(flags));
 	if (rc<0) {
@@ -195,13 +195,13 @@ static int cec_drv_open(void *inst, DRV_CBH cb, void *dum) {
 		sys_printf("pin_assignment failed\n");
 		return -1;
 	}
-	
+
 
 	flags=GPIO_DIR(0,GPIO_OUTPUT);
 	flags=GPIO_DRIVE(flags,GPIO_OPENDRAIN);
 	rc=pindrv->ops->control(pin_out_fd,GPIO_SET_FLAGS,&flags,sizeof(flags));
 	rc=pindrv->ops->control(pin_out_fd,GPIO_SET_PIN,&one,sizeof(one));
-	
+
 	return 0;
 }
 

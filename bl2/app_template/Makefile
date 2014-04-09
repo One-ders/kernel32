@@ -10,11 +10,11 @@ all:
 //all: app
 
 app: app_part1.o app_drv.o
-	$(CC) $(LDFLAGS) -o $@ ../lib/init_sect.o ../lib/os.o ../lib/bsp.o $^ ../lib/end_sect.o 
+	$(CC) $(LDFLAGS) -o $@ ../lib/init_sect.o ../lib/os.o ../lib/bsp.o $^ ../lib/end_sect.o
 
 app_part1.o:
 
 app_drv.o: app_drv.c app_drv.h
 
-clean: 
+clean:
 	rm -rf *.o app

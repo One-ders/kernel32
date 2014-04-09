@@ -286,7 +286,7 @@ static void cec_set_ack(void) {
 				wakeup_users(EV_WRITE|EV_READ);
 			}
 		}
-	} else { 
+	} else {
 		int uSec=1050;
 		timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 		cec_sub_state=CEC_REC_ACK_I;
@@ -369,7 +369,7 @@ static void cec_get_bit(void) {
 static void cec_get_eom(void) {
 	int uSec;
 	int pin_stat;
-	
+
 	pindrv->ops->control(pin_dh, GPIO_SENSE_PIN,&pin_stat,sizeof(pin_stat));
 	if (pin_stat) {
 		cecr_flags|=CECR_EOM;
@@ -414,7 +414,7 @@ static void cec_get_ack(void) {
 }
 
 static void handle_rec_tout(void) {
-	
+
 	switch(cec_sub_state) {
 		case CEC_REC_IDLE:
 		case CEC_REC_PLB_N:
@@ -568,7 +568,7 @@ static int cec_tx_get_ack_2(void);
 static int cec_tx_get_ack_3(void);
 
 static void handle_tx_tout(void) {
-	
+
 	switch(cec_sub_state) {
 		case CEC_TX_INIT_LO:
 			cec_tx_init_hi();
@@ -713,7 +713,7 @@ static int cec_tx_get_ack_3(void) {
 
 	cec_oix++;
 	if (cec_oix==olen) {               /* already send all bytes, change state to done */
-		cec_sub_state=CEC_TX_DONE;    
+		cec_sub_state=CEC_TX_DONE;
 		timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 		return 0;
 	}
@@ -910,9 +910,9 @@ static int cec_drv_start(void *inst) {
 		sys_printf("pin_assignment failed\n");
 		return -1;
 	}
-	
+
 	flags=GPIO_DIR(0,GPIO_BUSPIN);
-	flags=GPIO_DRIVE(flags,GPIO_PULLUP); 
+	flags=GPIO_DRIVE(flags,GPIO_PULLUP);
 	flags=GPIO_SPEED(flags,GPIO_SPEED_MEDIUM);
 	flags=GPIO_IRQ_ENABLE(flags);
 	rc=pindrv->ops->control(pin_dh,GPIO_SET_FLAGS,&flags,sizeof(flags));

@@ -8,9 +8,9 @@ LDFLAGS=-g -T../incl/stm32_flash.ld -mlittle-endian -mthumb -mcpu=cortex-m4 -mth
 all: blinky
 
 blinky: main.o
-	$(CC) $(LDFLAGS) -o $@ ../lib/init_sect.o ../lib/os.o ../lib/bsp.o $^ ../lib/led_drv.o ../lib/usb_serial_drv.o ../stmusb/stm_usb_drv.o ../lib/end_sect.o 
+	$(CC) $(LDFLAGS) -o $@ ../lib/init_sect.o ../lib/os.o ../lib/bsp.o $^ ../lib/led_drv.o ../lib/usb_serial_drv.o ../stmusb/stm_usb_drv.o ../lib/end_sect.o
 
 main.o:
 
-clean: 
+clean:
 	rm -rf *.o blinky

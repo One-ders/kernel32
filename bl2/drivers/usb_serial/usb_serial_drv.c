@@ -87,7 +87,7 @@ USB_OTG_CORE_HANDLE USB_OTG_dev;
 #define CDC_IF_DESC_SET_SIZE    ( USB_INTERFACE_DESC_SIZE + 0x05 + 0x05 + 0x04 + \
                                  0x05 + USB_ENDPOINT_DESC_SIZE + \
                                  USB_INTERFACE_DESC_SIZE + 2 * USB_ENDPOINT_DESC_SIZE )
- 
+
 #define IAD_CDC_IF_DESC_SET_SIZE    ( 8 + CDC_IF_DESC_SET_SIZE )
 
 #define VIRTUAL_COM_PORT_SIZ_DEVICE_DESC        18      // Standard of USB, not device dependent
@@ -97,9 +97,9 @@ USB_OTG_CORE_HANDLE USB_OTG_dev;
 #define VIRTUAL_COM_PORT_SIZ_STRING_VENDOR      38      // Ok, for "STMicroelectronics"
 #define VIRTUAL_COM_PORT_SIZ_STRING_PRODUCT     50      // Ok, "STM32 Virtual COM Port"
 #define VIRTUAL_COM_PORT_SIZ_STRING_SERIAL      26      // FIXME, it is actually 16 for "STM3210"
- 
+
 //#define STANDARD_ENDPOINT_DESC_SIZE             0x09  // Funny, this is wrong but unused anyway
- 
+
 //#define CDC_DATA_IN_PACKET_SIZE                64
 //#define CDC_DATA_OUT_PACKET_SIZE               64
 

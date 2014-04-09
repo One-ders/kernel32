@@ -25,8 +25,5 @@ $(SYS_LIB)/$(DRV_NAME).o: $(DRV_NAME).o
 	cp $^ $@
 
 
-
-	
-
 clean:
-	rm -rf *.o 
+	rm -rf *.o

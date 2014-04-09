@@ -26,7 +26,6 @@ $(SYS_LIB)/$(DRV_NAME).o: $(DRV_NAME).o
 
 
 
-	
 
 clean:
-	rm -rf *.o 
+	rm -rf *.o
