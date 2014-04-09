@@ -159,7 +159,7 @@ static int wake_fnc(int argc, char **argv, struct Env *env) {
 	return 0;
 }
 
-/* Note the commands are run from the sys_mon task, so dont use 
+/* Note the commands are run from the sys_mon task, so dont use
  * task specific data like filedescriptors
  */
 static int send_a1_fnc(int argc, char **argv, struct Env *env) {

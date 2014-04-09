@@ -11,5 +11,3 @@ clean:	$(SUBDIRS)
 .PHONY: $(SUBDIRS)
 $(SUBDIRS):
 	$(MAKE) -C $@ $(MAKECMDGOALS)
-	
-

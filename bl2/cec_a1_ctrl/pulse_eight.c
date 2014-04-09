@@ -160,7 +160,7 @@ static int handle_tx(int fd, unsigned char *buf, int len) {
 	} else {
 		DPRINTF("Sending to Cec dev: %x", buf[2]);
 	}
-	
+
 	tbuf[tbix++]=buf[2];
 	return send_accepted(fd);
 }
@@ -195,7 +195,7 @@ static int handle_tx_eom(int fd, unsigned char *buf, int len) {
 	} else {
 		DPRINTF("Sending to Cec dev: %x\n", buf[2]);
 	}
-	
+
 	tbuf[tbix++]=buf[2];
 	send_accepted(fd);
 	rc=cec_send(USB_BUS,tbuf,tbix);
@@ -306,7 +306,7 @@ static int handle_get_pa(int fd,unsigned char *buf, int len) {
 
 
 
-/* 
+/*
  * The start up sequence from libcec:
  * 	1. CMD_PING
  * 	2. CMD_GET_FW_VER
@@ -400,7 +400,7 @@ static int  handle_read_event(int fd, int ev, void *dum) {
 				handle_pe_cmd(fd,rbuf,bix);
 				bix=0;
 			}
-		}	
+		}
 	}
 	return 0;
 }
@@ -459,6 +459,6 @@ int init_pulse_eight(void) {
 	io_control(fd,F_SETFL,(void *)O_NONBLOCK,0);
 
 	register_event(fd,EV_READ,handle_read_event,0);
-	
+
 	return 0;
 }

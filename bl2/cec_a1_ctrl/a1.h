@@ -33,4 +33,3 @@
 int a1_init_a1(void);
 int a1_power_on(void);
 int a1_power_off(void);
-

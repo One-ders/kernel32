@@ -73,7 +73,7 @@ static int vol_state;
 /* Undefined 		0x13 */
 /* Undefined 		0x14 */
 /* Set TVLD		0x15 */
-#define SOURCE_TVLD	0x16 
+#define SOURCE_TVLD	0x16
 /* Undefined 		0x17 */
 /* Undefined 		0x18 */
 #define SOURCE_DVD	0x19
@@ -141,7 +141,7 @@ static int handle_cec_data(unsigned char *buf, int size) {
 		case CEC_OPCODE_USER_CONTROL_RELEASE:
 			a1_volume_released();
 			break;
-		case CEC_OPCODE_STANDBY: 
+		case CEC_OPCODE_STANDBY:
 			a1_power_off();
 			break;
 		default:
@@ -257,7 +257,6 @@ static int a1_volume_released(void) {
 static int handle_timeout(int fd, int ev, void *dum) {
 /* send a request for status, answer will be received below,
  */
-       
 	unsigned char send_data[] = {0xC0,0x0F};
 	io_write(fd_a1,(char *)send_data,sizeof(send_data));
 	q_count++;
@@ -280,7 +279,7 @@ static int handle_a1_data(int fd, int ev, void *dum) {
 		DPRINTF("received a1 data, not for me!\n");
 		DUMP_DATA(A1_LINK,"got a1 data", a1_rbuf,rc);
 	}
-	a1_rbuf[0]&=~0x8;	
+	a1_rbuf[0]&=~0x8;
 	if (a1_rbuf[0]==0xC0) {
 		DPRINTF("a1: msg from amp: ");
 		set_amp_avail(1);
@@ -319,7 +318,6 @@ static int handle_a1_data(int fd, int ev, void *dum) {
 					a1_rbuf[2], a1_rbuf[3], a1_rbuf[4]);
 				set_power_state((a1_rbuf[4]&POWER_STAT_BIT)?1:0);
 				set_audio_source(a1_rbuf[2]);
-				
 				break;
 			case 0x6A:
 				DPRINTF("Device Name %s\n", &a1_rbuf[2]);
