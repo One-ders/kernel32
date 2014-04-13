@@ -14,7 +14,7 @@ typedef int IRQn_Type;
 
 
 
-#define SystemCoreClock 168000000
+extern unsigned int SystemCoreClock;
 
 #include <stm32/core_cm4.h>
 

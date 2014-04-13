@@ -1,5 +1,5 @@
 
-DRIVERS_DIR := os stddrv stmusb drivers
+DRIVERS_DIR := os stddrv stmusb drivers arch
 APP_DIR := cec_a1_ctrl blinky
 
 SUBDIRS:=$(DRIVERS_DIR) $(APP_DIR)
