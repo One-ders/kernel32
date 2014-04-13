@@ -32,7 +32,8 @@
  */
 #include "sys.h"
 #include "io.h"
-#include "stm32f4xx.h"
+#include <stm32/devices.h>
+#include <stm32/stm32f407.h>
 
 #include "usart_drv.h"
 
@@ -332,9 +333,9 @@ static int usart_init(void *instance) {
 	RCC->APB1ENR|=RCC_APB1ENR_USART3EN;
 	RCC->AHB1ENR|=RCC_AHB1ENR_GPIOCEN;
 	/* USART3 uses PC10 for tx, PC11 for rx according to table 5 in  discovery documentation */
-	GPIOC->AFR[1] = 0;
-	GPIOC->AFR[1] |= 0x00007000;  /* configure pin 11 to AF7 (USART3) */
-	GPIOC->AFR[1] |= 0x00000700;  /* confiure pin 10 to AF7 */
+	GPIOC->AFRH = 0;
+	GPIOC->AFRH |= 0x00007000;  /* configure pin 11 to AF7 (USART3) */
+	GPIOC->AFRH |= 0x00000700;  /* confiure pin 10 to AF7 */
 	GPIOC->MODER |= (0x2 << 22);  /* set pin 11 to AF */
 	GPIOC->MODER |= (0x2 << 20) ;  /* set pin 10 to AF */
 	GPIOC->OSPEEDR |= (0x3 << 20); /* set pin 10 output high speed */

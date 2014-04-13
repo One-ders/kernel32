@@ -1,5 +1,4 @@
 
-#include "stm32f4xx_conf.h"
 #include "sys.h"
 #include "io.h"
 

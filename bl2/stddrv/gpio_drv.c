@@ -30,7 +30,8 @@
  *
  * @(#)gpio_drv.c
  */
-#include <stm32f4xx.h>
+#include <stm32/devices.h>
+#include <stm32/stm32f407.h>
 #include <sys.h>
 #include <io.h>
 
@@ -75,14 +76,14 @@ struct exti_regs {
 	volatile unsigned int pr;
 };
 
-struct exti_regs * const exti_regs=(struct exti_regs *)(APB2PERIPH_BASE+0x3c00);
+struct exti_regs * const exti_regs=(struct exti_regs *)(APB2+0x3c00);
 
 #define MAX_USERS 16
 static struct pin_data pd[MAX_USERS];
 
 static struct pin_data *exti2pd[16];
 
-unsigned int * const exti_cr=(unsigned int *)(APB2PERIPH_BASE+0x3808);
+unsigned int * const exti_cr=(unsigned int *)(APB2+0x3808);
 
 static unsigned int get_user(struct pin_data **pdpptr) {
 	int i;
@@ -391,7 +392,7 @@ static int gpio_control(struct device_handle *dh, int cmd, void *arg1, int arg2)
 static int gpio_init(void *inst) {
 	int i;
 	for(i=0;i<9;i++) {
-		GPIO[i]=(struct GPIO_REG *)(AHB1PERIPH_BASE+(i*0x400));
+		GPIO[i]=(struct GPIO_REG *)(AHB1+(i*0x400));
 	}
 	RCC->APB2ENR|=RCC_APB2ENR_SYSCFGEN;
 	return 0;

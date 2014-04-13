@@ -30,7 +30,7 @@
  *
  * @(#)sys.c
  */
-#include "stm32f4xx.h"
+#include "stm32/stm32f407.h"
 #include "io.h"
 #include "sys.h"
 
@@ -1276,8 +1276,11 @@ void init_sys(void) {
 	NVIC_SetPriority(PendSV_IRQn,0xf);
 	NVIC_SetPriority(SVCall_IRQn,0xe);
 	NVIC_SetPriority(SysTick_IRQn,0xd);  /* preemptive tics... */
-	*((unsigned int *)0xe000ed14)&=~0x200;
-	*((unsigned int *)0xe000ed14)|=1;
+
+#if 0
+	*((unsigned int *)0xe000ed14)&=~0x200;  /* dont align stack on 8 byte, use 4 byte */
+	*((unsigned int *)0xe000ed14)|=1;       /* allow software to return to threadmode always */
+#endif
 
 	SysTick_Config(SystemCoreClock/100); // 10 mS tic is 100/Sec
 	for(i=init_func_begin;i<init_func_end;i++) {

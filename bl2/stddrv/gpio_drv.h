@@ -52,9 +52,9 @@
 
 #define GPIO_DIR(a,b)			((a&GPIO_DIR_MASK)|b)
 #define GPIO_DIR_MASK			0x1
-#define GPIO_INPUT 			0x00000000
-#define GPIO_OUTPUT			0x00000001
-#define GPIO_BUSPIN			0x00000002
+#define GPIO_INPUT 			0x00000001
+#define GPIO_OUTPUT			0x00000002
+#define GPIO_BUSPIN			0x00000004
 
 #define GPIO_DRIVE(a,b)			((a&~GPIO_DRIVE_MASK)|(b<<GPIO_DRIVE_SHIFT))
 #define GPIO_DRIVE_MASK			0x6
