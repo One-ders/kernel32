@@ -13,6 +13,8 @@ void _exit(int status) {
 
 #define HSE_STARTUP_TIMEOUT	0x0500
 
+unsigned int  SystemCoreClock = 168000000;
+
 void system_init(void) {
 	volatile unsigned int startup_cnt=0;
 	volatile unsigned int HSE_status=0;
