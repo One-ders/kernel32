@@ -116,6 +116,9 @@
 
 #include "stm32f4xx.h"
 
+void _exit(int dum) {
+}
+
 /**
   * @}
   */
