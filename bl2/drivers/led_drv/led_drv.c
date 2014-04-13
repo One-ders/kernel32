@@ -30,7 +30,8 @@
  *
  * @(#)led_drv.c
  */
-#include "stm32f4xx_conf.h"
+#include "stm32/stm32f407.h"
+#include "stm32/devices.h"
 #include "sys.h"
 #include "led_drv.h"
 
@@ -42,7 +43,7 @@ static int led_control(struct device_handle *dh, int cmd, void *arg1, int arg2) 
         switch(cmd) {
                 case LED_CTRL_STAT:
 			if (arg2<4) return -1;
-			*((unsigned int *)arg1)=GPIOD->ODR&0xf0000;
+			*((unsigned int *)arg1)=GPIOD->ODR&0xf000;
                         return 0;
                 case LED_CTRL_ACTIVATE: {
 			if (arg2<4) return -1;

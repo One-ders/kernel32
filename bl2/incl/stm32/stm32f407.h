@@ -1,4 +1,22 @@
 
+typedef int IRQn_Type;
+#define __NVIC_PRIO_BITS 4
+
+#define SysTick_IRQn		-1
+#define PendSV_IRQn		-2
+#define SVCall_IRQn		-5
+
+#define TIM1_UP_TIM10_IRQn	25
+
+#define USART1_IRQn		37
+#define USART2_IRQn		38
+#define USART3_IRQn		39
+
+
+
+#define SystemCoreClock 168000000
+
+#include <stm32/core_cm4.h>
 
 #define set_reg(a,b) (*((unsigned int *)a)=(b))
 

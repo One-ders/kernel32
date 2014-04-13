@@ -30,7 +30,6 @@
  *
  * @(#)sys_tasklib.c
  */
-#include "stm32f4xx.h"
 #include "io.h"
 #include "sys.h"
 
@@ -167,8 +166,7 @@ int thread_create(void *fnc, void *val, int prio, char *name) {
 
 
 int sleep(unsigned int ms) {
-	unsigned int tics=ms/10;
-	return svc_sleep(tics);
+	return svc_sleep(ms);
 }
 
 #if 0

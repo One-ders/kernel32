@@ -30,7 +30,8 @@
  *
  * @(#)hr_tiemr.c
  */
-#include <stm32f4xx.h>
+#include <stm32/stm32f407.h>
+#include <stm32/devices.h>
 #include <sys.h>
 #include <io.h>
 
