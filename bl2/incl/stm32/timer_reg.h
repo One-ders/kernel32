@@ -175,23 +175,24 @@
 
 
 struct TIMER {
-	volatile unsigned int CR1;
-	volatile unsigned int CR2;
-	volatile unsigned int SMCR;
-	volatile unsigned int DIER;
-	volatile unsigned int SR;
-	volatile unsigned int EGR;
-	volatile unsigned int CCMR1;
-	volatile unsigned int CCMR2;
-	volatile unsigned int CNT;
-	volatile unsigned int PSC;
-	volatile unsigned int ARR;
-	volatile unsigned int RCR;
-	volatile unsigned int CCR1;
-	volatile unsigned int CCR2;
-	volatile unsigned int CCR3;
-	volatile unsigned int CCR4;
-	volatile unsigned int BDTR;
-	volatile unsigned int DCR;
-	volatile unsigned int DMAR;
+	volatile unsigned int CR1;	// 0x00
+	volatile unsigned int CR2;	// 0x04
+	volatile unsigned int SMCR;	// 0x08
+	volatile unsigned int DIER;	// 0x0c
+	volatile unsigned int SR;	// 0x10
+	volatile unsigned int EGR;	// 0x14
+	volatile unsigned int CCMR1;	// 0x18
+	volatile unsigned int CCMR2;	// 0x1c
+	volatile unsigned int CCER;	// 0x20
+	volatile unsigned int CNT;	// 0x24
+	volatile unsigned int PSC;	// 0x28
+	volatile unsigned int ARR;	// 0x2c
+	volatile unsigned int RCR;	// 0x30
+	volatile unsigned int CCR1;	// 0x34
+	volatile unsigned int CCR2;	// 0x38
+	volatile unsigned int CCR3;	// 0x3c
+	volatile unsigned int CCR4;	// 0x40
+	volatile unsigned int BDTR;	// 0x44
+	volatile unsigned int DCR;	// 0x48
+	volatile unsigned int DMAR;	// 0x4c
 };
