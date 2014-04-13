@@ -1,6 +1,6 @@
 
 DRIVERS_DIR := os stddrv stmusb drivers arch
-APP_DIR := cec_a1_ctrl blinky
+APP_DIR := cec_a1_ctrl blinky timer_test
 
 SUBDIRS:=$(DRIVERS_DIR) $(APP_DIR)
 
