@@ -152,7 +152,7 @@ static int handle_cec_data(unsigned char *buf, int size) {
 			cec_send_abort(A1_LINK,(5<<4)|fromAddr,cmd,0);
 			break;
 		case CEC_OPCODE_REPORT_PHYSICAL_ADDRESS:
-			cec_send_physical_address(A1_LINK,(5<<4)|0xf, 0x1000, 5);
+//			cec_send_physical_address(A1_LINK,(5<<4)|0xf, 0x1000, 5);
 			break;
 		default:
 			printf("a1: unknown cec_cmd %x\n", cmd);
@@ -186,6 +186,7 @@ int set_amp_avail(int state) {
 
 int a1_attach_amp(void) {
 	register_timer(0,0,0);
+	printf("attach amp\n");
 //	if (ping_cec_AUDIO()<0) {
 		if (!cec_handle) {
 			cec_handle=cec_attach(A1_LINK, CECDEVICE_AUDIOSYSTEM, handle_cec_data);
@@ -200,18 +201,19 @@ int a1_attach_amp(void) {
 
 
 int set_power_state(int state) {
+	if (state) state=1;
 	if (power_state!=state) {
 		printf("change power state to %d\n", state);
 		power_state=state;
 		if (state) {
-			a1_get_amp_name(0,0,0);
-			register_timer(500,a1_get_amp_name,0);
 			wakeup_usb_dev();
 			cec_send_image_view_on(A1_LINK,0x50);
 		} else {
 			cec_send_standby(A1_LINK,0x5f);
 		}
 	}
+	a1_get_amp_name(0,0,0);
+	register_timer(500,a1_get_amp_name,0);
 	return 0;
 }
 
@@ -225,6 +227,7 @@ int set_audio_source(int source) {
 
 int a1_power_off(void) {
 	unsigned char buf[]={0xc0, 0x2f};
+	power_state=0;
 	return a1_send(buf,sizeof(buf));
 }
 
