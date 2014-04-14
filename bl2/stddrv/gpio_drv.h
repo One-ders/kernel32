@@ -51,23 +51,23 @@
 #define GPIO_GET_FLAGS			5
 
 #define GPIO_DIR(a,b)			((a&GPIO_DIR_MASK)|b)
-#define GPIO_DIR_MASK			0x1
+#define GPIO_DIR_MASK			0x3
 #define GPIO_INPUT 			0x00000001
 #define GPIO_OUTPUT			0x00000002
-#define GPIO_BUSPIN			0x00000004
+#define GPIO_BUSPIN			0x00000003
 
 #define GPIO_DRIVE(a,b)			((a&~GPIO_DRIVE_MASK)|(b<<GPIO_DRIVE_SHIFT))
-#define GPIO_DRIVE_MASK			0x6
-#define GPIO_DRIVE_SHIFT		1
-#define GPIO_FLOAT			0	
+#define GPIO_DRIVE_MASK			0xc
+#define GPIO_DRIVE_SHIFT		2
+#define GPIO_FLOAT			0
 #define GPIO_PUSHPULL			0
 #define GPIO_PULLUP			1
 #define GPIO_PULLDOWN			2
 #define GPIO_OPENDRAIN			3
 
 #define GPIO_SPEED(a,b)			((a&~GPIO_SPEED_MASK)|(b<<GPIO_SPEED_SHIFT))
-#define GPIO_SPEED_MASK			0x18
-#define GPIO_SPEED_SHIFT		3
+#define GPIO_SPEED_MASK			0x30
+#define GPIO_SPEED_SHIFT		4
 #define GPIO_SPEED_SLOW			0
 #define GPIO_SPEED_MEDIUM		1
 #define GPIO_SPEED_FAST			2
@@ -77,7 +77,7 @@
 #define GPIO_SPEED_50MHZ		GPIO_SPEED_FAST
 #define GPIO_SPEED_100MHZ		GPIO_SPEED_HIGH
 
-#define GPIO_IRQ			0x20
+#define GPIO_IRQ			0x40
 #define GPIO_IRQ_ENABLE(a)		(a|GPIO_IRQ)
 #define GPIO_IRQ_DISABLE(a)		(a&~GPIO_IRQ)
 
