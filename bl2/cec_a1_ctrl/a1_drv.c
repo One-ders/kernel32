@@ -176,7 +176,6 @@ static int a1_timeout(struct device_handle *dh, int ev, void *dum) {
 		case A1_STATE_RX_INIT1: { /* means we have a startbit but timedout on data */
 			a1->state=A1_STATE_IDLE;
 			leddrv->ops->control(a1->led_dh,LED_CTRL_DEACTIVATE,&red,sizeof(red));
-			sys_printf("a1, got a timeout waiting for first databit\n");
 			break;
 		}
 		case A1_STATE_RX_DATA1: {
@@ -198,7 +197,6 @@ static int a1_timeout(struct device_handle *dh, int ev, void *dum) {
 		}
 		case A1_STATE_TX_INIT0: {
 			unsigned int uSec=600;
-	sys_printf("a1: timeout in TX_INIT0\n");
 			a1->state=A1_STATE_TX_DATA0;
 			pindrv->ops->control(a1->pin_dh,GPIO_RELEASE_PIN,0,0);
 			timerdrv->ops->control(a1->timer_dh,HR_TIMER_SET,&uSec,sizeof(uSec));
@@ -206,10 +204,10 @@ static int a1_timeout(struct device_handle *dh, int ev, void *dum) {
 		}
 		case A1_STATE_TX_DATA0: {
 			int pin_stat;
-	sys_printf("a1: timeout in TX_DATA0\n");
 			pindrv->ops->control(a1->pin_dh,GPIO_SENSE_PIN,&pin_stat,sizeof(pin_stat));
 			if (!pin_stat) {
 				int flags=GPIO_IRQ_ENABLE(0);
+				a1->prev_pin_stat=1;
 				pindrv->ops->control(a1->pin_dh,GPIO_SET_FLAGS,&flags,sizeof(flags));
 				leddrv->ops->control(a1->led_dh,LED_CTRL_DEACTIVATE,&amber,sizeof(amber));
 				sys_printf("a1: bus collision at start of send bit\n");
@@ -226,7 +224,6 @@ static int a1_timeout(struct device_handle *dh, int ev, void *dum) {
 		}
 		case A1_STATE_TX_DATA1: {
 			unsigned int uSec=600;
-	sys_printf("a1: timeout in TX_DATA1\n");
 			a1->state=A1_STATE_TX_DATA0;
 			pindrv->ops->control(a1->pin_dh,GPIO_RELEASE_PIN,0,0);
 			timerdrv->ops->control(a1->timer_dh,HR_TIMER_SET,&uSec,sizeof(uSec));
@@ -413,7 +410,6 @@ static int a1_start_tx(struct a1_data *a1) {
 	unsigned int uSec=2400;
 	unsigned int flags=GPIO_IRQ_ENABLE(0);
 
-	sys_printf("a1: start_tx\n");
 	pindrv->ops->control(a1->pin_dh,GPIO_CLR_FLAGS,&flags,sizeof(flags));
 	a1->state=A1_STATE_TX_INIT0;
 	a1->txlen=a1->txbuf[a1->txOut&TXB_MASK];

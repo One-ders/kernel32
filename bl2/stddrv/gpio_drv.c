@@ -218,30 +218,31 @@ static int release_pin(struct pin_data *pdp) {
 }
 
 static int set_flags(struct pin_data *pdp, unsigned int flags) {
+	int dir=flags&GPIO_DIR_MASK;
 	int drive=(flags&GPIO_DRIVE_MASK)>>GPIO_DRIVE_SHIFT;
 	int speed=(flags&GPIO_SPEED_MASK)>>GPIO_SPEED_SHIFT;
-	if ((flags&GPIO_OUTPUT)||(flags&GPIO_BUSPIN)) {
+	if ((dir==GPIO_OUTPUT)||(dir==GPIO_BUSPIN)) {
 		sys_printf("pin is output or bus\n");
 		GPIO[pdp->bus]->moder&=~(3<<(pdp->bpin<<1));
-		if (flags&GPIO_OUTPUT) {
+		if (dir==GPIO_OUTPUT) {
 			GPIO[pdp->bus]->moder|=(1<<(pdp->bpin<<1));
 		}
 
-		if ((flags&GPIO_OPENDRAIN)||(flags&GPIO_BUSPIN)) {
-			GPIO[pdp->bus]->otyper&=~(1<<pdp->bpin);
-		} else if (flags&GPIO_PUSHPULL) {
+		if ((drive==GPIO_OPENDRAIN)||(dir==GPIO_BUSPIN)) {
 			GPIO[pdp->bus]->otyper|=(1<<pdp->bpin);
+		} else if (drive==GPIO_PUSHPULL) {
+			GPIO[pdp->bus]->otyper&=~(1<<pdp->bpin);
 		}
 
 		GPIO[pdp->bus]->ospeedr&=~(3<<(pdp->bpin<<1));
 		GPIO[pdp->bus]->ospeedr|=(speed<<(pdp->bpin<<1));
 	}
 
-	if (flags&GPIO_BUSPIN) {    /* make sure output is low */
+	if (dir==GPIO_BUSPIN) {    /* make sure output is low */
 		GPIO[pdp->bus]->bsrr=(1<<(pdp->bpin+16));
 	}
-		
-	if ((flags&GPIO_INPUT)||(flags&GPIO_BUSPIN)) {
+
+	if ((dir==GPIO_INPUT)||(dir==GPIO_BUSPIN)) {
 		sys_printf("pin is input or bus\n");
 		GPIO[pdp->bus]->moder&=~(3<<(pdp->bpin<<1));
 
