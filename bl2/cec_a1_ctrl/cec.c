@@ -155,6 +155,19 @@ int cec_send_image_view_on(int itf, unsigned int cec_addr) {
 	return distribute_msg(itf,buf,sizeof(buf));
 }
 
+int cec_send_cec_version(int itf, unsigned int cec_addr, unsigned char version) {
+	unsigned char buf[]={cec_addr,CEC_OPCODE_CEC_VERSION,version};
+	return distribute_msg(itf,buf,sizeof(buf));
+}
+
+int cec_send_abort(int itf, unsigned int cec_addr,
+		unsigned char opcode, unsigned char reason) {
+	unsigned char buf[]={cec_addr,CEC_OPCODE_FEATURE_ABORT,opcode,reason};
+	return distribute_msg(itf,buf,sizeof(buf));
+}
+
+
+
 int cec_send(int itf, unsigned char *buf, int len) {
 	if (itf==USB_BUS) {
 		if ((len>1)&&(buf[1]==0x36)) {

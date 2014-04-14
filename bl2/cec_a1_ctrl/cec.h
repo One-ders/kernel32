@@ -159,3 +159,6 @@ int cec_send_power_status(int itf, unsigned int addr, int on);
 int cec_send_active_source(int itf, unsigned int cec_addr,unsigned short paddr);
 int cec_send_standby(int itf, unsigned int addr);
 int cec_send_image_view_on(int itf, unsigned int addr);
+int cec_send_cec_version(int itf, unsigned int addr, unsigned char ver);
+int cec_send_abort(int itf, unsigned int addr,unsigned char opcode, unsigned char reason);
+

@@ -87,7 +87,7 @@ static int vol_state;
 static int amp_avail;
 static int power_state;
 static int audio_source;
-unsigned char idbuf[16];
+unsigned char idbuf[16]={'b','u','b'};
 
 static int q_count;
 static int cec_handle;
@@ -124,7 +124,8 @@ static int handle_cec_data(unsigned char *buf, int size) {
 			cec_send_vendor_id(A1_LINK,(5<<4)|0xf,0x080046);
 			break;
 		case CEC_OPCODE_GIVE_DEVICE_POWER_STATUS:
-			cec_send_power_status(A1_LINK,(5<<4)|fromAddr, power_state);
+			cec_send_power_status(A1_LINK,(5<<4)|fromAddr, 
+				power_state?0:1);
 			break;
 		case CEC_OPCODE_USER_CONTROL_PRESSED:
 			switch (param) {
@@ -143,6 +144,15 @@ static int handle_cec_data(unsigned char *buf, int size) {
 			break;
 		case CEC_OPCODE_STANDBY:
 			a1_power_off();
+			break;
+		case CEC_OPCODE_GET_CEC_VERSION:
+			cec_send_cec_version(A1_LINK,(5<<4)|fromAddr,3);
+			break;
+		case CEC_OPCODE_GET_MENU_LANGUAGE:
+			cec_send_abort(A1_LINK,(5<<4)|fromAddr,cmd,0);
+			break;
+		case CEC_OPCODE_REPORT_PHYSICAL_ADDRESS:
+			cec_send_physical_address(A1_LINK,(5<<4)|0xf, 0x1000, 5);
 			break;
 		default:
 			printf("a1: unknown cec_cmd %x\n", cmd);
