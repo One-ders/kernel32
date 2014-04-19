@@ -204,6 +204,6 @@ int main(void) {
 	printf("In main, starting tasks\n");
 
 	/* create some jobs */
-	thread_create(cec_gw,0,1,"cec_gw");
+	thread_create(cec_gw,0,0,1,"cec_gw");
 	while (1);
 }

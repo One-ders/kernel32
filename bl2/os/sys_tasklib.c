@@ -50,7 +50,7 @@
  * frame for our SVC call
  */
 
-int svc_create_task(void *fnc, void *val, int prio, char *name);
+int svc_create_task(struct task_create_args *ta);
 int svc_sleep(unsigned int);
 #if 0
 int svc_sleep_on(struct sleep_obj *, void *buf, int size);
@@ -68,7 +68,7 @@ int svc_unblock_task(char *name);
 int svc_setprio_task(char *name, int prio);
 
 
-__attribute__ ((noinline)) int svc_create_task(void *fnc, void *val, int prio, char *name) {
+__attribute__ ((noinline)) int svc_create_task(struct task_create_args *ta) {
 	register int rc asm("r0");
 	svc(SVC_CREATE_TASK);
 	return rc;
@@ -160,8 +160,16 @@ __attribute__ ((noinline)) int svc_setprio_task(char *name, int prio) {
 
 
 
-int thread_create(void *fnc, void *val, int prio, char *name) {
-	return svc_create_task(fnc, val, prio, name);
+int thread_create(void *fnc, void *val, unsigned int val_size,
+		int prio, char *name) {
+	struct task_create_args tc_args;
+	tc_args.fnc=fnc;
+	tc_args.val=val;
+	tc_args.val_size=val_size;
+	tc_args.prio=prio;
+	tc_args.name=name;
+
+	return svc_create_task(&tc_args);
 }
 
 

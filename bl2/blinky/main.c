@@ -68,10 +68,10 @@ int main(void) {
 	start_sys();
 	printf("In main, starting blink tasks\n");
 
-	thread_create(blink,&green,1,"green");
-	thread_create(blink,&amber,1,"amber");
-//	thread_create(blink_loop,&red,256,"red_looping");
-	thread_create(blink, &red, 1, "red");
-	thread_create(blink, &blue,1,"blue");
+	thread_create(blink,&green,sizeof(green),1,"green");
+	thread_create(blink,&amber,sizeof(amber),1,"amber");
+//	thread_create(blink_loop,&red,sizeof(red),256,"red_looping");
+	thread_create(blink, &red,sizeof(red),1, "red");
+	thread_create(blink, &blue,sizeof(blue),1,"blue");
 	while (1);
 }

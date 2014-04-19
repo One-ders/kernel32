@@ -17,7 +17,7 @@ all: ../../lib ../../lib/stm32.o
 #
 #bsp.o:	startup_stm32f4xx.o system_stm32f4xx.o usart_drv.o stterm_drv.o
 
-stm32.o: system_init.o
+stm32.o: system_init.o mpu.o switch.o
 	$(CC) $(LDFLAGS) -r -nostdlib -o $@ $^
 
 clean:
