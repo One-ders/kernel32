@@ -68,6 +68,24 @@ struct blocker_list {
 	struct blocker *last;
 };
 
+struct sel_args {
+	int nfds;
+	fd_set *rfds;
+	fd_set *wfds;
+	fd_set *stfds;
+	unsigned int *tout;
+};
+
+struct sel_data {
+	int nfds;
+	fd_set rfds;
+	fd_set wfds;
+	fd_set stfds;
+	unsigned int *tout;
+};
+
+
+
 struct task {
 	char            *name;            /* 0-3 */
 	void            *sp;              /* 4-7 */
@@ -81,7 +99,8 @@ struct task {
 	void          	*estack;	  /* 32-35 */
 	struct user_fd  *fd_list;         /* 36-39 */ /* open driver list */
 	unsigned int    active_tics;      /* 36-39 */
-	struct sel_args *sel_args;
+	int		sel_data_valid;
+	struct sel_data sel_data;
 	struct blocker  blocker;
 };
 
@@ -204,15 +223,6 @@ struct task_create_args {
 	unsigned int val_size;
 	int prio;
 	char *name;
-};
-
-
-struct sel_args {
-	int nfds;
-	fd_set *rfds;
-	fd_set *wfds;
-	fd_set *stfds;
-	unsigned int *tout;
 };
 
 

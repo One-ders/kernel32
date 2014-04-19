@@ -361,20 +361,20 @@ static int sys_drv_wakeup(struct device_handle *dh, int ev, void *user_ref) {
 		sys_printf("sys_drv_wakeup: wake up running task\n");
 		goto out_err;
 	}
-	if (!task->sel_args) {
+	if (!task->sel_data_valid) {
 		goto out;
 	}
 	DEBUGP(DLEV_SCHED,"wakeup descriptor %d in task %s for ev %d\n", fd, task->name,ev);
 	if (ev&EV_READ) {
-		(*task->sel_args->rfds)|=(1<<fd);
+		(task->sel_data.rfds)|=(1<<fd);
 	}
 	if (ev&EV_WRITE) {
-		(*task->sel_args->wfds)|=(1<<fd);
+		(task->sel_data.wfds)|=(1<<fd);
 	}
 	if (ev&EV_STATE) {
-		(*task->sel_args->stfds)|=(1<<fd);
+		(task->sel_data.stfds)|=(1<<fd);
 	}
-	task->sel_args->nfds++;
+	task->sel_data.nfds++;
 out:
 	sys_wakeup(&task->blocker,0,0);
 out_err:
@@ -608,6 +608,11 @@ again:
 			*sel_args->wfds=0;
 			*sel_args->stfds=0;
 
+			current->sel_data.nfds=0;
+			current->sel_data.rfds=0;
+			current->sel_data.wfds=0;
+			current->sel_data.stfds=0;
+
 			disable_interrupt();
 			for(i=0;i<nfds;i++) {
 				if (wfds&(1<<i)) {
@@ -666,14 +671,14 @@ again:
 				}
 			}
 
-			current->sel_args=sel_args;
+			current->sel_data_valid=1;
 			sys_sleepon(&current->blocker,0,0,tout);
-			if (current->sel_args!=sel_args) {
-				ASSERT(0);
-			}
-			current->sel_args=0;
+			current->sel_data_valid=0;
 
-			svc_args[0]=sel_args->nfds;
+			*sel_args->rfds=current->sel_data.rfds;
+			*sel_args->wfds=current->sel_data.wfds;
+			*sel_args->stfds=current->sel_data.stfds;
+			svc_args[0]=current->sel_data.nfds;
 			enable_interrupt();
 			return 0;
 		}
