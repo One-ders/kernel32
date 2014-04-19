@@ -52,13 +52,20 @@ extern int sys_printf(const char *format, ...);
 
 #define ASSERT(a) { if (!(a)) {io_setpolled(1); sys_printf("assert stuck\n");} while (!(a)) ; }
 
-extern int sys_lev;
+extern unsigned int sys_irqs;
+extern struct task *volatile ready[5];
+extern struct task *volatile ready_last[5];
 
 struct blocker {
 	struct blocker *next;
 	struct blocker *next2;
 	unsigned int events;
 	unsigned int wakeup_tic;
+};
+
+struct blocker_list {
+	struct blocker *first;
+	struct blocker *last;
 };
 
 struct task {
@@ -71,12 +78,27 @@ struct task {
 	int             prio_flags;       /* 20-23 */
 	void            *bp;              /* 24-27 */ /* communication buffer for sleeping context */
 	int             bsize;            /* 28-31 */ /* size of the buffer */
-	int             stack_sz;         /* 32-35 */
+	void          	*estack;	  /* 32-35 */
 	struct user_fd  *fd_list;         /* 36-39 */ /* open driver list */
 	unsigned int    active_tics;      /* 36-39 */
 	struct sel_args *sel_args;
 	struct blocker  blocker;
 };
+
+#define TASK_STATE_IDLE         0
+#define TASK_STATE_RUNNING      1
+#define TASK_STATE_READY        2
+#define TASK_STATE_TIMER        3
+#define TASK_STATE_IO           4
+#define TASK_STATE_DEAD         6
+
+#define MAX_PRIO                4
+#define GET_PRIO(a)             ((a)->prio_flags&0x3)
+#define SET_PRIO(a,b)           ((a)->prio_flags=(b)&0xf)
+#define GET_TMARK(a)            ((a)->prio_flags&0x10)
+#define SET_TMARK(a)            ((a)->prio_flags|=0x10)
+#define CLR_TMARK(a)            ((a)->prio_flags&=0xEF)
+
 
 extern struct task * volatile current;
 extern volatile unsigned int tq_tic;
@@ -85,8 +107,22 @@ void init_sys(void);
 void start_sys(void);
 void *getSlab_256(void);
 
+/* interface towards arch functions */
+int init_memory_protection(void);
+int unmap_stack_memory(unsigned long int addr);
+int map_stack_page(unsigned long int addr,unsigned int size);
+int map_tmp_stack_page(unsigned long int addr,unsigned int size);
+int map_next_stack_page(unsigned long int new_addr, unsigned long int old_addr);
+int unmap_tmp_stack_page(void);
+int activate_memory_protection(void);
 
-int thread_create(void *fnc, void *val, int prio, char *name);
+void init_switcher(void);
+void switch_on_return(void);
+void switch_now(void);
+
+
+
+int thread_create(void *fnc, void *val, unsigned int val_size, int prio, char *name);
 int sleep(unsigned int ms);
 int block_task(char *name);
 int unblock_task(char *name);
@@ -95,6 +131,9 @@ int setprio_task(char *name,int prio);
 void *sys_sleep(unsigned int ms);
 void *sys_sleepon(struct blocker *so, void *bp, int bsize, unsigned int *ms_sleep);
 void *sys_wakeup(struct blocker *so, void *bp, int bsize);
+
+void *sys_sleepon_update_list(struct blocker *b, struct blocker_list *blocker_list);
+void *sys_wakeup_from_list(struct blocker_list *blocker_list);
 
 int sleepable(void);
 
@@ -115,7 +154,6 @@ void enable_interrupt(void) {
 
 struct device_handle {
 	unsigned int user_data1;
-	struct blocker *blocker;
 };
 
 typedef int (*DRV_CBH)(struct device_handle *, int event, void *user_ref);
@@ -159,6 +197,15 @@ int io_select(int nfds, fd_set *rfds, fd_set *wfds, fd_set *stfds, unsigned int 
 #define SVC_BLOCK_TASK  12
 #define SVC_UNBLOCK_TASK 13
 #define SVC_SETPRIO_TASK 14
+
+struct task_create_args {
+	void *fnc;
+	void *val;
+	unsigned int val_size;
+	int prio;
+	char *name;
+};
+
 
 struct sel_args {
 	int nfds;

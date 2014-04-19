@@ -79,7 +79,8 @@ struct usart_data {
 	char rx_buf[RX_BSIZE];
 	volatile int rx_i;
 	volatile int rx_o;
-	volatile int wev;
+	struct blocker_list rblocker_list;
+	struct blocker_list wblocker_list;
 };
 
 
@@ -98,38 +99,16 @@ static struct user_data udata[MAX_USERS];
 static int (*usart_putc_fnc)(struct user_data *, int c);
 static int usart_putc(struct user_data *u, int c);
 
-static int wakeup_users(int ev) {
-	int i;
-	for(i=0;i<MAX_USERS;i++) {
-		struct blocker *b=udata[i].dh.blocker;
-		struct blocker *nroot=0;
-		while (b) {
-			struct blocker *bnext=b->next2;
-			if (b->events&ev) {
-				b->events&=~ev;
-				sys_wakeup(b,0,0);
-				b->next2=0;
-			} else {
-				b->next2=nroot;
-				nroot=b;
-			}
-			b=bnext;
-		}
-		udata[i].dh.blocker=nroot;
-	}
-	usart_data0.wev&=~ev;
-	return 0;
-}
-
 void USART3_IRQHandler(void) {
 	unsigned int st=USART3->SR;
-	unsigned int ev=0;
 
 	if (st&USART_SR_LBD) {
 		usart_data0.chip_dead=1;
 		usart_data0.tx_out=usart_data0.tx_in;
 		USART3->SR&=~USART_SR_LBD;	
-		if (usart_data0.wev&EV_WRITE) wakeup_users(EV_WRITE);
+		if (usart_data0.wblocker_list.first){
+			 sys_wakeup_from_list(&usart_data0.wblocker_list);
+		}
 		sys_printf("SR_LBD\n");
 		return;
 	} else {
@@ -143,7 +122,9 @@ void USART3_IRQHandler(void) {
 			usart_data0.tx_out++;
 			st&=~USART_SR_TC;	// Dont shut off transmitter if we send some data
 			if ((usart_data0.tx_in-usart_data0.tx_out)==0) {
-				ev|=EV_WRITE;
+				if (usart_data0.wblocker_list.first) {
+					sys_wakeup_from_list(&usart_data0.wblocker_list);
+				}
 			}
 		}
 	} 
@@ -160,12 +141,13 @@ void USART3_IRQHandler(void) {
 		int c=USART3->DR;
 		usart_data0.rx_buf[usart_data0.rx_i%(RX_BSIZE)]=c;
 		usart_data0.rx_i++;
-		ev|=EV_READ;
+		if (usart_data0.rblocker_list.first) {
+			sys_wakeup_from_list(&usart_data0.rblocker_list);
+		}
 	}
 	if (st&USART_SR_ORE) {
 		USART3->DR=USART3->DR;
 	}
-	if (ev&usart_data0.wev) wakeup_users(ev);
 }
 
 
@@ -176,20 +158,20 @@ static int usart_putc(struct user_data *u, int c) {
 
 again:
 	if (ud->chip_dead) return -1;
+	disable_interrupt();
 	if ((ud->tx_in-ud->tx_out)>=TXB_SIZE)  {
-		if (!sleepable()) return -1;
-		ud->wev|=EV_WRITE;
-		current->blocker.events=EV_WRITE;
-		current->blocker.next2=u->dh.blocker;
-		u->dh.blocker=&current->blocker;
-		if (!sys_sleepon(&current->blocker,0,0,0)) {
-			u->dh.blocker=current->blocker.next2;
-			current->blocker.next2=0;
-			current->blocker.events&=~EV_WRITE;
+		if (!sleepable()) {
+			enable_interrupt();
 			return -1;
 		}
+		if (!sys_sleepon_update_list(&current->blocker,&ud->wblocker_list)) {
+			enable_interrupt();
+			return -1;
+		}
+		enable_interrupt();
 		goto again;
 	}
+	enable_interrupt();
 	ud->tx_buf[IX(ud->tx_in)]=c;
 	ud->tx_in++;	
 	if (!ud->txr) {
@@ -222,14 +204,13 @@ static int usart_read(struct user_data *u, char *buf, int len) {
 		int ch;
 
 again:
+		disable_interrupt();
 		if (!(ud->rx_i-ud->rx_o)) {
-			ud->wev|=EV_READ;
-			current->blocker.events=EV_READ;
-			current->blocker.next2=u->dh.blocker;
-			u->dh.blocker=&current->blocker;
-			sys_sleepon(&current->blocker,0,0,0);
+			sys_sleepon_update_list(&current->blocker,&ud->rblocker_list);
+			enable_interrupt();
 			goto again;
 		}
+		enable_interrupt();
 		ud->rx_o++;
 		ch=buf[i++]=ud->rx_buf[ix];
 		if (1) {
@@ -275,7 +256,10 @@ static int usart_close(struct device_handle *dh) {
 	return 0;
 }
 
-static int usart_control(struct device_handle *dh, int cmd, void *arg1, int arg2) {
+static int usart_control(struct device_handle *dh,
+			int cmd,
+			void *arg1,
+			int arg2) {
 	struct user_data *u=(struct user_data *)dh;
 	struct usart_data *ud=u->drv_data;
 
@@ -333,11 +317,11 @@ static int usart_init(void *instance) {
 	RCC->APB1ENR|=RCC_APB1ENR_USART3EN;
 	RCC->AHB1ENR|=RCC_AHB1ENR_GPIOCEN;
 	/* USART3 uses PC10 for tx, PC11 for rx according to table 5 in  discovery documentation */
-	GPIOC->AFRH = 0;
+//	GPIOC->AFRH = 0;
 	GPIOC->AFRH |= 0x00007000;  /* configure pin 11 to AF7 (USART3) */
 	GPIOC->AFRH |= 0x00000700;  /* confiure pin 10 to AF7 */
 	GPIOC->MODER |= (0x2 << 22);  /* set pin 11 to AF */
-	GPIOC->MODER |= (0x2 << 20) ;  /* set pin 10 to AF */
+	GPIOC->MODER |= (0x2 << 20);  /* set pin 10 to AF */
 	GPIOC->OSPEEDR |= (0x3 << 20); /* set pin 10 output high speed */
 	USART3->BRR=0x167;   /* 38400 baud at 8Mhz fpcl */
 	USART3->CR1=USART_CR1_UE;
@@ -349,7 +333,6 @@ static int usart_init(void *instance) {
 }
 
 static int usart_start(void *instance) {
-	
 	return 0;
 }
 

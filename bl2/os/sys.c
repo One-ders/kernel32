@@ -36,29 +36,14 @@
 
 #include <string.h>
 
-int sys_lev;
 unsigned int sys_irqs;
-
-#define TASK_STATE_IDLE		0
-#define TASK_STATE_RUNNING	1
-#define TASK_STATE_READY	2
-#define TASK_STATE_TIMER	3
-#define TASK_STATE_IO		4
-#define TASK_STATE_DEAD		6
-
-#define MAX_PRIO		4
-#define GET_PRIO(a)		((a)->prio_flags&0x3)
-#define SET_PRIO(a,b)		((a)->prio_flags=(b)&0xf)
-#define GET_TMARK(a)		((a)->prio_flags&0x10)
-#define SET_TMARK(a)		((a)->prio_flags|=0x10)
-#define CLR_TMARK(a)		((a)->prio_flags&=0xEF)
 
 struct user_fd;
 
 struct task * volatile ready[5];
 struct task * volatile ready_last[5];
 
-struct task main_task = { "init_main", (void *)0x20020000, 0, 0, 1, 3, 0,0,512 };
+struct task main_task = { "init_main", (void *)0x20020000, 0, 0, 1, 3, 0,0,(void *)(0x20020000-1024) };
 struct task *troot =&main_task;
 struct task * volatile current = &main_task;
 
@@ -66,74 +51,67 @@ struct Slab_256 {
 	unsigned char mem[256];
 };
 
-struct Slab_256 slab_256[80];
-int free_slab_256=0;
+struct Slab_1024 {
+	unsigned char mem[1024];
+};
+
+extern unsigned char __bss_end__[];
+struct Slab_256 *slab_256=(struct Slab_256 *)__bss_end__;
+unsigned int free_slab_256=0;
+
+#define MSTACK (0x20020000)
+#define MSTACK_SIZE (0x400)
+
+struct Slab_1024 *slab_1024=(struct Slab_1024 *)(MSTACK-(MSTACK_SIZE*16));
+
+unsigned int max_slab_256;
+unsigned int max_slab_1024=16;
+unsigned int free_slab_1024;
+
+
 
 void *getSlab_256(void) {
-	if (free_slab_256<80) {
+	if (free_slab_256<max_slab_256) {
 		return &slab_256[free_slab_256++];
 	}
 	return 0;
 }
 
-void *getSlab_768(void) {
-	int t=free_slab_256;
-	free_slab_256+=3;
-	return &slab_256[t];
-};
-
 void *getSlab_1024(void) {
-	int t=free_slab_256;
-	free_slab_256+=4;
-	return &slab_256[t];
+	if (free_slab_1024<(max_slab_1024-1)) {
+		return &slab_1024[free_slab_1024++];
+	}
+	return 0;
 };
 
+struct task *tpool;
+unsigned int tpool_free;
 
-/*
- * PendSV handler
- */
-void *PendSV_Handler_c(unsigned long int *svc_args);
+struct task *get_task() {
 
-void __attribute__ (( naked )) PendSV_Handler(void) {
-	asm volatile ( "tst lr,#4\n\t"
-			"ite eq\n\t"
-			"mrseq r0,msp\n\t"
-			"mrsne r0,psp\n\t"
-			"mov r1,lr\n\t"
-			"mov r2,r0\n\t"
-			"push {r1-r2}\n\t"
-			"cpsid i\n\t"    // I need to run this with irq off, usart driver chrashes all when unplugged
-//			"bl %[PendSV_Handler_c]\n\t"
-			"bl PendSV_Handler_c\n\t"
-			"pop {r1-r2}\n\t"
-			"mov lr,r1\n\t"
-			"cmp	r0,#0\n\t"
-			"bne.n	1f\n\t"
-			"cpsie i\n\t"
-			"bx lr\n\t"
-			"1:\n\t"
-			"stmfd r2!,{r4-r11}\n\t"
-			"ldr r1,.L1\n\t"
-			"ldr r1,[r1]\n\t"
-			"str r2,[r1,#4]\n\t"
-			"ldr r1,.L1\n\t"
-			"str r0,[r1,#0]\n\t"
-			"movs r2,#1\n\t"
-			"str r2,[r0,#16]\n\t"
-			"ldr r0,[r0,#4]\n\t"
-			"mov sp,r0\n\t"
-			"ldmfd sp!,{r4-r11}\n\t"
-			"cpsie i\n\t"
-			"bx lr\n\t"
-			".L1: .word current\n\t"
-			:
-			:
-//			: [PendSV_Handler_c] "i" (PendSV_Handler_c)
-//			: [current] "m" (current)
-			:
-	);
+again:
+	if (tpool_free) {
+		struct task *tmp=tpool;
+		tpool_free--;
+		tpool=tmp->next2;
+		__builtin_memset(tmp,0,sizeof(struct task));
+		return tmp;
+	} else {
+		struct task *tmp=getSlab_256();
+		int num=256/sizeof(struct task);
+		int i;
+		if (!tmp) return 0;
+		tmp[0].next2=0;
+		for(i=1;i<num;i++) {
+			tmp[i-1].next2=&tmp[i];
+		}
+		tmp[i].next2=0;
+		tpool_free=num;
+		tpool=tmp;
+		goto again;
+	}
+	return 0;
 }
-
 
 
 struct task *lookup_task_for_name(char *task_name) {
@@ -153,89 +131,11 @@ struct tq {
 
 volatile unsigned int tq_tic;
 
-#define LR(a)	((unsigned int *)a)[5]
-#define XPSR(a)	((unsigned int *)a)[7]
-#define TASK_XPSR(a)	((unsigned int *)a)[15]
-
 static inline unsigned int  xpsr() {
 	register unsigned int r0 asm("r0");
 	__asm__ __volatile__("mrs r0,xpsr"::: "r0");
 	return r0;
 }
-
-#if 0
-void check_stack(struct task *t,struct task *n) {
-	unsigned int stack_size=768-sizeof(*t);
-	unsigned int stack_base=(t==&main_task)?0x20020000:((unsigned int)t)+768;
-	if ((((unsigned int)t->sp)<(stack_base-stack_size))||(((unsigned int)t->sp)>stack_base)) {
-		io_setpolled(1);
-		sys_printf("stack corruption on task %s(%x)\n", t->name,t);
-		ASSERT(0);
-	}
-
-}
-#endif
-
-void *PendSV_Handler_c(unsigned long int *save_sp) {
-	int i=0;	
-	struct task *t;
-	sys_irqs++;
-	while(i<MAX_PRIO) {
-		t=ready[i];	
-		if (t) {
-			ready[i]=t->next;
-			t->next=0;
-			break;
-		}
-		i++;
-	}
-	if (!t) {
-		ASSERT(0);
-	}
-	if (t==current) {
-		ASSERT(0);
-	}
-	/* Have next, move away current if still here, timer and blocker moves it themselves */
-	if (current->state==TASK_STATE_RUNNING) {
-		int prio=current->prio_flags&0xf;
-		current->state=TASK_STATE_READY;
-		ASSERT(!current->next);
-		CLR_TMARK(current);
-		if (prio>4) prio=4;
-		if (ready[prio]) {
-			ready_last[prio]->next=current;
-		} else {
-			ready[prio]=current;
-		}
-		ready_last[prio]=current;
-	}
-
-	if ((TASK_XPSR(t->sp)&0x1ff)!=0) {
-		*(save_sp-2)=0xfffffff1;
-	} else {
-		*(save_sp-2)=0xfffffff9;
-	}
-	return t;
-}
-
-void  pendSV(void) {
-	*((unsigned int volatile *)0xE000ED04) = 0x10000000; // trigger PendSV
-}
-
-__attribute__ ((naked)) int fake_pendSV(void) {
-	asm volatile (
-			"cpsid i\n\t"
-			"mrs r0,psr\n\t"
-			"orr r0,r0,0x01000000\n\t"
-			"stmfd sp!,{r0}\n\t"
-			"push {lr}\n\t"
-			"stmfd sp!,{r0-r3,r12,lr}\n\t"
-			"mvns lr,#0x0e\n\t"
-			"b	PendSV_Handler\n\t"
-			:::);
-	return 1;
-}
-//			"cpsie i\n\t"
 
 void Error_Handler_c(void *sp);
 
@@ -260,7 +160,7 @@ void SysTick_Handler(void) {
 			t->next=0;
 			b->next=0;
 			if (b->next2) {
-				sys_printf("systick: blocker hae next2 link %x\n", b->next2);
+				sys_printf("systick: blocker have next2 link %x\n", b->next2);
 			}
 			if(prio<p) p=prio;
 			if (!ready[prio]) {
@@ -276,13 +176,13 @@ void SysTick_Handler(void) {
 	}
 
 	if (p<GET_PRIO(current)) {
-		pendSV();
+		switch_on_return();
 		return;
 	}
 
 	if (GET_TMARK(current) && ready[GET_PRIO(current)]) {
 		DEBUGP(DLEV_SCHED,"time slice: switch out %s, switch in %s\n", current->name, ready[GET_PRIO(current)]->name);
-		pendSV();
+		switch_on_return();
 		return;
 	}
 	SET_TMARK(current);
@@ -481,18 +381,6 @@ out_err:
 	return 0;
 }
 
-static int dump_blockers(struct device_handle *dh) {
-	struct blocker *b=dh->blocker;
-	int i=0;
-	while (b) {
-		struct task *t=container_of(b,struct task,blocker);
-		sys_printf("%d: blocker for task %s\n",i, t->name);
-		b=b->next;
-		i++;
-	}
-	return 0;
-}
-
 void *SVC_Handler_c(unsigned long int *svc_args) {
 	unsigned int svc_number;
 
@@ -507,29 +395,39 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 	svc_number=((char *)svc_args[6])[-2];
 	switch(svc_number) {
 		case SVC_CREATE_TASK: {
-			unsigned long int fnc=svc_args[0];
-			unsigned long int val=svc_args[1];
-//			unsigned int stacksz=svc_args[2];
-			char *name=(char *)svc_args[3];
-			int prio = svc_args[2];
-			struct task *t=(struct task *)getSlab_1024();
-			unsigned long int *stackp;
-
-			if (prio>MAX_PRIO) {
+			struct task_create_args *tca=
+				(struct task_create_args *)svc_args[0];
+			unsigned char *estack=getSlab_1024();
+			struct task *t=get_task();
+			unsigned long int *stackp=(unsigned long int *)(estack+1024);
+			unsigned char *uval=tca->val;
+			if ((!t)||(!estack)) {
 				svc_args[0]=-1;
 				return 0;
 			}
-			__builtin_memset(t,0,1024);
-			t->sp=(void *)(((unsigned char *)t)+1024);
-			stackp=(unsigned long int *)t->sp;
+
+			map_tmp_stack_page((unsigned long int)estack,9);
+
+			if (tca->prio>MAX_PRIO) {
+				svc_args[0]=-1;
+				return 0;
+			}
+			__builtin_memset(estack,0,1020);
+			t->estack=estack;
+			if (tca->val_size) {
+				int aval_size=(tca->val_size+7)&~0x7;
+				uval=((unsigned char *)stackp)-aval_size;
+				__builtin_memcpy(uval,tca->val,tca->val_size);
+				stackp=(unsigned long int *)uval;
+			}
 			*(--stackp)=0x01000000; 		 // xPSR
-			*(--stackp)=(unsigned long int)fnc;    // r15
+			*(--stackp)=(unsigned long int)tca->fnc;    // r15
 			*(--stackp)=(unsigned long int)svc_kill_self;     // r14
 			*(--stackp)=0;     // r12
 			*(--stackp)=0;     // r3
 			*(--stackp)=0;     // r2
 			*(--stackp)=0;     // r1
-			*(--stackp)=(unsigned long int)val;    // r0
+			*(--stackp)=(unsigned long int)uval;    // r0
 ////
 			*(--stackp)=0;     // r4
 			*(--stackp)=0;     // r5
@@ -542,21 +440,22 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 
 			t->sp=(void *) stackp;
 			t->state=TASK_STATE_READY;
-			t->name=name;
-			SET_PRIO(t,prio);
+			t->name=tca->name;
+			SET_PRIO(t,tca->prio);
 			t->next2=troot;
 			troot=t;
 
-			if(!ready[prio]) {
-				ready[prio]=t;
+			if(!ready[tca->prio]) {
+				ready[tca->prio]=t;
 			} else {
-				ready_last[prio]->next=t;
+				ready_last[tca->prio]->next=t;
 			}
-			ready_last[prio]=t;
+			ready_last[tca->prio]=t;
+			unmap_tmp_stack_page();
 
-			if (prio<GET_PRIO(current)) {
+			if (tca->prio<GET_PRIO(current)) {
 				DEBUGP(DLEV_SCHED,"Create task: name %s, switch out %s\n", t->name, current->name);
-				pendSV();
+				switch_on_return();
 			} else {
 				DEBUGP(DLEV_SCHED,"Create task: name %s\n", t->name);
 			}
@@ -572,7 +471,7 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			current->state=TASK_STATE_DEAD;
 
 			DEBUGP(DLEV_SCHED,"kill self  task: name %s\n", current->name);
-			pendSV();
+			switch_on_return();
 			return 0;
 		}
 		case SVC_SLEEP: {
@@ -621,10 +520,6 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 				return 0;
 			}
 
-			if (dh->blocker) {
-				dump_blockers(dh);
-				sys_printf("oh shit!\n");
-			}
 			while(1) {
 				rc=driver->ops->control(dh,RD_CHAR,(void *)svc_args[1],svc_args[2]);
 				if (rc==-DRV_AGAIN&&(!fdd->flags&O_NONBLOCK)) {
@@ -713,6 +608,7 @@ again:
 			*sel_args->wfds=0;
 			*sel_args->stfds=0;
 
+			disable_interrupt();
 			for(i=0;i<nfds;i++) {
 				if (wfds&(1<<i)) {
 					struct driver *driver=fd_tab[i].driver;
@@ -721,9 +617,11 @@ again:
 						if (driver->ops->control(dh,IO_POLL,(void *)EV_WRITE,0)) {
 							*sel_args->wfds=(1<<i);
 							svc_args[0]=1;
+							enable_interrupt();
 							return 0;
 						}
 					} else {
+						enable_interrupt();
 						svc_args[0]=-1;
 						return 0;
 					}
@@ -738,10 +636,12 @@ again:
 						if (driver->ops->control(dh,IO_POLL,(void *)EV_READ,0)) {
 							*sel_args->rfds=(1<<i);
 							svc_args[0]=1;
+							enable_interrupt();
 							return 0;
 						}
 					} else {
 						svc_args[0]=-1;
+						enable_interrupt();
 						return 0;
 					}
 				}
@@ -755,10 +655,12 @@ again:
 						if (driver->ops->control(dh,IO_POLL,(void *)EV_STATE,0)) {
 							*sel_args->stfds=(1<<i);
 							svc_args[0]=1;
+						enable_interrupt();
 							return 0;
 						}
 					} else {
 						svc_args[0]=-1;
+						enable_interrupt();
 						return 0;
 					}
 				}
@@ -772,6 +674,7 @@ again:
 			current->sel_args=0;
 
 			svc_args[0]=sel_args->nfds;
+			enable_interrupt();
 			return 0;
 		}
 		case SVC_BLOCK_TASK: {
@@ -784,7 +687,7 @@ again:
 			if (t==current) {
 				SET_PRIO(t,t->prio_flags|0x8);
 				DEBUGP(DLEV_SCHED,"blocking current task: name %s\n",current->name);
-				pendSV();
+				switch_on_return();
 			} else {
 				struct task *p=ready[GET_PRIO(t)];
 				struct task * volatile *p_prev=&ready[GET_PRIO(t)];
@@ -873,7 +776,7 @@ set_ready:
 					}
 					if (i<prio) {
 						DEBUGP(DLEV_SCHED,"degrading current prio task: name %s\n",current->name);
-						pendSV();
+						switch_on_return();
 					}
 				}
 			} else {
@@ -903,7 +806,7 @@ set_ready:
 check_resched:
 			if (prio<curr_prio) {
 				DEBUGP(DLEV_SCHED,"setprio task: name %s prio=%d, current %s, reschedule\n",t->name,t->prio_flags,current->name);
-				pendSV();
+				switch_on_return();
 			}
 			svc_args[0]=0;
 			return 0;
@@ -982,11 +885,11 @@ void *sys_sleepon(struct blocker *so, void *bp, int bsize,unsigned int *tout) {
 	} else {
 		so->wakeup_tic=0;
 	}
+	current->state=TASK_STATE_IO; /* Do not do any more debug when state
+					is running */
 	DEBUGP(DLEV_SCHED,"sys sleepon %x task: name %s\n", so, current->name);
-	current->state=TASK_STATE_IO;
-	fake_pendSV();
-	*((volatile unsigned int *)0xe000ed24)|=0x80; /* set cpu state to
-							SVC call active */
+	switch_now();
+
 	if (tout) {
 		if (so->wakeup_tic!=tq_tic) {
 			*tout=(so->wakeup_tic-tq_tic)*10;
@@ -994,6 +897,26 @@ void *sys_sleepon(struct blocker *so, void *bp, int bsize,unsigned int *tout) {
 		so->wakeup_tic=0;
 	}
 	return so;
+}
+
+void *sys_sleepon_update_list(struct blocker *b, struct blocker_list *bl_ptr) {
+	void *rc=0;
+	if (current->state!=TASK_STATE_RUNNING) {
+		return 0;
+	}
+	disable_interrupt();
+	if (!bl_ptr) goto out;
+	b->next2=0;
+	if (bl_ptr->first) {
+		b->next2=bl_ptr->last;
+	} else {
+		bl_ptr->first=b;
+	}
+	bl_ptr->last=b;
+	rc=sys_sleepon(b,0,0,0);
+out:
+	enable_interrupt();
+	return rc;
 }
 
 void *sys_wakeup(struct blocker *so, void *bp, int bsize) {
@@ -1007,11 +930,15 @@ void *sys_wakeup(struct blocker *so, void *bp, int bsize) {
 		return 0;
 	}
 	if (n==current) {
-		sys_printf("waking up current\n");
-		return 0;
+		if (n->state==TASK_STATE_RUNNING) {
+			return n;
+		}
+		n->state=TASK_STATE_READY;
+		return n;
 	}
 	if (n->state==TASK_STATE_RUNNING) {
 		sys_printf("waking up running process\n");
+		ASSERT(0);
 		return 0;
 	}
 
@@ -1039,9 +966,26 @@ void *sys_wakeup(struct blocker *so, void *bp, int bsize) {
 	
 	if (prio<GET_PRIO(current)) {
 		DEBUGP(DLEV_SCHED,"wakeup(readying) %x task: name %s, readying %s\n",so,current->name,n->name);
-		pendSV();
+		switch_on_return();
 	}
  	return n;
+}
+
+void *sys_wakeup_from_list(struct blocker_list *bl) {
+	struct blocker *tmp;
+	void *rc=0;
+	disable_interrupt();
+	if (bl->first) {
+		tmp=bl->first;
+		bl->first=tmp->next2;
+		tmp->next2=0;
+		enable_interrupt();
+		rc=sys_wakeup(tmp,0,0);
+		ASSERT(rc);
+	} else {
+		enable_interrupt();
+	}
+	return rc;
 }
 
 /***********************************************************/
@@ -1165,8 +1109,10 @@ static int ps_fnc(int argc, char **argv, struct Env *env) {
 	struct task *t=troot;
 	fprintf(env->io_fd," sys_irqs %d\n", sys_irqs);
 	while(t) {
-		fprintf(env->io_fd,"task(%x) %12s, sp=0x%08x, pc=0x%08x, prio=%x, state=%c, atics=%d\n", 
-			t, t->name, t->sp, (t->state!=TASK_STATE_RUNNING)?((unsigned int *)t->sp)[13]:0xffffffff, t->prio_flags, get_state(t), t->active_tics);
+//		fprintf(env->io_fd,"task(%x) %12s, sp=0x%08x, pc=0x%08x, prio=%x, state=%c, atics=%d\n", 
+//			t, t->name, t->sp, (t->state!=TASK_STATE_RUNNING)?((unsigned int *)t->sp)[13]:0xffffffff, t->prio_flags, get_state(t), t->active_tics);
+		fprintf(env->io_fd,"task(%x) %12s, sp=0x%08x, prio=%x, state=%c, atics=%d\n", 
+			t, t->name, t->sp, t->prio_flags, get_state(t), t->active_tics);
 		t=t->next2;
 	}
 	return 0;
@@ -1273,14 +1219,16 @@ typedef void (*ifunc)(void);
 
 void init_sys(void) {
 	unsigned long int *i;
-	NVIC_SetPriority(PendSV_IRQn,0xf);
+	init_memory_protection();
+	slab_256=(struct Slab_256 *)((unsigned int)((slab_256+0xff))&~0xff);
+	max_slab_256=(((unsigned int)slab_1024)-((unsigned int)slab_256))/0x100;
+	unmap_stack_memory((unsigned long int)slab_1024);
+	map_stack_page((unsigned long int)&slab_1024[15], 9); /* map in last stackpage, size 1k */
+	__builtin_memset(&slab_1024[15],0,900);
+	activate_memory_protection();
+	init_switcher();
 	NVIC_SetPriority(SVCall_IRQn,0xe);
 	NVIC_SetPriority(SysTick_IRQn,0xd);  /* preemptive tics... */
-
-#if 0
-	*((unsigned int *)0xe000ed14)&=~0x200;  /* dont align stack on 8 byte, use 4 byte */
-	*((unsigned int *)0xe000ed14)|=1;       /* allow software to return to threadmode always */
-#endif
 
 	SysTick_Config(SystemCoreClock/100); // 10 mS tic is 100/Sec
 	for(i=init_func_begin;i<init_func_end;i++) {
@@ -1294,7 +1242,7 @@ void init_sys(void) {
 extern void sys_mon(void *);
 
 void start_sys(void) {
-	thread_create(sys_mon,"usart0",3,"sys_mon");
+	thread_create(sys_mon,"usart0",0,3,"sys_mon");
 //	thread_create(sys_mon,"stterm0",3,"sys_mon");
 //	thread_create(sys_mon,"usb_serial0",2,"sys_mon");
 }
