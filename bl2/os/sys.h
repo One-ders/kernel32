@@ -59,13 +59,17 @@ extern struct task *volatile ready_last[5];
 struct blocker {
 	struct blocker *next;
 	struct blocker *next2;
-	unsigned int events;
+	unsigned int ev;
+	struct device_handle *dh;
+	struct driver *driver;
+	unsigned int wake;
 	unsigned int wakeup_tic;
 };
 
 struct blocker_list {
 	struct blocker *first;
 	struct blocker *last;
+	int  (*is_ready)(void);
 };
 
 struct sel_args {
@@ -154,7 +158,7 @@ void *sys_wakeup(struct blocker *so, void *bp, int bsize);
 void *sys_sleepon_update_list(struct blocker *b, struct blocker_list *blocker_list);
 void *sys_wakeup_from_list(struct blocker_list *blocker_list);
 
-int sleepable(void);
+int task_sleepable(void);
 
 static inline __attribute__ ((always_inline))
 void disable_interrupt(void) {
@@ -269,6 +273,8 @@ extern struct cmd_node *root_cmd_node;
 
 int generic_help_fnc(int argc, char **argv, struct Env *env);
 int install_cmd_node(struct cmd_node *, struct cmd_node *parent);
+
+void sys_mon(void *);
 
 
 #if 0

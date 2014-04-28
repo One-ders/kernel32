@@ -131,12 +131,6 @@ struct tq {
 
 volatile unsigned int tq_tic;
 
-static inline unsigned int  xpsr() {
-	register unsigned int r0 asm("r0");
-	__asm__ __volatile__("mrs r0,xpsr"::: "r0");
-	return r0;
-}
-
 void Error_Handler_c(void *sp);
 
 void SysTick_Handler(void) {
@@ -156,6 +150,7 @@ void SysTick_Handler(void) {
 			int prio=t->prio_flags&0xf;
 			if (prio>MAX_PRIO) prio=MAX_PRIO;
 			ASSERT(t->state!=TASK_STATE_RUNNING);
+			disable_interrupt();
 			t->state=TASK_STATE_READY;
 			t->next=0;
 			b->next=0;
@@ -169,6 +164,7 @@ void SysTick_Handler(void) {
 				ready_last[prio]->next=t;
 			}
 			ready_last[prio]=t;
+			enable_interrupt();
 			DEBUGP(DLEV_SCHED,"timer_wakeup: readying %s\n", t->name);
 			b=bnext;
 		}
@@ -353,30 +349,30 @@ int detach_driver_fd(struct user_fd *fd) {
 static int sys_drv_wakeup(struct device_handle *dh, int ev, void *user_ref) {
 	struct task *task=(struct task *)user_ref;
 	int fd=dh->user_data1;
+
+	if (task->sel_data_valid) {
+		DEBUGP(DLEV_SCHED,"wakeup descriptor %d in task %s for ev %d\n", fd, task->name,ev);
+		if (ev&EV_READ) {
+			(task->sel_data.rfds)|=(1<<fd);
+		}
+		if (ev&EV_WRITE) {
+			(task->sel_data.wfds)|=(1<<fd);
+		}
+		if (ev&EV_STATE) {
+			(task->sel_data.stfds)|=(1<<fd);
+		}
+		task->sel_data.nfds++;
+	}
+
 	if (task==current) {
-		sys_printf("sys_drv_wakeup: wake up current\n");
+		current->blocker.wake=1;
+//		sys_printf("sys_drv_wakeup: wake up current\n");
 		goto out_err;
 	}
-	if (task->state==TASK_STATE_RUNNING) {
-		sys_printf("sys_drv_wakeup: wake up running task\n");
-		goto out_err;
+
+	if (task->state!=TASK_STATE_RUNNING) {
+		sys_wakeup(&task->blocker,0,0);
 	}
-	if (!task->sel_data_valid) {
-		goto out;
-	}
-	DEBUGP(DLEV_SCHED,"wakeup descriptor %d in task %s for ev %d\n", fd, task->name,ev);
-	if (ev&EV_READ) {
-		(task->sel_data.rfds)|=(1<<fd);
-	}
-	if (ev&EV_WRITE) {
-		(task->sel_data.wfds)|=(1<<fd);
-	}
-	if (ev&EV_STATE) {
-		(task->sel_data.stfds)|=(1<<fd);
-	}
-	task->sel_data.nfds++;
-out:
-	sys_wakeup(&task->blocker,0,0);
 out_err:
 	return 0;
 }
@@ -477,6 +473,7 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 		case SVC_SLEEP: {
 			if (current->state!=TASK_STATE_RUNNING) return 0;
 			DEBUGP(DLEV_SCHED,"sleep task: name %s\n", current->name);
+			current->blocker.driver=0;
 			sys_sleepon(&current->blocker,0,0,(unsigned int *)&svc_args[0]);
 			return 0;
 			break;
@@ -520,6 +517,10 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 				return 0;
 			}
 
+			current->blocker.dh=dh;
+			current->blocker.driver=driver;
+			current->blocker.ev=EV_READ;
+
 			while(1) {
 				rc=driver->ops->control(dh,RD_CHAR,(void *)svc_args[1],svc_args[2]);
 				if (rc==-DRV_AGAIN&&(!fdd->flags&O_NONBLOCK)) {
@@ -536,19 +537,25 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			struct user_fd *fdd=&fd_tab[fd];
 			struct driver *driver=fdd->driver;
 			struct device_handle *dh=fdd->dev_handle;
-			int rc;
+			int rc=0;
+			int done=0;
 			if (!driver) {
 				svc_args[0]=-1;
 				return 0;
 			}
 
+			current->blocker.dh=dh;
+			current->blocker.driver=driver;
+			current->blocker.ev=EV_WRITE;
+
 again:
-			rc=driver->ops->control(dh,WR_CHAR,(void *)svc_args[1],svc_args[2]);
+			rc=driver->ops->control(dh,WR_CHAR,(void *)svc_args[1]+done,svc_args[2]-done);
 
 			if (rc==-DRV_AGAIN&&(!(fdd->flags&O_NONBLOCK))) {
 				sys_sleepon(&current->blocker,0,0,0);
 				goto again;
 			}
+
 			if (rc==-DRV_INPROGRESS&&(!(fdd->flags&O_NONBLOCK))) {
 				int result;
 				sys_sleepon(&current->blocker,0,0,0);
@@ -560,7 +567,11 @@ again:
 				}
 				return 0;
 			}
-			svc_args[0]=rc;
+			if (done!=svc_args[2]) {
+				done+=rc;
+				goto again;
+			}
+			svc_args[0]=done;
 			return 0;
 		}
 		case SVC_IO_CONTROL: {
@@ -613,7 +624,7 @@ again:
 			current->sel_data.wfds=0;
 			current->sel_data.stfds=0;
 
-			disable_interrupt();
+			current->sel_data_valid=1;
 			for(i=0;i<nfds;i++) {
 				if (wfds&(1<<i)) {
 					struct driver *driver=fd_tab[i].driver;
@@ -622,11 +633,9 @@ again:
 						if (driver->ops->control(dh,IO_POLL,(void *)EV_WRITE,0)) {
 							*sel_args->wfds=(1<<i);
 							svc_args[0]=1;
-							enable_interrupt();
 							return 0;
 						}
 					} else {
-						enable_interrupt();
 						svc_args[0]=-1;
 						return 0;
 					}
@@ -641,12 +650,10 @@ again:
 						if (driver->ops->control(dh,IO_POLL,(void *)EV_READ,0)) {
 							*sel_args->rfds=(1<<i);
 							svc_args[0]=1;
-							enable_interrupt();
 							return 0;
 						}
 					} else {
 						svc_args[0]=-1;
-						enable_interrupt();
 						return 0;
 					}
 				}
@@ -660,20 +667,22 @@ again:
 						if (driver->ops->control(dh,IO_POLL,(void *)EV_STATE,0)) {
 							*sel_args->stfds=(1<<i);
 							svc_args[0]=1;
-						enable_interrupt();
 							return 0;
 						}
 					} else {
 						svc_args[0]=-1;
-						enable_interrupt();
 						return 0;
 					}
 				}
 			}
 
-			current->sel_data_valid=1;
-			sys_sleepon(&current->blocker,0,0,tout);
+			current->blocker.driver=0;
+			disable_interrupt();
+			if (!current->sel_data.nfds) {
+				sys_sleepon(&current->blocker,0,0,tout);
+			}
 			current->sel_data_valid=0;
+			enable_interrupt();
 
 			*sel_args->rfds=current->sel_data.rfds;
 			*sel_args->wfds=current->sel_data.wfds;
@@ -825,6 +834,7 @@ check_resched:
 
 
 void *sys_sleep(unsigned int ms) {
+	current->blocker.driver=0;
 	sys_sleepon(&current->blocker,0,0,&ms);
 	return 0;
 }
@@ -862,36 +872,42 @@ void sys_timer_remove(struct blocker *b) {
 	}
 }
 
-int sleepable(void) {
-	int in_irq=xpsr()&0x1ff;
-	if (in_irq&&(in_irq!=0xb)) {
-                return 0;
-	}
-	return 1;
+int device_ready(struct blocker *b) {
+	return b->driver->ops->control(b->dh, IO_POLL, (void *)b->ev, 0);
 }
 
 /* not to be called from irq, cant sleep */
 void *sys_sleepon(struct blocker *so, void *bp, int bsize,unsigned int *tout) {
-	int in_irq=xpsr()&0x1ff;
-	if (in_irq&&(in_irq!=0xb)) {
-		return 0;
-	}
-	
-	if (current->state!=TASK_STATE_RUNNING) {
-		return 0;
-	}
-	current->bp=bp;
-	current->bsize=bsize;
+	if (!task_sleepable()) return 0;
+	disable_interrupt();
 
+	if (so->wake) {
+		so->wake=0;
+		enable_interrupt();
+		return 0;
+	}
+	if (so->driver && device_ready(so)) {
+		enable_interrupt();
+		return 0;
+	}
+	if (current->state!=TASK_STATE_RUNNING) {
+		enable_interrupt();
+		sys_printf("wanted to sleep, non running task\n");
+		return 0;
+	}
+
+	current->state=TASK_STATE_IO; /* Do not do any more debug when state
+					is running */
+	enable_interrupt();
 	CLR_TMARK(current);
 
 	if (tout) {
+		current->state=TASK_STATE_TIMER;
 		sys_timer(so,*tout);
 	} else {
 		so->wakeup_tic=0;
 	}
-	current->state=TASK_STATE_IO; /* Do not do any more debug when state
-					is running */
+
 	DEBUGP(DLEV_SCHED,"sys sleepon %x task: name %s\n", so, current->name);
 	switch_now();
 
@@ -901,24 +917,50 @@ void *sys_sleepon(struct blocker *so, void *bp, int bsize,unsigned int *tout) {
 		}
 		so->wakeup_tic=0;
 	}
+	DEBUGP(DLEV_SCHED,"sys sleepon woke up %x task: name %s\n", so, current->name);
 	return so;
 }
 
 void *sys_sleepon_update_list(struct blocker *b, struct blocker_list *bl_ptr) {
 	void *rc=0;
+	struct blocker **pprev;
+	struct blocker *tmp;
 	if (current->state!=TASK_STATE_RUNNING) {
 		return 0;
 	}
 	disable_interrupt();
 	if (!bl_ptr) goto out;
+	if (bl_ptr->is_ready()) goto out;
 	b->next2=0;
 	if (bl_ptr->first) {
-		b->next2=bl_ptr->last;
+		bl_ptr->last->next2=b;
 	} else {
 		bl_ptr->first=b;
 	}
 	bl_ptr->last=b;
+	enable_interrupt();
 	rc=sys_sleepon(b,0,0,0);
+	if (!rc) { 
+		/* return 0, means no sleep */
+		/* link out the blocker */
+		pprev=&bl_ptr->first;
+		tmp=bl_ptr->first;
+		while(tmp) {
+			if (tmp==b) {
+				*pprev=b->next2;
+				b->next2=0;
+				break;
+			}
+			pprev=&tmp->next2;
+			tmp=tmp->next2;
+		}
+		if (tmp==b) {
+			sys_printf("sleep_list: failed, linked out blocker\n");
+		} else {
+			sys_printf("sleep_list: failed, blocker not found\n");
+		}
+	}
+	return rc;
 out:
 	enable_interrupt();
 	return rc;
@@ -935,15 +977,20 @@ void *sys_wakeup(struct blocker *so, void *bp, int bsize) {
 		return 0;
 	}
 	if (n==current) {
-		if (n->state==TASK_STATE_RUNNING) {
-			return n;
-		}
-		n->state=TASK_STATE_READY;
-		return n;
+		so->wake=1;
+		return 0;
 	}
+
 	if (n->state==TASK_STATE_RUNNING) {
-		sys_printf("waking up running process\n");
-		ASSERT(0);
+		so->wake=1;
+//		sys_printf("waking up running process\n");
+//		ASSERT(0);
+		return 0;
+	}
+
+	if (n->state==TASK_STATE_READY) {
+//		sys_printf("waking up ready process\n");
+//		ASSERT(0);
 		return 0;
 	}
 
@@ -957,6 +1004,8 @@ void *sys_wakeup(struct blocker *so, void *bp, int bsize) {
 	if (so->wakeup_tic) {
 		sys_timer_remove(so);
 	}
+
+	disable_interrupt();
 	n->next=0;
 	n->state=TASK_STATE_READY;
 	prio=n->prio_flags&0xf;
@@ -968,11 +1017,14 @@ void *sys_wakeup(struct blocker *so, void *bp, int bsize) {
 		ready[prio]=n;
 	}
 	ready_last[prio]=n;
+	enable_interrupt();
 	
 	if (prio<GET_PRIO(current)) {
-		DEBUGP(DLEV_SCHED,"wakeup(readying) %x task: name %s, readying %s\n",so,current->name,n->name);
+		DEBUGP(DLEV_SCHED,"wakeup(immed readying) %x task: name %s, readying %s\n",so,current->name,n->name);
 		switch_on_return();
+		return n;
 	}
+	DEBUGP(DLEV_SCHED,"wakeup(readying) %x task: name %s, readying %s\n",so,current->name,n->name);
  	return n;
 }
 
@@ -980,16 +1032,17 @@ void *sys_wakeup_from_list(struct blocker_list *bl) {
 	struct blocker *tmp;
 	void *rc=0;
 	disable_interrupt();
-	if (bl->first) {
+	tmp=bl->first;
+	while (bl->first) {
 		tmp=bl->first;
 		bl->first=tmp->next2;
 		tmp->next2=0;
 		enable_interrupt();
 		rc=sys_wakeup(tmp,0,0);
-		ASSERT(rc);
-	} else {
-		enable_interrupt();
+		disable_interrupt();
+//		ASSERT(rc);
 	}
+	enable_interrupt();
 	return rc;
 }
 
@@ -1149,7 +1202,13 @@ static int lsdrv_fnc(int argc, char **argv, struct Env *env) {
 
 static int debug_fnc(int argc, char **argv, struct Env *env) {
 	if (argc>1) {
-		dbglev=10;
+		if (__builtin_strcmp(argv[1],"on")==0) {
+			dbglev=10;
+		} else if (__builtin_strcmp(argv[1],"off")==0) {
+			dbglev=0;
+		} else {
+			fprintf(env->io_fd,"debug <on> | <off>\n");
+		}
 	} else {
 		dbglev=0;
 	}
@@ -1232,7 +1291,8 @@ void init_sys(void) {
 	__builtin_memset(&slab_1024[15],0,900);
 	activate_memory_protection();
 	init_switcher();
-	NVIC_SetPriority(SVCall_IRQn,0xe);
+//	NVIC_SetPriority(SVCall_IRQn,0xe);
+	NVIC_SetPriority(SVCall_IRQn,0xf);  /* try to share level with pendsv */
 	NVIC_SetPriority(SysTick_IRQn,0xd);  /* preemptive tics... */
 
 	SysTick_Config(SystemCoreClock/100); // 10 mS tic is 100/Sec
