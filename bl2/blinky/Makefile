@@ -8,8 +8,8 @@ LDFLAGS=-g -T../incl/stm32/stm32_flash.ld -mlittle-endian -mthumb -mcpu=cortex-m
 
 all: blinky
 
-blinky: main.o
-	$(CC) $(LDFLAGS) -o $@ ../lib/init_sect.o ../lib/os.o ../lib/bsp.o ../lib/stm32.o $^ ../lib/led_drv.o ../lib/usb_serial_drv.o ../stmusb/stm_usb_drv.o ../lib/end_sect.o
+blinky: main.o timer_test.o
+	$(CC) $(LDFLAGS) -o $@ ../lib/init_sect.o ../lib/os.o ../lib/bsp.o ../lib/stm32.o $^ ../lib/led_drv.o ../lib/usb_serial_drv.o ../lib/hr_timer.o ../stmusb/stm_usb_drv.o ../lib/end_sect.o
 
 main.o:
 

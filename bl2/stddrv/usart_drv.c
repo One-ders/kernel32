@@ -116,7 +116,7 @@ void USART3_IRQHandler(void) {
 	}
 	
 //	sys_printf("got usart irq, status %x\n", USART3->SR);
-	if ((st&USART_SR_TXE)&&(usart_data0.tx_in-usart_data0.tx_out)) {
+	if ((st&(USART_SR_TXE|USART_SR_TC))&&(usart_data0.tx_in-usart_data0.tx_out)) {
 		if (usart_putc_fnc==usart_putc) {
 			USART3->DR=usart_data0.tx_buf[IX(usart_data0.tx_out)];
 			usart_data0.tx_out++;
@@ -127,8 +127,7 @@ void USART3_IRQHandler(void) {
 				}
 			}
 		}
-	} 
-	if((st&USART_SR_TC)) {
+	}  else if((st&USART_SR_TC)) {
 		if (usart_putc_fnc==usart_putc) {
 			USART3->CR1&=~(USART_CR1_TE|USART_CR1_TXEIE|USART_CR1_TCIE);
 			usart_data0.txr=0;
@@ -160,7 +159,7 @@ again:
 	if (ud->chip_dead) return -1;
 	disable_interrupt();
 	if ((ud->tx_in-ud->tx_out)>=TXB_SIZE)  {
-		if (!sleepable()) {
+		if (!task_sleepable()) {
 			enable_interrupt();
 			return -1;
 		}
@@ -201,7 +200,6 @@ static int usart_read(struct user_data *u, char *buf, int len) {
 	int i=0;
 	while(i<len) {
 		int ix=ud->rx_o%(RX_BSIZE);
-		int ch;
 
 again:
 		disable_interrupt();
@@ -212,14 +210,7 @@ again:
 		}
 		enable_interrupt();
 		ud->rx_o++;
-		ch=buf[i++]=ud->rx_buf[ix];
-		if (1) {
-			usart_putc_fnc(u,ch);
-		}
-//		sys_printf("usart read got a char %c(%d), store at index %d\n",ch,ch,i-1);
-		if (ch==0x0d) {
-			return i-1;
-		}
+		buf[i++]=ud->rx_buf[ix];
 	}
 	return i;
 }
@@ -230,11 +221,24 @@ static int usart_write(struct user_data *u, char *buf, int len) {
 	for (i=0;i<len;i++) {
 		rc=usart_putc_fnc(u,buf[i]);
 		if (rc<0) return rc;
-		if (buf[i]=='\n') {
-			usart_putc_fnc(u,'\r');
-		}
 	}
 	return (len);
+}
+
+static int tx_buf_empty(void) {
+	struct usart_data *ud=&usart_data0;
+	if (!(ud->tx_in-ud->tx_out))  {
+		return 1;
+	}
+	return 0;
+}
+
+static int rx_data_avail(void) {
+	struct usart_data *ud=&usart_data0;
+	if (ud->rx_i-ud->rx_o) {
+		return 1;
+	}
+	return 0;
 }
 
 
@@ -329,6 +333,9 @@ static int usart_init(void *instance) {
 	USART3->CR1|=(USART_CR1_TXEIE|USART_CR1_TCIE|USART_CR1_TE|USART_CR1_RE|USART_CR1_RXNEIE);
 	NVIC_SetPriority(USART3_IRQn,0xd);
 	NVIC_EnableIRQ(USART3_IRQn);
+
+	ud->wblocker_list.is_ready=tx_buf_empty;
+	ud->rblocker_list.is_ready=rx_data_avail;
 	return 0;
 }
 

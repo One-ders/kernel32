@@ -1,3 +1,3 @@
 
 
-export PATH=/home/anders/Downloads/arm/gcc-arm-none-eabi-4_6-2012q4/bin:/home/anders/Downloads/arm/stlink:$PATH
+export PATH=$HOME/stm/gcc-arm-none-eabi-4_8-2014q1/bin:$PATH

@@ -48,9 +48,15 @@ int map_tmp_stack_page(unsigned long int addr, unsigned int size) {
 }
 
 int map_next_stack_page(unsigned long int new_addr, unsigned long int old_addr) {
+	/* got an interrupt between the two RBAR updates */
+	/* new address valid map, old address not valid until */
+	/* RASR is updated, gives exception stacking error */
+	/* current stack is still on old addr */
+	disable_interrupt();
 	MPU->RBAR=new_addr|MPU_RBAR_VALID|1;
 	MPU->RBAR=old_addr|MPU_RBAR_VALID|2;
 	MPU->RASR=AP_FULL|CACHE_MEM|(9<<1)|1;
+	enable_interrupt();
 	__DMB();
 	return 0;
 }

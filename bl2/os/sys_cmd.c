@@ -143,8 +143,7 @@ void sys_mon(void *dum) {
 
 	while(1) {
 		int rc;
-		fprintf(fd,"\n%s--->",current_node->name);
-		rc=io_read(fd,buf,200);
+		rc=readline_r(fd,"\n--->",buf,200);
 		if (rc>0) {
 			struct cmd *cmd;
 			if (rc>200) {

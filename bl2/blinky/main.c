@@ -68,6 +68,9 @@ int main(void) {
 	start_sys();
 	printf("In main, starting blink tasks\n");
 
+	io_open("test_driver");
+
+	thread_create(sys_mon,"usb_serial0",0,2,"sys_mon_u");
 	thread_create(blink,&green,sizeof(green),1,"green");
 	thread_create(blink,&amber,sizeof(amber),1,"amber");
 //	thread_create(blink_loop,&red,sizeof(red),256,"red_looping");

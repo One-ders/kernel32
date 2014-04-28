@@ -49,3 +49,5 @@ int fprintf(int fd, const char *format, ...);
 #define printf(b...) fprintf(0,b)
 
 unsigned long int strtoul(char *str, char *endp, int base);
+
+int readline_r(int fd, char *prompt, char *buf, int buf_size);
