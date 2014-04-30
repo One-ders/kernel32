@@ -69,6 +69,7 @@ static struct cmd_node cmn = {
 };
 
 static int debug_fnc(int argc, char **argv, struct Env *env) {
+	fprintf(env->io_fd,"debug called with %d args\n",argc);
 	if (argc==1) {
 		cec_debug=1;
 	} else {

@@ -129,7 +129,6 @@ void TIM1_UP_TIM10_IRQHandler(void) {
 	int i;
 
 	if (TIM10->CNT>0) {
-		ASSERT(0);
 		sys_printf("took %d to get irq\n", TIM10->CNT);
 	}
 	sys_irqs++;
@@ -324,6 +323,11 @@ static int hr_timer_control(struct device_handle *dh, int cmd, void *arg, int le
 		case HR_TIMER_CANCEL:
 			return hr_timer_clr(u);
 			break;
+		case HR_TIMER_GET_TIC: {
+			unsigned int *ttic=((unsigned int *)arg);
+			*ttic=get_current_tic();
+			return 0;
+		}
 		default:
 			return -1;
 	}
