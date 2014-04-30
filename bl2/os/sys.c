@@ -518,12 +518,12 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			}
 
 			current->blocker.dh=dh;
-			current->blocker.driver=driver;
 			current->blocker.ev=EV_READ;
 
 			while(1) {
 				rc=driver->ops->control(dh,RD_CHAR,(void *)svc_args[1],svc_args[2]);
 				if (rc==-DRV_AGAIN&&(!fdd->flags&O_NONBLOCK)) {
+					current->blocker.driver=driver;
 					sys_sleepon(&current->blocker,0,0,0);
 				} else {
 					break;
@@ -545,19 +545,20 @@ void *SVC_Handler_c(unsigned long int *svc_args) {
 			}
 
 			current->blocker.dh=dh;
-			current->blocker.driver=driver;
 			current->blocker.ev=EV_WRITE;
 
 again:
 			rc=driver->ops->control(dh,WR_CHAR,(void *)svc_args[1]+done,svc_args[2]-done);
 
 			if (rc==-DRV_AGAIN&&(!(fdd->flags&O_NONBLOCK))) {
+				current->blocker.driver=driver;
 				sys_sleepon(&current->blocker,0,0,0);
 				goto again;
 			}
 
 			if (rc==-DRV_INPROGRESS&&(!(fdd->flags&O_NONBLOCK))) {
 				int result;
+				current->blocker.driver=driver;
 				sys_sleepon(&current->blocker,0,0,0);
 				rc=driver->ops->control(dh,WR_GET_RESULT,&result,sizeof(result));
 				if (rc<0) {
@@ -688,7 +689,6 @@ again:
 			*sel_args->wfds=current->sel_data.wfds;
 			*sel_args->stfds=current->sel_data.stfds;
 			svc_args[0]=current->sel_data.nfds;
-			enable_interrupt();
 			return 0;
 		}
 		case SVC_BLOCK_TASK: {

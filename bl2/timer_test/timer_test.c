@@ -40,7 +40,7 @@ static int pin_irq(struct device_handle *dh, int ev, void *dum) {
 }
 
 int  cecs_timeout(struct device_handle *dh, int ev, void *dum) {
-	int nSec=610;
+	int uSec=610;
 	csc++;
 	if (csc==1000) {
 		leddrv->ops->control(led_dh,LED_CTRL_ACTIVATE,&red,sizeof(red));
@@ -48,13 +48,13 @@ int  cecs_timeout(struct device_handle *dh, int ev, void *dum) {
 		csc=0;
 		leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&red,sizeof(red));
 	}
-	drv->ops->control(cecs_dh, HR_TIMER_SET, &nSec, sizeof(nSec));
+	drv->ops->control(cecs_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 	return 0;
 }
 
 
 int cecr_timeout(struct device_handle *dh, int ev, void *dum) {
-	int nSec=620;
+	int uSec=500;
 	crc++;
 	if (crc==1000) {
 		leddrv->ops->control(led_dh,LED_CTRL_ACTIVATE,&blue,sizeof(blue));
@@ -62,14 +62,14 @@ int cecr_timeout(struct device_handle *dh, int ev, void *dum) {
 		crc=0;
 		leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
 	}
-	drv->ops->control(cecr_dh, HR_TIMER_SET, &nSec, sizeof(nSec));
+	drv->ops->control(cecr_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 	return 0;
 }
 
 
 
 static struct device_handle *cec_drv_open(void *inst, DRV_CBH cb, void *dum) {
-	int nSec;
+	int uSec;
 	int flags;
 	int rc;
 	int pin;
@@ -90,21 +90,21 @@ static struct device_handle *cec_drv_open(void *inst, DRV_CBH cb, void *dum) {
 	drv=driver_lookup(HR_TIMER);
 	if (!drv) return 0;
 
-	nSec=300;
+	uSec=300;
 	cecs_dh=drv->ops->open(drv->instance,cecs_timeout, 0);
 	if (!cecs_dh) {
 		drv=0;
 		return 0;
 	}
-	drv->ops->control(cecs_dh, HR_TIMER_SET, &nSec, sizeof(nSec));
+	drv->ops->control(cecs_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 
-	nSec=610;
+	uSec=610;
 	cecr_dh=drv->ops->open(drv->instance,cecr_timeout, 0);
 	if (!cecr_dh) {
 		drv=0;
 		return 0;
 	}
-	drv->ops->control(cecr_dh, HR_TIMER_SET, &nSec, sizeof(nSec));
+	drv->ops->control(cecr_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 
 	/* */
 			/*PA0 is the blue button */

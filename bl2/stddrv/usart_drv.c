@@ -63,7 +63,7 @@ typedef struct
 
 #endif
 
-#define TXB_SIZE 256
+#define TXB_SIZE 1024
 #define TXB_MASK (TXB_SIZE-1)
 #define IX(a) (a&TXB_MASK)
 
