@@ -38,6 +38,14 @@
 
 #include "a1_drv.h"
 
+#if 1
+#define TIM_START	2400
+#define TIM_BASIC	600
+#define TIM_HIGH	600
+#define TIM_LOW_0	600
+#define TIM_LOW_1	1200
+#endif
+
 #define RXB_SIZE 64
 #define RXB_MASK (RXB_SIZE-1)
 #define TXB_SIZE 64
@@ -168,7 +176,7 @@ static int a1_timeout(struct device_handle *dh, int ev, void *dum) {
 	switch (a1->state) {
 		case A1_STATE_RX_INIT0:
 		case A1_STATE_RX_DATA0: {  /* counting periods */
-			int uSec=600;
+			int uSec=TIM_BASIC;
 			a1->rx_tout_cnt++;
 			timerdrv->ops->control(a1->timer_dh,HR_TIMER_SET,&uSec,sizeof(uSec));
 			break;
@@ -176,6 +184,7 @@ static int a1_timeout(struct device_handle *dh, int ev, void *dum) {
 		case A1_STATE_RX_INIT1: { /* means we have a startbit but timedout on data */
 			a1->state=A1_STATE_IDLE;
 			leddrv->ops->control(a1->led_dh,LED_CTRL_DEACTIVATE,&red,sizeof(red));
+			sys_printf("sender never started to send data\n");
 			break;
 		}
 		case A1_STATE_RX_DATA1: {
@@ -196,7 +205,7 @@ static int a1_timeout(struct device_handle *dh, int ev, void *dum) {
 			break;
 		}
 		case A1_STATE_TX_INIT0: {
-			unsigned int uSec=600;
+			unsigned int uSec=TIM_HIGH;
 			a1->state=A1_STATE_TX_DATA0;
 			pindrv->ops->control(a1->pin_dh,GPIO_RELEASE_PIN,0,0);
 			timerdrv->ops->control(a1->timer_dh,HR_TIMER_SET,&uSec,sizeof(uSec));
@@ -223,7 +232,7 @@ static int a1_timeout(struct device_handle *dh, int ev, void *dum) {
 			break;
 		}
 		case A1_STATE_TX_DATA1: {
-			unsigned int uSec=600;
+			unsigned int uSec=TIM_HIGH;
 			a1->state=A1_STATE_TX_DATA0;
 			pindrv->ops->control(a1->pin_dh,GPIO_RELEASE_PIN,0,0);
 			timerdrv->ops->control(a1->timer_dh,HR_TIMER_SET,&uSec,sizeof(uSec));
@@ -244,7 +253,7 @@ static int a1_timeout(struct device_handle *dh, int ev, void *dum) {
 /* A1 IDLE */
 
 static int handle_rx_start(struct a1_data *a1, int pin_lev) {
-	int uSec=300;
+	int uSec=TIM_BASIC/2;
 	if (pin_lev) {
 		/* stay in idle, must have been a disturbance in the force */
 		sys_printf("got a 'pin to high' transition in idle??\n");
@@ -261,7 +270,7 @@ static int handle_rx_start(struct a1_data *a1, int pin_lev) {
 /* A1 RX INIT 0:  the remote device is keeping the line low, we count how long on a high transition*/
 
 static int handle_rx_init0(struct a1_data *a1,int pin_lev) {
-	int uSec=1200;
+	int uSec=TIM_START;
 	timerdrv->ops->control(a1->timer_dh,HR_TIMER_CANCEL,0,0);
 	if (!pin_lev) {
 		a1->state=A1_STATE_IDLE;
@@ -269,10 +278,11 @@ static int handle_rx_init0(struct a1_data *a1,int pin_lev) {
 		sys_printf("a1, got a 'pin to low' transition in init0\n");
 		return 0;
 	}
+
 	if (a1->rx_tout_cnt!=4) {
 		a1->state=A1_STATE_IDLE;
 		leddrv->ops->control(a1->led_dh,LED_CTRL_DEACTIVATE,&red,sizeof(red));
-		sys_printf("a1, in INIT0,  got a 'pin low' wrong timer for startbit %d\n",600*a1->rx_tout_cnt);
+		sys_printf("a1, in INIT0,  got a 'pin low' wrong timer for startbit %d\n",a1->rx_tout_cnt);
 		return 0;
 	}
 
@@ -286,7 +296,7 @@ static int handle_rx_init0(struct a1_data *a1,int pin_lev) {
 /* A1 RX INIT 1: We are waiting for the line to go lo, the start of the first data bits */
 
 static int handle_rx_init1(struct a1_data *a1, int pin_lev) {
-	int uSec=300;
+	int uSec=TIM_BASIC/2;
 
 	timerdrv->ops->control(a1->timer_dh,HR_TIMER_CANCEL,0,0);
 	if (pin_lev) {
@@ -306,7 +316,7 @@ static int handle_rx_init1(struct a1_data *a1, int pin_lev) {
 
 /* A1 RX DATA 0: We are waiting for the line to go hi,  */
 static int handle_rx_data0(struct a1_data *a1,int pin_lev) {
-	int uSec=1200;
+	int uSec=TIM_START;
 	timerdrv->ops->control(a1->timer_dh,HR_TIMER_CANCEL,0,0);
 	if (!pin_lev) {
 		a1->state=A1_STATE_IDLE;
@@ -347,7 +357,7 @@ static int handle_rx_data0(struct a1_data *a1,int pin_lev) {
 
 /* A1 RX DATA 1:  */
 static int handle_rx_data1(struct a1_data *a1, int pin_lev) {
-	int uSec=300;
+	int uSec=TIM_BASIC/2;
 
 	timerdrv->ops->control(a1->timer_dh,HR_TIMER_CANCEL,0,0);
 	if (pin_lev) {
@@ -384,9 +394,9 @@ int a1_send_bit(struct a1_data *a1) {
 	}
 	a1->state=A1_STATE_TX_DATA1;
 	if (bit_1) {
-		uSec=1200;
+		uSec=TIM_LOW_1;
 	} else {
-		uSec=600;
+		uSec=TIM_LOW_0;
 	}
 	timerdrv->ops->control(a1->timer_dh,HR_TIMER_SET,&uSec,sizeof(uSec));
 	pindrv->ops->control(a1->pin_dh,GPIO_SINK_PIN,0,0);
@@ -407,7 +417,7 @@ int a1_send_bit(struct a1_data *a1) {
 }
 
 static int a1_start_tx(struct a1_data *a1) {
-	unsigned int uSec=2400;
+	unsigned int uSec=TIM_START;
 	unsigned int flags=GPIO_IRQ_ENABLE(0);
 
 	pindrv->ops->control(a1->pin_dh,GPIO_CLR_FLAGS,&flags,sizeof(flags));
@@ -487,7 +497,7 @@ static int a1_drv_control(struct device_handle *dh, int cmd, void *arg, int size
 				u->events|=EV_WRITE;
 				return -DRV_AGAIN;
 			}
-			u->events&=EV_WRITE;
+			u->events&=~EV_WRITE;
 			a1->txbuf[a1->txIn&TXB_MASK]=size;
 			a1->txIn++;
 			for(i=0;i<size;i++) {

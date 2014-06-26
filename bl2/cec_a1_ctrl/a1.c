@@ -165,7 +165,6 @@ static int name_requested;
 
 int a1_get_amp_name(int a1, int a2, void *a3) {
 	unsigned char buf[]={0xc0,0x6a};
-	printf("sending a1_get_amp_name\n");
 	name_requested=1;
 	return a1_send(buf,sizeof(buf));
 }
