@@ -40,7 +40,7 @@
 #if 0
 #define PERIPH_BASE	0x40000000
 #define APB2PERIPH	(PERIPH_BASE+0x00010000)
-#define TIMER9_ADDR 		(APB2PERIPH+0x4000)
+#define TIMER9_ADDR 	(APB2PERIPH+0x4000)
 
 struct Timer {
 /*	0	*/	volatile unsigned int cr1;
@@ -265,17 +265,22 @@ static int hr_timer_set(struct timer_user *u, int val) {
 		return -1;
 	}
 
+	disable_interrupt();
 	ct=get_current_tic();
 	u->out_tic=ct+(val-1);
 	u->next=0;
 	timer_link_in(u);
 
-	if (in_irq) return 0;
+	if (in_irq) {
+		enable_interrupt();
+		return 0;
+	}
 	if (tout==u) {
 		if (adj_hwtimer()) {
 			sys_printf("hr_timer_set: should have timeout immideately\n");
 		}
 	}
+	enable_interrupt();
 	return 0;
 }
 

@@ -568,8 +568,8 @@ again:
 				}
 				return 0;
 			}
+			if (rc>=0) done+=rc;
 			if (done!=svc_args[2]) {
-				done+=rc;
 				goto again;
 			}
 			svc_args[0]=done;
