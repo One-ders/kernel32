@@ -155,9 +155,9 @@ static unsigned int cec_rx_ix;
 static unsigned int cec_promisc;
 static int prev_pin_stat=-1;
 
-/* A Cec device claims the bus by sinking the wire for 3400 mS */
+/* A Cec device claims the bus by sinking the wire for 3700 mS */
 static int start_r_sync(int pstate) {
-	int uSec=3400;
+	int uSec=3500;
 	if (pstate) {
 		sys_printf("false start_bit signal\n");
 		return 0;
@@ -194,7 +194,7 @@ static int handle_r_init(int pstate) {
 				cec_sub_state=CEC_RSYNC_IDLE;
 				timerdrv->ops->control(cec_timer_dh, HR_TIMER_CANCEL, 0, 0);
 				leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
-			wakeup_users(EV_WRITE);
+				wakeup_users(EV_WRITE);
 			}
 			break;
 		case	CEC_RSYNC_TOL:
@@ -234,19 +234,19 @@ static void handle_r_sync_tout() {
 			wakeup_users(EV_WRITE);
 			break;
 		case CEC_RSYNC_LOW: {
-			int uSec=600;
+			int uSec=400;
 			cec_sub_state=CEC_RSYNC_TOH;
 			timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 			break;
 		}
 		case CEC_RSYNC_HI1: {
-			int uSec=200;
+			int uSec=400;
 			cec_sub_state=CEC_RSYNC_HI2;
 			timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 			break;
 		}
 		case CEC_RSYNC_HI2: {
-			int uSec=600;
+			int uSec=400;
 			cec_sub_state=CEC_RSYNC_TOL;
 			timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 			break;
@@ -495,6 +495,7 @@ static int pin_irq(struct device_handle *dh, int ev, void *dum) {
 	int pin_stat;
 	pindrv->ops->control(pin_dh, GPIO_SENSE_PIN,&pin_stat,sizeof(pin_stat));
 	if (pin_stat==prev_pin_stat) {
+//		sys_printf("cec: spurious pin irq, pin at %d\n", pin_stat);
 		goto pin_out;
 	}
 	prev_pin_stat=pin_stat;
