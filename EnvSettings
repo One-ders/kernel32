@@ -1,2 +1,2 @@
 
-export PATH=`pwd`/gcc-arm-none-eabi-4_8-2014q1/bin:`pwd`/../stlink:$PATH
+export PATH=`pwd`/../gcc-arm-none-eabi-4_8-2014q1/bin:`pwd`/../stlink:$PATH
