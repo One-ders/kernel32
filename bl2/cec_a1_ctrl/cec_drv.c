@@ -225,16 +225,19 @@ static void handle_r_sync_tout() {
 	switch(cec_sub_state) {
 		case CEC_RSYNC_IDLE:
 		case CEC_RSYNC_TOH:
-		case CEC_RSYNC_TOL:
+		case CEC_RSYNC_TOL: {
 			/* Start bit failed */
-			sys_printf("Start Bit Failed in substate %d tout\n", cec_sub_state);
+			int pin_stat;
+			pindrv->ops->control(pin_dh, GPIO_SENSE_PIN,&pin_stat,sizeof(pin_stat));
+			sys_printf("Start Bit Failed in substate %d tout, pin is %d\n", cec_sub_state,pin_stat);
 			cec_state=CEC_IDLE;
 			cec_sub_state=CEC_RSYNC_IDLE;
 			leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
 			wakeup_users(EV_WRITE);
 			break;
+		}
 		case CEC_RSYNC_LOW: {
-			int uSec=400;
+			int uSec=500;
 			cec_sub_state=CEC_RSYNC_TOH;
 			timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 			break;
@@ -246,7 +249,7 @@ static void handle_r_sync_tout() {
 			break;
 		}
 		case CEC_RSYNC_HI2: {
-			int uSec=400;
+			int uSec=500;
 			cec_sub_state=CEC_RSYNC_TOL;
 			timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 			break;
