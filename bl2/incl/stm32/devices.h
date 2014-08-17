@@ -6,6 +6,7 @@
 #include <stm32/timer_reg.h>
 #include <stm32/power_reg.h>
 #include <stm32/flash_reg.h>
+#include <stm32/iwdg_reg.h>
 
 
 #define RCC	((struct RCC *)(AHB1+0x3800))
@@ -49,6 +50,7 @@
 #define TIM13	((struct TIMER *)(APB1+0x1c00))
 #define TIM14	((struct TIMER *)(APB1+0x2000))
 
+#define IWDG	((struct IWDG *)(APB1+0x3000))
 #define PWR	((struct POWER *)(APB1+0x7000))
 
 #define FLASH	((struct FLASH *)(AHB1+0x3c00))

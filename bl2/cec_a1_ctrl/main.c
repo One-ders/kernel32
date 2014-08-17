@@ -38,6 +38,7 @@
 #include "a1_drv.h"
 #include "a1.h"
 #include "asynchio.h"
+#include "iwdg_drv.h"
 
 #include <string.h>
 
@@ -194,6 +195,18 @@ void cec_gw(void *dum) {
 	while(1) do_event();
 }
 
+void watchdog(void *dum) {
+	int fd=io_open(IWDG_DRV);
+	char *bub="hej";
+	if (fd<0) {
+		return;
+	}
+	while(1) {
+		sleep(250);
+		io_write(fd,bub,1);
+	}
+}
+
 int main(void) {
 
 	/* initialize the executive */
@@ -205,6 +218,7 @@ int main(void) {
 	printf("In main, starting tasks\n");
 
 	/* create some jobs */
+	thread_create(watchdog,0,0,3,"watchdog");
 	thread_create(cec_gw,0,0,1,"cec_gw");
 	while (1);
 }
