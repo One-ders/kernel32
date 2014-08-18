@@ -345,6 +345,7 @@ int detach_driver_fd(struct user_fd *fd) {
 	return -1;
 }
 
+static void sys_timer_remove(struct blocker *b);
 
 static int sys_drv_wakeup(struct device_handle *dh, int ev, void *user_ref) {
 	struct task *task=(struct task *)user_ref;
@@ -366,6 +367,9 @@ static int sys_drv_wakeup(struct device_handle *dh, int ev, void *user_ref) {
 
 	if (task==current) {
 		current->blocker.wake=1;
+		if (current->blocker.wakeup_tic) {
+			sys_timer_remove(&current->blocker);
+		}
 //		sys_printf("sys_drv_wakeup: wake up current\n");
 		goto out_err;
 	}
@@ -569,7 +573,7 @@ again:
 				return 0;
 			}
 			if (rc>=0) done+=rc;
-			if (done!=svc_args[2]) {
+			if ((done!=svc_args[2])&&(!(fdd->flags&O_NONBLOCK))) {
 				goto again;
 			}
 			svc_args[0]=done;
@@ -843,6 +847,7 @@ struct tq *sys_timer(struct blocker *so, unsigned int ms) {
 	int wtic=(ms/10)+tq_tic;
 	struct tq *tout=&tq[wtic%1024];
 	so->wakeup_tic=wtic;
+	so->next=0;
 	if (!tout->tq_out_first) {
 		tout->tq_out_first=so;
 		tout->tq_out_last=so;
@@ -853,23 +858,26 @@ struct tq *sys_timer(struct blocker *so, unsigned int ms) {
 	return tout;
 }
 
-void sys_timer_remove(struct blocker *b) {
+static void sys_timer_remove(struct blocker *b) {
 	struct tq *tout=&tq[b->wakeup_tic%1024];
 	struct blocker *bp=tout->tq_out_first;
 	struct blocker **bpp=&tout->tq_out_first;
 	struct blocker *bprev=0;
+
 	while(bp) {
 		if (bp==b) {
 			(*bpp)=bp->next;
-			if (bp==tq->tq_out_last) {
-				tq->tq_out_last=bprev;
+			bp->next=0;
+			if (bp==tout->tq_out_last) {
+				tout->tq_out_last=bprev;
 			}
-			return ;
+			return;
 		}
 		bprev=bp;
 		bpp=&bp->next;
 		bp=bp->next;
 	}
+	b->next=0;
 }
 
 int device_ready(struct blocker *b) {
@@ -978,11 +986,17 @@ void *sys_wakeup(struct blocker *so, void *bp, int bsize) {
 	}
 	if (n==current) {
 		so->wake=1;
+		if (so->wakeup_tic) {
+			sys_timer_remove(so);
+		}
 		return 0;
 	}
 
 	if (n->state==TASK_STATE_RUNNING) {
 		so->wake=1;
+		if (so->wakeup_tic) {
+			sys_timer_remove(so);
+		}
 //		sys_printf("waking up running process\n");
 //		ASSERT(0);
 		return 0;
@@ -994,16 +1008,17 @@ void *sys_wakeup(struct blocker *so, void *bp, int bsize) {
 		return 0;
 	}
 
-	if (so->next) {
-		sys_printf("sys_wakeup:blocker has next link to %x in wakup\n", so->next);
-	}
-
 	if (so->next2) {
 		sys_printf("sys_wakeup:blocker has next2 link to %x in wakup\n", so->next2);
 	}
 	if (so->wakeup_tic) {
 		sys_timer_remove(so);
 	}
+
+	if (so->next) { /* means we have timer objects still linked in */
+		sys_printf("sys_wakeup:blocker %x has next link to %x in wakup\n", so, so->next);
+	}
+
 
 	disable_interrupt();
 	n->next=0;
