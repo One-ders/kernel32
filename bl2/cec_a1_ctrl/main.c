@@ -201,6 +201,7 @@ void watchdog(void *dum) {
 	if (fd<0) {
 		return;
 	}
+	io_control(fd,F_SETFL,(void *)O_NONBLOCK,0);
 	while(1) {
 		sleep(250);
 		io_write(fd,bub,1);
