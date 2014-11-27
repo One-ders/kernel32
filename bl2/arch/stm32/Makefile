@@ -1,17 +1,17 @@
 
-AS=arm-none-eabi-as
-CC=arm-none-eabi-gcc
-#CFLAGS=-g -O2 -DDEBUG -DDRIVERSUPPORT -DUNECESS -Wall -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi=hard -mfpu=fpv4-sp-d16 -fno-builtin -I../incl
-CFLAGS=-g -O2 -DDEBUG -DDRIVERSUPPORT -DUNECESS -Wall -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi=soft -fno-builtin -I../../incl
-LDFLAGS=-g -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -fno-builtin
+#AS=arm-none-eabi-as
+#CC=arm-none-eabi-gcc
+##CFLAGS=-g -O2 -DDEBUG -DDRIVERSUPPORT -DUNECESS -Wall -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi=hard -mfpu=fpv4-sp-d16 -fno-builtin -I../incl
+#CFLAGS=-g -O2 -DDEBUG -DDRIVERSUPPORT -DUNECESS -Wall -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi=soft -fno-builtin -I../../incl
+#LDFLAGS=-g -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -fno-builtin
 
 
-all: ../../lib ../../lib/stm32.o
+all: $(OBJ)/lib $(OBJ)/lib/stm32.o
 
-../../lib:
-	mkdir ../../lib
+$(OBJ)/lib:
+	mkdir $@
 
-../../lib/stm32.o: stm32.o
+$(OBJ)/lib/stm32.o: stm32.o
 	cp $^ $@
 
 #

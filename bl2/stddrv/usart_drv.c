@@ -32,8 +32,8 @@
  */
 #include "sys.h"
 #include "io.h"
-#include <stm32/devices.h>
-#include <stm32/stm32f407.h>
+#include <devices.h>
+#include <stm32f407.h>
 
 #include "usart_drv.h"
 
@@ -157,20 +157,20 @@ static int usart_putc(struct user_data *u, int c) {
 
 again:
 	if (ud->chip_dead) return -1;
-	disable_interrupt();
+	disable_interrupts();
 	if ((ud->tx_in-ud->tx_out)>=TXB_SIZE)  {
 		if (!task_sleepable()) {
-			enable_interrupt();
+			enable_interrupts();
 			return -1;
 		}
 		if (!sys_sleepon_update_list(&current->blocker,&ud->wblocker_list)) {
-			enable_interrupt();
+			enable_interrupts();
 			return -1;
 		}
-		enable_interrupt();
+		enable_interrupts();
 		goto again;
 	}
-	enable_interrupt();
+	enable_interrupts();
 	ud->tx_buf[IX(ud->tx_in)]=c;
 	ud->tx_in++;	
 	if (!ud->txr) {
@@ -202,13 +202,13 @@ static int usart_read(struct user_data *u, char *buf, int len) {
 		int ix=ud->rx_o%(RX_BSIZE);
 
 again:
-		disable_interrupt();
+		disable_interrupts();
 		if (!(ud->rx_i-ud->rx_o)) {
 			sys_sleepon_update_list(&current->blocker,&ud->rblocker_list);
-			enable_interrupt();
+			enable_interrupts();
 			goto again;
 		}
-		enable_interrupt();
+		enable_interrupts();
 		ud->rx_o++;
 		buf[i++]=ud->rx_buf[ix];
 	}

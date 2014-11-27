@@ -1,7 +1,7 @@
 
 #include <sys.h>
-#include <stm32/stm32f407.h>
-#include <stm32/devices.h>
+#include <stm32f407.h>
+#include <devices.h>
 
 void _exit(int status) {
 }
@@ -92,4 +92,19 @@ void system_init(void) {
 	RCC->CFGR |= RCC_CFGR_SW1;
 
 	while((RCC->CFGR&RCC_CFGR_SWS_MASK)!=(0x2<<RCC_CFGR_SWS_SHIFT));
+}
+
+void init_irq(void) {
+//      NVIC_SetPriority(SVCall_IRQn,0xe);
+	NVIC_SetPriority(SVCall_IRQn,0xf);  /* try to share level with pendsv */
+	NVIC_SetPriority(SysTick_IRQn,0xd);  /* preemptive tics... */
+}
+
+void config_sys_tic(unsigned int ms) {
+	unsigned int perSec=1000/ms;
+	SysTick_Config(SystemCoreClock/perSec);
+}
+
+void board_reboot(void) {
+	NVIC_SystemReset();
 }

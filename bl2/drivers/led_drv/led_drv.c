@@ -30,8 +30,8 @@
  *
  * @(#)led_drv.c
  */
-#include "stm32/stm32f407.h"
-#include "stm32/devices.h"
+#include "stm32f407.h"
+#include "devices.h"
 #include "sys.h"
 #include "led_drv.h"
 

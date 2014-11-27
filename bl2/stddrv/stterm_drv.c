@@ -99,7 +99,7 @@ static void stterm_io_t(void *dum) {
                         tx_out+=len;
                         st_term.tx_len=len;
                 } else {
-			if (tx_in==tx_out) sleep_on(&txoblocker,0,0);
+			if (tx_in==tx_out) sleep_on(&txoblocker);
                 }
         }
 
@@ -124,7 +124,7 @@ static int stterm_read(char *buf, int len) {
 			ch=buf[i++]=rx_buf[ix];
 			if (1) {
 				stterm_putc(ch);
-				sys_wakeup(&txoblocker,0,0);
+				sys_wakeup(&txoblocker);
 			}
 			if (ch=='\n') return i-1;
 		} else {
@@ -139,7 +139,7 @@ static int stterm_write(char *buf, int len) {
 	for(i=0;i<len;i++) {
 		stterm_putc(buf[i]);
 	}
-	sys_wakeup(&txoblocker,0,0);
+	sys_wakeup(&txoblocker);
 	return len;
 }
 

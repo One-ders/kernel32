@@ -1,4 +1,4 @@
-#include "stm32/stm32f407.h"
+#include "stm32f407.h"
 #include "io.h"
 #include "sys.h"
 
@@ -43,14 +43,14 @@ void __attribute__ (( naked )) PendSV_Handler(void) {
 		"1:\n\t"
 		"cpsid i\n\t"
 		"stmfd r2!,{r4-r11}\n\t"
-		"ldr r1,.L1\n\t"
+		"ldr r1,.Label1\n\t"
 		"ldr r1,[r1]\n\t"
 		"str r2,[r1,#4]\n\t"		/* save sp on prev task */
-		"ldr r1,.L2\n\t"
+		"ldr r1,.Label2\n\t"
 		"ldr r2,[r1,#0]\n\t"
 		"bic r2,r2,0x03000000\n\t"
 		"str r2,[r1,#0]\n\t"		/* map out prev task mem */
-		"ldr r1,.L1\n\t"
+		"ldr r1,.Label1\n\t"
 		"str r0,[r1,#0]\n\t"		/* store new task as current */
 		"movs r2,#1\n\t"
 		"str r2,[r0,#16]\n\t"		/* set current state running */
@@ -59,8 +59,8 @@ void __attribute__ (( naked )) PendSV_Handler(void) {
 		"ldmfd sp!,{r4-r11}\n\t"
 		"cpsie i\n\t"
 		"bx lr\n\t"
-		".L1: .word current\n\t"
-		".L2: .word 0xe000eda0\n\t"
+		".Label1: .word current\n\t"
+		".Label2: .word 0xe000eda0\n\t"
 		:
 		:
 		:
@@ -72,7 +72,7 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 	struct task *t;
 	sys_irqs++;
 
-	disable_interrupt();
+	disable_interrupts();
 	while(i<MAX_PRIO) {
 		t=ready[i];
 		if (t) {
@@ -85,7 +85,7 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 	if (t==current) {
 		ASSERT(0);
 	}
-	enable_interrupt();
+	enable_interrupts();
 
 	if (!t) {
 		ASSERT(0);
@@ -108,7 +108,7 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 		ASSERT(!current->next);
 		CLR_TMARK(current);
 		if (prio>4) prio=4;
-		disable_interrupt();
+		disable_interrupts();
 		current->state=TASK_STATE_READY;
 		if (ready[prio]) {
 			ready_last[prio]->next=current;
@@ -116,7 +116,7 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 			ready[prio]=current;
 		}
 		ready_last[prio]=current;
-		enable_interrupt();
+		enable_interrupts();
 	}
 
 	map_next_stack_page((unsigned long int)t->estack,
@@ -177,3 +177,73 @@ void init_switcher(void) {
         *((unsigned int *)0xe000ed14)|=1;
 #endif
 }
+
+void __attribute__ (( naked )) UsageFault_Handler(void) {
+        io_setpolled(1);
+        sys_printf("in usagefault handler\n");
+        ASSERT(0);
+}
+
+void Error_Handler_c(void *sp);
+
+void __attribute__ (( naked )) HardFault_Handler(void) {
+        asm volatile ( "tst lr,#4\n\t"
+                        "ite eq\n\t"
+                        "mrseq r0,msp\n\t"
+                        "mrsne r0,psp\n\t"
+                        "mov r1,lr\n\t"
+                        "mov r2,r0\n\t"
+                        "push {r1-r2}\n\t"
+                        "bl %[Error_Handler_c]\n\t"
+                        "pop {r1-r2}\n\t"
+                        "mov lr,r1\n\t"
+                        "bx lr\n\t"
+                        :
+                        : [Error_Handler_c] "i" (Error_Handler_c)
+                        :
+        );
+}
+
+void Error_Handler_c(void *sp_v) {
+        unsigned int *sp=(unsigned int *)sp_v;
+        io_setpolled(1);
+        sys_printf("\nerrorhandler trap, current=%s@0x%08x sp=0x%08x\n",current->name,current,sp);
+        sys_printf("Value of CFSR register 0x%08x\n", SCB->CFSR);
+        sys_printf("Value of HFSR register 0x%08x\n", SCB->HFSR);
+        sys_printf("Value of DFSR register 0x%08x\n", SCB->DFSR);
+        sys_printf("Value of MMFAR register 0x%08x\n", SCB->MMFAR);
+        sys_printf("Value of BFAR register 0x%08x\n", SCB->BFAR);
+        sys_printf("r0 =0x%08x, r1=0x%08x, r2=0x%08x, r3  =0x%08x\n", sp[0], sp[1], sp[2], sp[3]);
+        sys_printf("r12=0x%08x, LR=0x%08x, PC=0x%08x, xPSR=0x%08x\n", sp[4], sp[5], sp[6], sp[7]);
+
+        ASSERT(0);
+}
+
+void *SVC_Handler_c(unsigned long int *sp);
+
+void __attribute__ (( naked )) SVC_Handler(void) {
+ /*
+ *   * Get the pointer to the stack frame which was saved before the SVC
+ *     * call and use it as first parameter for the C-function (r0)
+ *       * All relevant registers (r0 to r3, r12 (scratch register), r14 or lr
+ *         * (link register), r15 or pc (programm counter) and xPSR (program
+ *           * status register) are saved by hardware.
+ *             */
+
+        asm volatile ( "tst lr,#4\n\t"
+                        "ite eq\n\t"
+                        "mrseq r0,msp\n\t"
+                        "mrsne r0,psp\n\t"
+                        "mov r1,lr\n\t"
+                        "mov r2,r0\n\t"
+                        "push {r1-r2}\n\t"
+                        "bl %[SVC_Handler_c]\n\t"
+                        "pop {r1-r2}\n\t"
+                        "mov lr,r1\n\t"
+                        "bx lr\n\t"
+                        :
+                        : [SVC_Handler_c] "i" (SVC_Handler_c)
+                        :
+        );
+}
+
