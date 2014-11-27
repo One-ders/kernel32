@@ -50,5 +50,5 @@ $(OBJ)/os/init_sect.o: sys_init.c
 $(OBJ)/os/end_sect.o: sys_init.c
 	$(CC) $(CFLAGS) -c -o $@ -DSECTION_END $^
 
-os_clean:
+clean:
 	rm -rf *.o *.a
