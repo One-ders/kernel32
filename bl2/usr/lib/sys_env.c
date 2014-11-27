@@ -30,19 +30,23 @@
  *
  * @(#)sys_cmd.c
  */
-#include "io.h"
-#include "sys.h"
+#include <io.h>
+#include <sys_env.h>
 
 #include <string.h>
 
 extern struct cmd_node my_cmd_node;
 
-struct cmd_node *root_cmd_node=&my_cmd_node;
-static struct cmd_node *current_node=&my_cmd_node;
+struct cmd_node *root_cmd_node=0;
+static struct cmd_node *current_node=0;
 
-int install_cmd_node(struct cmd_node *new,struct cmd_node *parent) {
-	new->next=parent->next;
-	parent->next=new;
+int install_cmd_node(struct cmd_node *new, struct cmd_node *parent) {
+	if (parent) {
+		new->next=parent->next;
+		parent->next=new;
+	} else {
+		root_cmd_node=current_node=new;
+	}
 	return 0;
 }
 
@@ -130,41 +134,3 @@ int argit(char *str, int len, char *argv[16]) {
 	return ac;
 }
 
-int argc;
-char *argv[16];
-
-void sys_mon(void *dum) {
-	char *buf=getSlab_256();
-	int fd=io_open((char *)dum);
-	struct Env env;
-	if (fd<0) return;
-	env.io_fd=fd;
-	io_write(fd,"Starting sys_mon\n",17);
-
-	while(1) {
-		int rc;
-		rc=readline_r(fd,"\n--->",buf,200);
-		if (rc>0) {
-			struct cmd *cmd;
-			if (rc>200) {
-				rc=200;
-			}
-			buf[rc]=0;
-			rc=argit(buf,rc,argv);
-			if (rc<0) {
-				continue;
-			}
-			argc=rc;
-			cmd=lookup_cmd(argv[0],fd);
-			if (cmd) {
-				int rc;
-				fprintf(fd,"\n");
-				rc=cmd->fnc(argc,argv,&env); 
-				if (rc<0) {
-					fprintf(fd,"%s returned %d\n",rc);
-				}
-			}
-		}
-	}
-
-}

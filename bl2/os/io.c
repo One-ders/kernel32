@@ -324,6 +324,7 @@ void init_io(void) {
 	io_push();    /* to force out prints, done before open */
 }
 
+#if 0
 int fprintf(int fd, const char *fmt, ...) {
 	int i=0;
 	va_list ap;
@@ -389,6 +390,7 @@ int fprintf(int fd, const char *fmt, ...) {
 #define DOWN_CURSOR(BUF,Y)	{BUF[0]=0x1b;BUF[1]='[';BUF[2]=Y;BUF[3]='B';BUF[4]=0;}
 #define GET_CURSOR(BUF)		{BUF[0]=0x1b;BUF[1]='[';BUF[2]='6';BUF[3]='n';BUF[4]=0;}
 
+#endif
 #if 0
 static int get_cursor(int fd,unsigned int *x, unsigned int *y) {
 	char buf[10];
@@ -414,6 +416,8 @@ static int get_cursor(int fd,unsigned int *x, unsigned int *y) {
 	return 0;
 }
 #endif
+
+#if 0
 
 static int forw_cursor(int fd) {
 	char buf[10];
@@ -582,3 +586,4 @@ next:;
 	}
 	return 0;
 }
+#endif

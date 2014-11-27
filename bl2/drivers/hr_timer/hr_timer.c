@@ -30,8 +30,8 @@
  *
  * @(#)hr_tiemr.c
  */
-#include <stm32/stm32f407.h>
-#include <stm32/devices.h>
+#include <stm32f407.h>
+#include <devices.h>
 #include <sys.h>
 #include <io.h>
 
@@ -265,14 +265,14 @@ static int hr_timer_set(struct timer_user *u, int val) {
 		return -1;
 	}
 
-	disable_interrupt();
+	disable_interrupts();
 	ct=get_current_tic();
 	u->out_tic=ct+(val-1);
 	u->next=0;
 	timer_link_in(u);
 
 	if (in_irq) {
-		enable_interrupt();
+		enable_interrupts();
 		return 0;
 	}
 	if (tout==u) {
@@ -280,14 +280,14 @@ static int hr_timer_set(struct timer_user *u, int val) {
 			sys_printf("hr_timer_set: should have timeout immideately\n");
 		}
 	}
-	enable_interrupt();
+	enable_interrupts();
 	return 0;
 }
 
 static int hr_timer_clr(struct timer_user *u) {
 	unsigned int left;
 	if (!u->out_tic) return 0;
-	disable_interrupt();
+	disable_interrupts();
 	left=u->out_tic-get_current_tic();
 	u->out_tic=0;
 	timer_link_out(u);
@@ -296,7 +296,7 @@ static int hr_timer_clr(struct timer_user *u) {
 		TIM10->ARR=tic_step;
 		TIM10->CNT=0;
 	}
-	enable_interrupt();
+	enable_interrupts();
 	return left;
 }
 

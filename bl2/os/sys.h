@@ -32,6 +32,7 @@
  */
 
 #include "io.h"
+#include "sys_arch.h"
 
 
 #define offsetof(st, m) __builtin_offsetof(st, m)
@@ -98,14 +99,13 @@ struct task {
 	struct task     *next2;           /* 12-15 */  /* all tasks chain */
 	int             state;            /* 16-19 */
 	int             prio_flags;       /* 20-23 */
-	void            *bp;              /* 24-27 */ /* communication buffer for sleeping context */
-	int             bsize;            /* 28-31 */ /* size of the buffer */
-	void          	*estack;	  /* 32-35 */
-	struct user_fd  *fd_list;         /* 36-39 */ /* open driver list */
-	unsigned int    active_tics;      /* 36-39 */
+	void          	*estack;	  /* 24-27 */
+	struct user_fd  *fd_list;         /* 28-31 */ /* open driver list */
+	unsigned int    active_tics;      /* 32-35 */
 	int		sel_data_valid;
 	struct sel_data sel_data;
 	struct blocker  blocker;
+	int		id;
 };
 
 #define TASK_STATE_IDLE         0
@@ -126,9 +126,12 @@ struct task {
 extern struct task * volatile current;
 extern volatile unsigned int tq_tic;
 
+void start_up(void);
 void init_sys(void);
 void start_sys(void);
 void *getSlab_256(void);
+void *get_page(void);
+void put_page(void *);
 
 /* interface towards arch functions */
 int init_memory_protection(void);
@@ -138,10 +141,16 @@ int map_tmp_stack_page(unsigned long int addr,unsigned int size);
 int map_next_stack_page(unsigned long int new_addr, unsigned long int old_addr);
 int unmap_tmp_stack_page(void);
 int activate_memory_protection(void);
+struct task *create_user_context(void);
+int load_init(struct task *);
 
 void init_switcher(void);
 void switch_on_return(void);
 void switch_now(void);
+
+void init_irq(void);
+void config_sys_tic(unsigned int ms);
+void board_reboot(void);
 
 
 
@@ -152,24 +161,13 @@ int unblock_task(char *name);
 int setprio_task(char *name,int prio);
 
 void *sys_sleep(unsigned int ms);
-void *sys_sleepon(struct blocker *so, void *bp, int bsize, unsigned int *ms_sleep);
-void *sys_wakeup(struct blocker *so, void *bp, int bsize);
+void *sys_sleepon(struct blocker *so, unsigned int *ms_sleep);
+void *sys_wakeup(struct blocker *so);
 
 void *sys_sleepon_update_list(struct blocker *b, struct blocker_list *blocker_list);
 void *sys_wakeup_from_list(struct blocker_list *blocker_list);
 
 int task_sleepable(void);
-
-static inline __attribute__ ((always_inline))
-void disable_interrupt(void) {
-	asm("cpsid i");
-}
-
-static inline __attribute__ ((always_inline))
-void enable_interrupt(void) {
-	asm("cpsie i");
-}
-
 
 #define EV_READ  1
 #define EV_WRITE 2
@@ -198,12 +196,14 @@ typedef int (*DRV_CBH)(struct device_handle *, int event, void *user_ref);
 #define DRV_AGAIN 	11
 #define DRV_INPROGRESS 	12
 
+#if 0
 int io_open(const char *name);
 int io_read(int fd, char *buf, int size);
 int io_write(int fd, const char *buf, int size);
 int io_control(int fd, int cmd, void *b, int size);
 int io_close(int fd);
 int io_select(int nfds, fd_set *rfds, fd_set *wfds, fd_set *stfds, unsigned int *tout);
+#endif
 
 
 #define SVC_CREATE_TASK 1
@@ -252,6 +252,7 @@ struct driver *driver_lookup(char *name);
 
 /********* Cmd funcs ************/
 
+#if 0
 struct Env {
         int io_fd;
 };
@@ -276,6 +277,7 @@ int install_cmd_node(struct cmd_node *, struct cmd_node *parent);
 
 void sys_mon(void *);
 
+#endif
 
 #if 0
 #define INIT_FUNC(a) void *init_func_##a __attribute__((section(".init_funcs"))) = a

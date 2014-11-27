@@ -1,12 +1,12 @@
 
-#include <stm32/busses.h>
-#include <stm32/usart_reg.h>
-#include <stm32/rcc_reg.h>
-#include <stm32/gpio_reg.h>
-#include <stm32/timer_reg.h>
-#include <stm32/power_reg.h>
-#include <stm32/flash_reg.h>
-#include <stm32/iwdg_reg.h>
+#include <busses.h>
+#include <usart_reg.h>
+#include <rcc_reg.h>
+#include <gpio_reg.h>
+#include <timer_reg.h>
+#include <power_reg.h>
+#include <flash_reg.h>
+#include <iwdg_reg.h>
 
 
 #define RCC	((struct RCC *)(AHB1+0x3800))

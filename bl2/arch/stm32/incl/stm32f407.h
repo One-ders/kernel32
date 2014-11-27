@@ -16,7 +16,7 @@ typedef int IRQn_Type;
 
 extern unsigned int SystemCoreClock;
 
-#include <stm32/core_cm4.h>
+#include <core_cm4.h>
 
 #define set_reg(a,b) (*((unsigned int *)a)=(b))
 
