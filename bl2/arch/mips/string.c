@@ -48,20 +48,30 @@ size_t strlen(const char *s) {
 }
 
 int strcmp(const char *s1, const char *s2) {
-	while(*s1&*s2&*s1==*s2) {
+	while((*s1)&&(*s2)&&(*s1==*s2)) {
 		s1++;s2++;
 	}
-	return *s1-*s2;
+	return (*s1)-(*s2);
 }
 
 int strncmp(const char *s1, const char *s2, size_t n) {
 	int i;
 	for(i=0;i<n;i++) {
-		if(*s1&*s2&*s1==*s2){
+		if((*s1)&&(*s2)&&(*s1==*s2)){
 			s1++;s2++;
 		} else {
 			break;
 		}
 	}
-	return *s1-*s2;
+	return (*s1)-(*s2);
+}
+
+char *strcpy(char *d, const char *s) {
+	char *r=d;
+	unsigned char c;
+	do {
+		c=*d=*s;
+		d++;s++;
+	} while (c!=0);
+	return r;
 }

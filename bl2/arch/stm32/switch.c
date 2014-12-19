@@ -53,7 +53,7 @@ void __attribute__ (( naked )) PendSV_Handler(void) {
 		"ldr r1,.Label1\n\t"
 		"str r0,[r1,#0]\n\t"		/* store new task as current */
 		"movs r2,#1\n\t"
-		"str r2,[r0,#16]\n\t"		/* set current state running */
+		"str r2,[r0,#20]\n\t"		/* set current state running */
 		"ldr r0,[r0,#4]\n\t"
 		"mov sp,r0\n\t"			/* switch stack		*/
 		"ldmfd sp!,{r4-r11}\n\t"
@@ -70,9 +70,10 @@ void __attribute__ (( naked )) PendSV_Handler(void) {
 void *PendSV_Handler_c(unsigned long int *save_sp) {
 	int i=0;
 	struct task *t;
+	unsigned long int cpu_flags;
 	sys_irqs++;
 
-	disable_interrupts();
+	cpu_flags=disable_interrupts();
 	while(i<MAX_PRIO) {
 		t=ready[i];
 		if (t) {
@@ -85,7 +86,7 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 	if (t==current) {
 		ASSERT(0);
 	}
-	enable_interrupts();
+	restore_cpu_flags(cpu_flags);
 
 	if (!t) {
 		ASSERT(0);
@@ -108,7 +109,7 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 		ASSERT(!current->next);
 		CLR_TMARK(current);
 		if (prio>4) prio=4;
-		disable_interrupts();
+		cpu_flags=disable_interrupts();
 		current->state=TASK_STATE_READY;
 		if (ready[prio]) {
 			ready_last[prio]->next=current;
@@ -116,7 +117,7 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 			ready[prio]=current;
 		}
 		ready_last[prio]=current;
-		enable_interrupts();
+		restore_cpu_flags(cpu_flags);
 	}
 
 	map_next_stack_page((unsigned long int)t->estack,
@@ -219,7 +220,7 @@ void Error_Handler_c(void *sp_v) {
         ASSERT(0);
 }
 
-void *SVC_Handler_c(unsigned long int *sp);
+void *handle_syscall(unsigned long int *sp);
 
 void __attribute__ (( naked )) SVC_Handler(void) {
  /*
@@ -237,13 +238,12 @@ void __attribute__ (( naked )) SVC_Handler(void) {
                         "mov r1,lr\n\t"
                         "mov r2,r0\n\t"
                         "push {r1-r2}\n\t"
-                        "bl %[SVC_Handler_c]\n\t"
+                        "bl %[handle_syscall]\n\t"
                         "pop {r1-r2}\n\t"
                         "mov lr,r1\n\t"
                         "bx lr\n\t"
                         :
-                        : [SVC_Handler_c] "i" (SVC_Handler_c)
+                        : [handle_syscall] "i" (handle_syscall)
                         :
         );
 }
-

@@ -34,6 +34,7 @@
 #include <string.h>
 #include <assert.h>
 #include <io.h>
+#include <sys.h>
 
 int parse_fmt(const char *fmt, int *field_width, int *zero_fill) {
 	int i=0;

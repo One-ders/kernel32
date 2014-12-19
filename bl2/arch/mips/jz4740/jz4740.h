@@ -418,6 +418,27 @@ do {                                            \
 #define	DMAR_MASK_MASK		0x00ff
 #define	DMAR_MASK_SHIFT		0
 
+
+/*************************************************************************
+ * INTC
+ *************************************************************************/
+#define INTC_BASE	(APB_BUS+0x1000)
+
+#ifndef __ASSEMBLER__
+
+struct INTC_regs {
+	volatile unsigned int icsr;
+	volatile unsigned int icmr;
+	volatile unsigned int icmsr;
+	volatile unsigned int icmcr;
+	volatile unsigned int icpr;
+};
+
+#define INTC ((struct INTC_regs *)INTC_BASE)
+
+#endif
+
+
 /*************************************************************************
  * UART
  *************************************************************************/
@@ -427,7 +448,53 @@ do {                                            \
 
 #define UART_OFF        0x1000
 
-/* Register Offset */
+#ifndef __ASSEMBLER__
+
+struct UART_regs {
+	union {
+		volatile unsigned char urbr;
+		volatile unsigned char uthr;
+		volatile unsigned char udllr;
+		volatile unsigned int  fill1;
+	};
+	union {
+		volatile unsigned char uier;
+		volatile unsigned char udlhr;
+		volatile unsigned int  fill2;
+	};
+	union {
+		volatile unsigned char uiir;
+		volatile unsigned char ufcr;
+		volatile unsigned int  fill3;
+	};
+	union {
+		volatile unsigned char ulcr;
+		volatile unsigned int  fill4;
+	};
+	union {
+		volatile unsigned char umcr;
+		volatile unsigned int  fill5;
+	};
+	union {
+		volatile unsigned char ulsr;
+		volatile unsigned int  fill6;
+	};
+	union {
+		volatile unsigned char umsr;
+		volatile unsigned int  fill7;
+	};
+	union {
+		volatile unsigned char uspr;
+		volatile unsigned int  fill8;
+	};
+	union {
+		volatile unsigned char isr;
+		volatile unsigned int  fill9;
+	};
+};
+
+#endif
+
 #define OFF_RDR         (0x00)  /* R  8b H'xx */
 #define OFF_TDR         (0x00)  /* W  8b H'xx */
 #define OFF_DLLR        (0x00)  /* RW 8b H'00 */
@@ -466,8 +533,8 @@ do {                                            \
  * Define macros for UART_IER
  * UART Interrupt Enable Register
  */
-#define UART_IER_RIE    (1 << 0)        /* 0: receive fifo "full" interrupt disable */
-#define UART_IER_TIE    (1 << 1)        /* 0: transmit fifo "empty" interrupt disable */
+#define UART_IER_RDRIE    (1 << 0)        /* 0: receive fifo "full" interrupt disable */
+#define UART_IER_TDRIE    (1 << 1)        /* 0: transmit fifo "empty" interrupt disable */
 #define UART_IER_RLIE   (1 << 2)        /* 0: receive line status interrupt disable */
 #define UART_IER_MIE    (1 << 3)        /* 0: modem status interrupt disable */
 #define UART_IER_RTIE   (1 << 4)        /* 0: receive timeout interrupt disable */
@@ -490,16 +557,16 @@ do {                                            \
  * Define macros for UART_FCR
  * UART FIFO Control Register
  */
-#define UART_FCR_FE     (1 << 0)        /* 0: non-FIFO mode  1: FIFO mode */
-#define UART_FCR_RFLS   (1 << 1)        /* write 1 to flush receive FIFO */
-#define UART_FCR_TFLS   (1 << 2)        /* write 1 to flush transmit FIFO */
-#define UART_FCR_DMS    (1 << 3)        /* 0: disable DMA mode */
-#define UART_FCR_UUE    (1 << 4)        /* 0: disable UART */
-#define UART_FCR_RTRG   (3 << 6)        /* Receive FIFO Data Trigger */
-#define UART_FCR_RTRG_1 (0 << 6)
-#define UART_FCR_RTRG_4 (1 << 6)
-#define UART_FCR_RTRG_8 (2 << 6)
-#define UART_FCR_RTRG_15        (3 << 6)
+#define UART_FCR_FME    (1 << 0)        /* 0: non-FIFO mode  1: FIFO mode */
+#define UART_FCR_RFRT   (1 << 1)        /* write 1 to flush receive FIFO */
+#define UART_FCR_TFRT   (1 << 2)        /* write 1 to flush transmit FIFO */
+#define UART_FCR_DME    (1 << 3)        /* 0: disable DMA mode */
+#define UART_FCR_UME    (1 << 4)        /* 0: disable UART */
+#define UART_FCR_RDTR   (3 << 6)        /* Receive FIFO Data Trigger */
+#define UART_FCR_RDTR_1 (0 << 6)
+#define UART_FCR_RDTR_4 (1 << 6)
+#define UART_FCR_RDTR_8 (2 << 6)
+#define UART_FCR_RDTR_15 (3 << 6)
 
 /*
  * Define macros for UART_LCR
@@ -526,13 +593,13 @@ do {                                            \
  * Define macros for UART_LSR
  * UART Line Status Register
  */
-#define UART_LSR_DR     (1 << 0)  /* 0: receive FIFO is empty  1: receive data is ready */
+#define UART_LSR_DRY    (1 << 0)  /* 0: receive FIFO is empty  1: receive data is ready */
 #define UART_LSR_ORER   (1 << 1)  /* 0: no overrun error */
 #define UART_LSR_PER    (1 << 2)  /* 0: no parity error */
 #define UART_LSR_FER    (1 << 3)  /* 0; no framing error */
 #define UART_LSR_BRK    (1 << 4)  /* 0: no break detected  1: receive a break signal */
 #define UART_LSR_TDRQ   (1 << 5)  /* 1: transmit FIFO half "empty" */
-#define UART_LSR_TEMT   (1 << 6)  /* 1: transmit FIFO and shift registers empty */
+#define UART_LSR_TEMP   (1 << 6)  /* 1: transmit FIFO and shift registers empty */
 #define UART_LSR_RFER   (1 << 7)  /* 0: no receive error  1: receive error in FIFO mode */
 
 /*
@@ -544,7 +611,7 @@ do {                                            \
 #define UART_MCR_OUT1   (1 << 2)  /* 0: UART_MSR.RI is set to 0 and RI_ input high */
 #define UART_MCR_OUT2   (1 << 3)  /* 0: UART_MSR.DCD is set to 0 and DCD_ input high */
 #define UART_MCR_LOOP   (1 << 4)  /* 0: normal  1: loopback mode */
-#define UART_MCR_MCE    (1 << 7)  /* 0: modem function is disable */
+#define UART_MCR_MDCE   (1 << 7)  /* 0: modem function is disable */
 
 /*
  * Define macros for UART_MSR

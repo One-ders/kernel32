@@ -843,15 +843,15 @@ static int usb_serial_read(struct user_data *ud, char *buf, int len) {
 
 static int usb_serial_putc(struct user_data *ud, int c) {
 	struct usb_data *usb_data=ud->usb_data;
-	disable_interrupts();
+	unsigned long int cpu_flags=disable_interrupts();
 	if ((usb_data->tx_in-usb_data->tx_out)>=TX_BSIZE) {
 		ud->ev_flags|=EV_WRITE;
-		enable_interrupts();
+		restore_cpu_flags(cpu_flags);
 		return -DRV_AGAIN;
 	}
 	usb_data->tx_buf[IX(usb_data->tx_in)]=c;
 	usb_data->tx_in++;
-	enable_interrupts();
+	restore_cpu_flags(cpu_flags);
 	if (!tx_started) return 1;
 	if(!usb_data->txr) {
 		int len=usb_data->tx_in;

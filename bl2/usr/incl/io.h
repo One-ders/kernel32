@@ -30,18 +30,8 @@
  *
  * @(#)io.h
  */
-typedef unsigned int fd_set;
-
-#define FD_SET(a,b)	((*(b))|=(1<<a))
-#define FD_CLR(a,b)	((*(b))&=~(1<<a))
-#define FD_ISSET(a,b)	((*(b))&(1<<a))
-#define FD_ZERO(a)	((*(b))=0)
-
-int io_select(int nfds, fd_set *rfds, fd_set *wfds, fd_set *stfds, unsigned int *tout);
 
 int fprintf(int fd, const char *format, ...);
 #define printf(b...) fprintf(0,b)
-
-unsigned long int strtoul(char *str, char *endp, int base);
 
 int readline_r(int fd, char *prompt, char *buf, int buf_size);

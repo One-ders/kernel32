@@ -6,19 +6,23 @@
 #LDFLAGS=-g -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -fno-builtin
 
 
-all: $(OBJ)/lib $(OBJ)/lib/stm32.o
+all:  stm32.o
 
-$(OBJ)/lib:
-	mkdir $@
+#$(OBJ)/lib $(OBJ)/lib/stm32.o
 
-$(OBJ)/lib/stm32.o: stm32.o
-	cp $^ $@
+#$(OBJ)/lib:
+#	mkdir $@
+
+stm32.o: $(OBJ)/arch/stm32/stm32.o
 
 #
 #bsp.o:	startup_stm32f4xx.o system_stm32f4xx.o usart_drv.o stterm_drv.o
 
-stm32.o: system_init.o mpu.o switch.o
+$(OBJ)/arch/stm32/stm32.o: system_init.o mpu.o switch.o support_funcs.o ffs.S
 	$(CC) $(LDFLAGS) -r -nostdlib -o $@ $^
+
+%.O: %.S
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
 	rm -rf *.o *.a

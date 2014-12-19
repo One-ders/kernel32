@@ -52,11 +52,11 @@ int map_next_stack_page(unsigned long int new_addr, unsigned long int old_addr) 
 	/* new address valid map, old address not valid until */
 	/* RASR is updated, gives exception stacking error */
 	/* current stack is still on old addr */
-	disable_interrupts();
+	unsigned long cpu_flags=disable_interrupts();
 	MPU->RBAR=new_addr|MPU_RBAR_VALID|1;
 	MPU->RBAR=old_addr|MPU_RBAR_VALID|2;
 	MPU->RASR=AP_FULL|CACHE_MEM|(9<<1)|1;
-	enable_interrupts();
+	restore_cpu_flags(cpu_flags);
 	__DMB();
 	return 0;
 }

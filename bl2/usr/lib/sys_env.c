@@ -74,21 +74,21 @@ struct cmd *lookup_cmd(char *name, int fd) {
 	struct cmd *cmd=current_node->cmds;
 	struct cmd_node *cn=current_node->next;
 	while(cmd->name) {
-		if (__builtin_strcmp(cmd->name,name)==0) {
+		if (strcmp(cmd->name,name)==0) {
 			return cmd;
 		}
 		cmd++;
 	}
 	
 	while(cn) {
-		if (__builtin_strcmp(cn->name,name)==0) {
+		if (strcmp(cn->name,name)==0) {
 			current_node=cn;
 			return 0;
 		}
 		cn=cn->next;
 	}
 
-	if (__builtin_strcmp("exit",name)==0) {
+	if (strcmp("exit",name)==0) {
 		struct cmd_node *cn=root_cmd_node->next;
 		struct cmd_node *prevcn=root_cmd_node;
 
@@ -102,7 +102,7 @@ struct cmd *lookup_cmd(char *name, int fd) {
 		}
 		return 0;
 	}
-	fprintf(fd,"cmd %s, not found\n", name);
+	fprintf(fd,"\ncmd %s, not found\n", name);
 	return 0;
 }
 

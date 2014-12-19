@@ -1,6 +1,5 @@
 
 #include <config.h>
-#include <jz4740.h>
 
 void flush_cache_all(void);
 

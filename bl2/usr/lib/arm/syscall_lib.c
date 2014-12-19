@@ -33,7 +33,41 @@
 #include "io.h"
 #include "sys.h"
 
+#define SVC_CREATE_TASK 1
+#define SVC_SLEEP       2
+#define SVC_SLEEP_ON    3
+#define SVC_WAKEUP      4
+#define SVC_IO_OPEN     5
+#define SVC_IO_READ     6
+#define SVC_IO_WRITE    7
+#define SVC_IO_CONTROL  8
+#define SVC_IO_CLOSE    9
+#define SVC_IO_SELECT   10
+#define SVC_KILL_SELF   11
+#define SVC_BLOCK_TASK  12
+#define SVC_UNBLOCK_TASK 13
+#define SVC_SETPRIO_TASK 14
+#define SVC_SETDEBUG_LEVEL 15
+#define SVC_REBOOT	16
+
 #include <string.h>
+
+struct sel_args {
+	int nfds;
+	fd_set *rfds;
+	fd_set *wfds;
+	fd_set *stfds;
+	unsigned int *tout;
+};
+
+struct task_create_args {
+	void *fnc;
+	void *val;
+	unsigned int val_size;
+	int prio;
+	char *name;
+};
+
 
 /*
  *    Task side library calls
@@ -53,14 +87,16 @@
 int svc_create_task(struct task_create_args *ta);
 int svc_sleep(unsigned int);
 int svc_io_open(const char *);
-int svc_io_read(int fd, const char *b, int size);
-int svc_io_write(int fd, const char *b, int size);
+int svc_io_read(int fd, void *b, int size);
+int svc_io_write(int fd, const void *b, int size);
 int svc_io_control(int fd, int cmd, void *b, int s);
 int svc_io_close(int fd);
 int svc_io_select(struct sel_args *sel_args);
 int svc_block_task(char *name);
 int svc_unblock_task(char *name);
 int svc_setprio_task(char *name, int prio);
+int svc_set_debug_level(unsigned int dbglev);
+int svc_reboot(unsigned int cookie);
 
 
 __attribute__ ((noinline)) int svc_create_task(struct task_create_args *ta) {
@@ -88,13 +124,13 @@ __attribute__ ((noinline)) int svc_io_open(const char *name) {
 	return rc;
 }
 
-__attribute__ ((noinline)) int svc_io_read(int fd, const char *b, int size) {
+__attribute__ ((noinline)) int svc_io_read(int fd, void *b, int size) {
 	register int rc asm("r0");
 	svc(SVC_IO_READ);
 	return rc;
 }
 
-__attribute__ ((noinline)) int svc_io_write(int fd, const char *b, int size) {
+__attribute__ ((noinline)) int svc_io_write(int fd, const void *b, int size) {
 	register int rc asm("r0");
 	svc(SVC_IO_WRITE);
 	return rc;
@@ -136,9 +172,19 @@ __attribute__ ((noinline)) int svc_setprio_task(char *name, int prio) {
 	return rc;
 }
 
+__attribute__ ((noinline)) int svc_set_debug_level(unsigned int dbglev) {
+	register int rc asm("r0");
+	svc(SVC_SETDEBUG_LEVEL);
+	return rc;
+}
 
+__attribute__ ((noinline)) int svc_reboot(unsigned int cookie) {
+	register int rc asm("r0");
+	svc(SVC_REBOOT);
+	return rc;
+}
 
-
+/****************************************************************/
 
 int thread_create(void *fnc, void *val, unsigned int val_size,
 		int prio, char *name) {
@@ -169,6 +215,15 @@ int setprio_task(char *name,int prio) {
 	return svc_setprio_task(name,prio);
 }
 
+int set_debug_level(unsigned int dbglev) {
+	return svc_set_debug_level(dbglev);
+}
+
+int _reboot_(unsigned int cookie) {
+	return svc_reboot(cookie);
+}
+
+
 
 
 /**********************************************************************/
@@ -178,11 +233,11 @@ int io_open(const char *drvname) {
 	return svc_io_open(drvname);
 }
 
-int io_read(int fd, char *buf, int size) {
+int io_read(int fd, void *buf, int size) {
 	return svc_io_read(fd,buf,size);
 }
 
-int io_write(int fd, const char *buf, int size) {
+int io_write(int fd, const void *buf, int size) {
 	return svc_io_write(fd,buf,size);
 }
 
