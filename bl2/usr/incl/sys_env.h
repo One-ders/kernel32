@@ -22,3 +22,5 @@ int generic_help_fnc(int argc, char **argv, struct Env *env);
 int install_cmd_node(struct cmd_node *, struct cmd_node *parent);
 struct cmd *lookup_cmd(char *name, int fd);
 
+int argit(char *str, int len, char *argv[16]);
+

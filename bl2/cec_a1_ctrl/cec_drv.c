@@ -34,13 +34,14 @@
 #include <io.h>
 #include <led_drv.h>
 
+#include <hr_timer.h>
+#include <gpio_drv.h>
+
 #include "cec_drv.h"
-#include "hr_timer.h"
-#include "gpio_drv.h"
 
 #define MIN(a,b)	(a<b?a:b)
 
-struct user_fd {
+struct u_fd {
 	struct device_handle dh;
 	DRV_CBH callback;
 	void *userdata;
@@ -49,9 +50,9 @@ struct user_fd {
 };
 
 #define MAX_USERS 4
-static struct user_fd user_fd[MAX_USERS];
+static struct u_fd user_fd[MAX_USERS];
 
-static struct user_fd *get_user_fd() {
+static struct u_fd *get_user_fd() {
 	int i;
 	for(i=0;i<MAX_USERS;i++) {
 		if (!user_fd[i].in_use) {
@@ -737,7 +738,7 @@ got_nack:
 	return 0;
 }
 
-static int send_cec(struct user_fd *u, unsigned char *data, int len) {
+static int send_cec(struct u_fd *u, unsigned char *data, int len) {
 	unsigned int flags;
 	unsigned char addr=data[0];
 	unsigned int uSec;
@@ -780,7 +781,7 @@ static int send_cec(struct user_fd *u, unsigned char *data, int len) {
 /**** Driver API ********************/
 
 static struct device_handle *cec_drv_open(void *inst, DRV_CBH cb, void *udata) {
-	struct user_fd *user_fd=get_user_fd();
+	struct u_fd *user_fd=get_user_fd();
 
 	if (!user_fd) return 0;
 	user_fd->callback=cb;
@@ -790,7 +791,7 @@ static struct device_handle *cec_drv_open(void *inst, DRV_CBH cb, void *udata) {
 }
 
 static int cec_drv_close(struct device_handle *dh) {
-	struct user_fd *u=(struct user_fd *)dh;
+	struct u_fd *u=(struct u_fd *)dh;
 
 	if (u)  {
 		u->in_use=0;
@@ -799,7 +800,7 @@ static int cec_drv_close(struct device_handle *dh) {
 }
 
 static int cec_drv_control(struct device_handle *dh, int cmd, void *arg1, int size) {
-	struct user_fd *u=(struct user_fd *)dh;
+	struct u_fd *u=(struct u_fd *)dh;
 	if (!u) return -1;
 	switch(cmd) {
 		case RD_CHAR: {

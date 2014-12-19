@@ -1,6 +1,5 @@
 
 #include <dev/nand/nand.h>
-#include <jz4740.h>
 #include <config.h>
 
 

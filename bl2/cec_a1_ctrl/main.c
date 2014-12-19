@@ -32,6 +32,7 @@
  */
 
 #include "sys.h"
+#include "sys_env.h"
 #include "io.h"
 #include "cec_drv.h"
 #include "cec.h"
@@ -42,7 +43,7 @@
 
 #include <string.h>
 
-#if DEBUG
+#ifdef DEBUG
 
 int cec_debug;
 
@@ -190,7 +191,9 @@ void cec_gw(void *dum) {
 	cec_init_cec();
 	init_pulse_eight();
 
+#ifdef DEBUG
 	install_cmd_node(&cmn,root_cmd_node);
+#endif
 
 	while(1) do_event();
 }
@@ -208,18 +211,12 @@ void watchdog(void *dum) {
 	}
 }
 
-int main(void) {
 
-	/* initialize the executive */
-	init_sys();
-	init_io();
-
-	/* start the executive */
-	start_sys();
-	printf("In main, starting tasks\n");
-
+//int main(void) {
+int init_cec_a1(void) {
 	/* create some jobs */
 	thread_create(watchdog,0,0,3,"watchdog");
 	thread_create(cec_gw,0,0,1,"cec_gw");
-	while (1);
+//	while (1);
+	return 0;
 }

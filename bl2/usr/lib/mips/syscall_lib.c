@@ -31,6 +31,7 @@
  * @(#)sys_tasklib.c
  */
 #include "io.h"
+#include <sys.h>
 
 #define SVC_CREATE_TASK 1
 #define SVC_SLEEP       2
@@ -46,6 +47,7 @@
 #define SVC_BLOCK_TASK  12
 #define SVC_UNBLOCK_TASK 13
 #define SVC_SETPRIO_TASK 14
+#define SVC_SETDEBUG_LEVEL 15
 
 
 #include <string.h>
@@ -88,14 +90,15 @@ struct task_create_args {
 int svc_create_task(struct task_create_args *ta);
 int svc_sleep(unsigned int);
 int svc_io_open(const char *);
-int svc_io_read(int fd, const char *b, int size);
-int svc_io_write(int fd, const char *b, int size);
+int svc_io_read(int fd, void *b, int size);
+int svc_io_write(int fd, const void *b, int size);
 int svc_io_control(int fd, int cmd, void *b, int s);
 int svc_io_close(int fd);
 int svc_io_select(struct sel_args *sel_args);
 int svc_block_task(char *name);
 int svc_unblock_task(char *name);
 int svc_setprio_task(char *name, int prio);
+int svc_set_debug_level(unsigned int dbglev);
 
 
 __attribute__ ((noinline)) int svc_create_task(struct task_create_args *ta) {
@@ -124,13 +127,13 @@ __attribute__ ((noinline)) int svc_io_open(const char *name) {
 	return rc;
 }
 
-__attribute__ ((noinline)) int svc_io_read(int fd, const char *b, int size) {
+__attribute__ ((noinline)) int svc_io_read(int fd, void *b, int size) {
 	register int rc asm("v0");
 	svc(SVC_IO_READ);
 	return rc;
 }
 
-__attribute__ ((noinline)) int svc_io_write(int fd, const char *b, int size) {
+__attribute__ ((noinline)) int svc_io_write(int fd, const void *b, int size) {
 	register int rc asm("v0");
 	svc(SVC_IO_WRITE);
 	return rc;
@@ -172,6 +175,13 @@ __attribute__ ((noinline)) int svc_setprio_task(char *name, int prio) {
 	return rc;
 }
 
+__attribute__ ((noinline)) int svc_set_debug_level(unsigned int dbglev) {
+	register int rc asm("v0");
+	svc(SVC_SETDEBUG_LEVEL);
+	return rc;
+}
+
+
 
 
 
@@ -205,6 +215,9 @@ int setprio_task(char *name,int prio) {
 	return svc_setprio_task(name,prio);
 }
 
+int set_debug_level(unsigned int dbglev) {
+	return svc_set_debug_level(dbglev);
+}
 
 
 /**********************************************************************/
@@ -214,11 +227,11 @@ int io_open(const char *drvname) {
 	return svc_io_open(drvname);
 }
 
-int io_read(int fd, char *buf, int size) {
+int io_read(int fd, void *buf, int size) {
 	return svc_io_read(fd,buf,size);
 }
 
-int io_write(int fd, const char *buf, int size) {
+int io_write(int fd, const void *buf, int size) {
 	return svc_io_write(fd,buf,size);
 }
 

@@ -1,4 +1,5 @@
 
+#include <io.h>
 #include <string.h>
 #include <ctype.h>
 #include <assert.h>
@@ -18,6 +19,7 @@ void *memmove(void *dst, const void *src, size_t n) {
 				((unsigned char *)src)[i];
 		}
 	}
+	return dst;
 }
 
 void *memcpy(void *dst, const void *src, size_t n) {
@@ -31,6 +33,17 @@ void *memset(void *s, int c, size_t n) {
 	}
 	return s;
 }
+
+int memcmp(const void *s1, const void *s2, size_t n) {
+	int i;
+	for(i=0;i<n;i++) {
+		if ((*((int *)s1))!=(*((int *)s2))) break;
+		s1++;s2++;
+	}
+	return (*((int *)s1)-*((int *)s2));
+}
+
+
 
 char *strchr(const char *s, int c) {
 	c&=0xff;
@@ -56,22 +69,23 @@ char *strcpy(char *d, const char *s) {
 }
 
 int strcmp(const char *s1, const char *s2) {
-	while(*s1&*s2&*s1==*s2) {
-		s1++;s2++;
+	while((*s1)&&(*s2)&&((*s1)==(*s2))) {
+		s1=s1+1;
+		s2=s2+1;
 	}
-	return *s1-*s2;
+	return (*s1)-(*s2);
 }
 
 int strncmp(const char *s1, const char *s2, size_t n) {
 	int i;
 	for(i=0;i<n;i++) {
-		if(*s1&*s2&*s1==*s2){
+		if((*s1)&&(*s2)&&(*s1==*s2)){
 			s1++;s2++;
 		} else {
 			break;
 		}
 	}
-	return *s1-*s2;
+	return (*s1)-(*s2);
 }
 
 

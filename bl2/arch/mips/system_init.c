@@ -1,5 +1,4 @@
 
-#include <config.h>
 #include <sys.h>
 
 void _exit(int status) {
@@ -29,7 +28,7 @@ extern unsigned long __bss_end__;
 void build_free_page_list() {
 	unsigned long int mptr=0x80000000;
 	int i;
-	sys_printf("build_free_page_list\n");
+//	sys_printf("build_free_page_list\n");
 
 	for(i=0;i<(sizeof(free_page_map)/sizeof(unsigned long int));i++) {
 		free_page_map[i]=~0;
@@ -52,10 +51,10 @@ void *get_page(void) {
 		if (free_page_map[i]) {
 			int j=ffsl(free_page_map[i]);
 			if (!j) return 0;
-			sys_printf("found free page att index %x, bit %x\n",
-					i,j);
+//			sys_printf("found free page att index %x, bit %x\n",
+//					i,j);
 			j--;
-			free_page_map[i]&=~j;
+			free_page_map[i]&=~(1<<j);
 			return (void *)(0x80000000 + (i*32*4096) + (j*4096));
 		}
 	}
@@ -101,12 +100,12 @@ unsigned char to_val(char n) {
 int handle_srec_header(unsigned char *r, int len) {
 	char bbuf[len];
 	int i;
-	sys_printf("handle_srec_header: r(%x) len(%x)\n", *r, len);
+//	sys_printf("handle_srec_header: r(%x) len(%x)\n", *r, len);
 	for (i=0;i<(len-1);i++) {
 		bbuf[i]=(to_val(r[i*2])<<4)|to_val(r[(i*2)+1]);
 	}
 	bbuf[len-1]=0;
-	sys_printf("srec header: %s\n", &bbuf[2]);
+//	sys_printf("srec header: %s\n", &bbuf[2]);
 	return 0;
 }
 
@@ -121,7 +120,7 @@ int handle_srec_memline(unsigned char *r, int len) {
 		(to_val(r[4])<<12)|(to_val(r[5])<<8)|
 		(to_val(r[6])<<4)|(to_val(r[7])<<0);
 
-	sys_printf("addr is %x\n",addr);
+//	sys_printf("addr is %x\n",addr);
 	p=(unsigned char *)addr;
 	for (i=4;i<(len-1);i++) {
 		(*p)=(to_val(r[i*2])<<4)|to_val(r[(i*2)+1]);
@@ -151,7 +150,7 @@ int parse_srec(unsigned char *srec_buf, int *ofs) {
 	unsigned char *b_end=srec_buf+4096;
 	
 	if (*ofs) {
-		sys_printf("parse_srec: got ofs %d\n", *ofs);
+//		sys_printf("parse_srec: got ofs %d\n", *ofs);
 		b_start=srec_buf;
 		memcpy(&sbuf[*ofs],srec_buf,255-*ofs);
 		srec_buf=sbuf;
@@ -168,7 +167,7 @@ again:
 	len=(to_val(srec_buf[2])<<4)|to_val(srec_buf[3]);
 	if (((srec_buf+(len*2)+4))>=b_end) {
 		*ofs=b_end-srec_buf;
-		sys_printf("parse_srec: premature end of payload buf, ofs=%d\n",*ofs);
+//		sys_printf("parse_srec: premature end of payload buf, ofs=%d\n",*ofs);
 		memcpy(sbuf,srec_buf,b_end-srec_buf);
 		return 1;
 	}
@@ -183,8 +182,8 @@ again:
 		case '7':
 			handle_srec_start_addr(r,len);
 			return 0;
-		default:
-			sys_printf("srec type yeahh %d\n", type);
+		default:;
+//			sys_printf("srec type yeahh %d\n", type);
 	}
 	if (b_start&&srec_buf!=b_start) {
 		srec_buf=b_start-*ofs;
@@ -194,13 +193,15 @@ again:
 	srec_buf+=((len*2)+4+2); /* payload len + 'S' + type + len + crlf */
 	if (srec_buf>=(b_end-4)) {
 		*ofs=b_end-srec_buf;
-		sys_printf("parse_srec: premature end of header buf, ofs %d\n",*ofs);
+//		sys_printf("parse_srec: premature end of header buf, ofs %d\n",*ofs);
 		memcpy(sbuf,srec_buf,b_end-srec_buf);
 		return 1;
 	}
 	goto again;
 	return 0;
 }
+
+extern unsigned long int *curr_pgd;
 
 int load_init(struct task *t) {
 	unsigned char buf[5096];
@@ -211,15 +212,17 @@ int load_init(struct task *t) {
 	nand_pos=(nand_pos+4095)&~4095; /* align up to nearest 4k pos */
 	nand_pos+=4096;			/* skip ipl loader */
 	
-	sys_printf("nand_pos = %d\n", nand_pos);
+//	sys_printf("nand_pos = %d\n", nand_pos);
 
+	curr_pgd=t->pgd;  /* repoint page table directory while loading */
 	while(1) {
 		nand_load(nand_pos,4096,buf);
-		sys_printf("read 4k nand\n");
+//		sys_printf("read 4k nand\n");
 		if (!parse_srec(buf,&ofs)) {
 			break;
 		}
 		nand_pos+=4096;
 	}
+	curr_pgd=current->pgd;  /* restore page table direcotry */
 	return 0;
 }
