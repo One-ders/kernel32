@@ -41,6 +41,11 @@ unsigned long int disable_interrupts(void) {
 
 static inline __attribute__ ((always_inline))
 void enable_interrupts(void) {
+	__asm__ __volatile__ (	"cpsie\ti\n\t" );
+}
+
+static inline __attribute__ ((always_inline))
+void clear_all_interrupts(void) {
 	unsigned long int dum;
 	__asm__ __volatile__ (	"cpsie\ti\n\t"
 				"and\t%0,%0,#0\n\t"

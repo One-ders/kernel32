@@ -128,6 +128,7 @@ void TIM1_UP_TIM10_IRQHandler(void) {
 	int rc;
 	int i;
 
+	enable_interrupts();
 	if (TIM10->CNT>0) {
 		sys_printf("took %d to get irq\n", TIM10->CNT);
 	}

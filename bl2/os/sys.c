@@ -168,6 +168,8 @@ void SysTick_Handler(void) {
 	tq_tic++;
 	tqp=&tq[tq_tic%1024];
 
+	enable_interrupts();
+
 #if 0
 	if (!(sys_irqs%1000)) {
 		sys_printf("sys_tic: current %x\n",current);
@@ -1273,7 +1275,7 @@ void start_sys(void) {
 	}
 	ready_last[GET_PRIO(t)]=t;
 	sys_printf("leaving start_sys: got task ptr %x\n", t);
-	enable_interrupts();
+	clear_all_interrupts();
 	switch_on_return();
 	
 //	thread_create(sys_mon,"usart0",0,3,"sys_mon");
