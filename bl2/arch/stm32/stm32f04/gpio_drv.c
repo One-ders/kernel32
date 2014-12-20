@@ -101,6 +101,7 @@ static unsigned int get_user(struct pin_data **pdpptr) {
 /*************** The Irqers *************************/
 
 void EXTI0_IRQHandler(void) {
+	enable_interrupts();
 	if (exti2pd[0]) {
 		if (exti2pd[0]->callback) {
 			exti2pd[0]->callback(&exti2pd[0]->dh,EV_STATE,exti2pd[0]->userdata);
@@ -110,6 +111,7 @@ void EXTI0_IRQHandler(void) {
 }
 
 void EXTI1_IRQHandler(void) {
+	enable_interrupts();
 	if (exti2pd[1]) {
 		if (exti2pd[1]->callback) {
 			exti2pd[1]->callback(&exti2pd[1]->dh,EV_STATE,exti2pd[1]->userdata);
@@ -119,6 +121,7 @@ void EXTI1_IRQHandler(void) {
 }
 
 void EXTI2_IRQHandler(void) {
+	enable_interrupts();
 	if (exti2pd[2]) {
 		if (exti2pd[2]->callback) {
 			exti2pd[2]->callback(&exti2pd[2]->dh,EV_STATE,exti2pd[2]->userdata);
@@ -128,6 +131,7 @@ void EXTI2_IRQHandler(void) {
 }
 
 void EXTI3_IRQHandler(void) {
+	enable_interrupts();
 	if (exti2pd[3]) {
 		if (exti2pd[3]->callback) {
 			exti2pd[3]->callback(&exti2pd[3]->dh,EV_STATE,exti2pd[3]->userdata);
@@ -137,6 +141,7 @@ void EXTI3_IRQHandler(void) {
 }
 
 void EXTI4_IRQHandler(void) {
+	enable_interrupts();
 	if (exti2pd[4]) {
 		if (exti2pd[4]->callback) {
 			exti2pd[4]->callback(&exti2pd[4]->dh,EV_STATE,exti2pd[4]->userdata);
@@ -146,11 +151,13 @@ void EXTI4_IRQHandler(void) {
 }
 
 void EXTI9_5_IRQHandler(void) {
+	enable_interrupts();
 	sys_printf("exti9_5_irq\n");
 	exti_regs->pr=0x03e0;
 }
 
 void EXTI15_10_IRQHandler(void) {
+	enable_interrupts();
 	sys_printf("exti15_10_irq\n");
 	exti_regs->pr=0xfc00;
 }

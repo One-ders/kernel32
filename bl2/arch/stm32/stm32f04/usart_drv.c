@@ -30,8 +30,8 @@
  *
  * @(#)usart_drv.c
  */
-#include "sys.h"
-#include "io.h"
+#include <sys.h>
+#include <io.h>
 #include <devices.h>
 #include <stm32f407.h>
 
@@ -101,6 +101,8 @@ static int usart_putc(struct user_data *u, int c);
 
 void USART3_IRQHandler(void) {
 	unsigned int st=USART3->SR;
+
+	enable_interrupts();
 
 	if (st&USART_SR_LBD) {
 		usart_data0.chip_dead=1;
