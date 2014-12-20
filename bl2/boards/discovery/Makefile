@@ -1,6 +1,7 @@
 
 TOP:=$(shell pwd)/../..
 OBJ:=$(TOP)/boards/discovery/obj
+GCC_BASE:=$(shell dirname `which arm-none-eabi-gcc`)/..
 
 export AS:=arm-none-eabi-as
 export CC:=arm-none-eabi-gcc
@@ -9,7 +10,7 @@ export OBJCOPY:=arm-none-eabi-objcopy
  
 CFLAGS=-I. -I$(TOP)/incl -I$(TOP)/boards/discovery -I$(TOP)/arch/stm32 -I$(TOP)/arch/stm32/incl -g -O2 -DDEBUG -Wall -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi=soft -fno-builtin
 
-CFLAGS_USR:=-I$(TOP)/usr/incl -I/opt/cross/lib/gcc/arm-none-eabi/4.8.3/include -g -Os -DDEBUG -fno-builtin -ffreestanding -nostdinc -Wall -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi=soft -fno-builtin
+CFLAGS_USR:=-I$(TOP)/usr/incl -I$(GCC_BASE)/lib/gcc/arm-none-eabi/4.8.3/include -g -Os -DDEBUG -fno-builtin -ffreestanding -nostdinc -Wall -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi=soft -fno-builtin
 
 #LDFLAGS=-g -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi=hard -mfpu=fpv4-sp-d16 -fno-builtin
 LDFLAGS=-g -T./stm32_flash.ld -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -fno-builtin -nostartfiles
