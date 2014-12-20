@@ -238,6 +238,7 @@ void __attribute__ (( naked )) SVC_Handler(void) {
                         "mov r1,lr\n\t"
                         "mov r2,r0\n\t"
                         "push {r1-r2}\n\t"
+			"cpsie i\n\t"
                         "bl %[handle_syscall]\n\t"
                         "pop {r1-r2}\n\t"
                         "mov lr,r1\n\t"
