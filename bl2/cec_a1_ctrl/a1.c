@@ -115,6 +115,15 @@ static int handle_cec_data(unsigned char *buf, int size) {
 		case CEC_OPCODE_GIVE_SYSTEM_AUDIO_MODE_STATUS:
 			cec_send_system_audio_mode_status(A1_LINK,(5<<4)|fromAddr, 1);
 			break;
+		case CEC_OPCODE_SYSTEM_AUDIO_MODE_REQUEST:
+			if (size==4) {
+				a1_power_on();
+				cec_send_system_audio_mode_set(A1_LINK,(5<<4)|fromAddr,1);
+			} else {
+				a1_power_off();
+				cec_send_system_audio_mode_set(A1_LINK,(5<<4)|fromAddr,0);
+			}
+			break;
 		case CEC_OPCODE_ROUTING_CHANGE:
 			break;
 		case CEC_OPCODE_GIVE_OSD_NAME:
