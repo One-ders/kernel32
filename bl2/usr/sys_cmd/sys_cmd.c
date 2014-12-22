@@ -38,14 +38,6 @@
 #include <procps.h>
 #include <devls.h>
 
-int argc;
-char *argv[16];
-
-static int hej_fnc(int argc, char **arv, struct Env *env) {
-	fprintf(env->io_fd, "someone said hej\n");
-	return 1;
-};
-
 struct dents {
 	char name[32];
 };
@@ -205,10 +197,9 @@ static int setprio_fnc(int argc, char **argv, struct Env *env) {
 }
 
 static int reboot_fnc(int argc, char **argv, struct Env *env) {
-	int rc;
 	fprintf(env->io_fd, "rebooting\n\n\n");
 	sleep(100);
-	rc=_reboot_(0x5a5aa5a5);
+	_reboot_(0x5a5aa5a5);
 	return 0;
 }
 
@@ -234,25 +225,32 @@ void init_blinky(void);
 
 void init_cec_a1();
 
-void main(int argc, char **dum) {
+void main(void *dum) {
 	char buf[256];
-	int fd=io_open(dum[0]);
+	int fd=io_open(dum);
 	struct Env env;
+	static int u_init=0;
 	if (fd<0) return;
 
 	env.io_fd=fd;
 	io_write(fd,"Starting sys_mon\n",17);
 
-	install_cmd_node(&my_cmd_node,0);
-	init_blinky();
+	if (!u_init) {
+		u_init=1;
+		install_cmd_node(&my_cmd_node,0);
+		init_blinky();
+		init_cec_a1();
+//		thread_create(main,"usb_serial0",12,1,"sys_mon:usb");
+	}
 
-	init_cec_a1();
 
 	while(1) {
 		int rc;
 		rc=readline_r(fd,"\n--->",buf,200);
 		if (rc>0) {
 			struct cmd *cmd;
+			int argc;
+			char *argv[16];
 			if (rc>200) {
 				rc=200;
 			}
