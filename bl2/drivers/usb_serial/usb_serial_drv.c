@@ -432,6 +432,7 @@ static void wakeup_users(unsigned int ev) {
 		if ((udata[i].usb_data)&&
 			(udata[i].callback) &&
 			(rev=udata[i].ev_flags&ev)) {
+			udata[i].ev_flags&=~ev;
 			udata[i].callback(&udata[i].dh,rev,udata[i].userdata);
 		}
 	}
@@ -643,9 +644,7 @@ static unsigned char class_data_in(void *core, unsigned char epnum) {
 	} else {
 	   ud->txr=0;
 	}
-
 	wakeup_users(EV_WRITE);
-
 	return 0;
 }
 
@@ -671,7 +670,6 @@ static unsigned char class_data_out(void *core, unsigned char epnum) {
 				rx_buf[epnum],8);
 
 	wakeup_users(EV_READ);
-
 	return 0;
 }
 
@@ -833,7 +831,9 @@ static int usb_serial_read(struct user_data *ud, char *buf, int len) {
 			if (!i) {
 				ud->ev_flags|=EV_READ;
 				return -DRV_AGAIN;
-			} else return i;
+			} else {
+				return i;
+			}
 		}
 		buf[i++]=usb_data->rx_buf[ix];
 		usb_data->rx_out++;
@@ -865,7 +865,7 @@ static int usb_serial_putc(struct user_data *ud, int c) {
 static int usb_serial_write(struct user_data *ud, char *buf, int len) {
 	int i;
 	for(i=0;i<len;i++) {
-		usb_serial_putc(ud,buf[i]);
+		if (usb_serial_putc(ud,buf[i])<0) return i;
 	}
 	return len;
 }

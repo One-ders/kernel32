@@ -46,77 +46,6 @@ struct task main_task = { "init_main", (void *)(0x20020000-0x1000), 256, 0, 0, 1
 struct task *troot =&main_task;
 struct task * volatile current = &main_task;
 
-#if 0
-struct Slab_256 {
-	unsigned char mem[256];
-};
-
-struct Slab_1024 {
-	unsigned char mem[1024];
-};
-
-extern unsigned char __bss_end__[];
-struct Slab_256 *slab_256=(struct Slab_256 *)__bss_end__;
-unsigned int free_slab_256=0;
-
-#define MSTACK (0x20020000)
-#define MSTACK_SIZE (0x400)
-
-struct Slab_1024 *slab_1024=(struct Slab_1024 *)(MSTACK-(MSTACK_SIZE*16));
-
-unsigned int max_slab_256;
-unsigned int max_slab_1024=16;
-unsigned int free_slab_1024;
-
-#endif
-
-
-void *getSlab_256(void) {
-#if 0
-	if (free_slab_256<max_slab_256) {
-		return &slab_256[free_slab_256++];
-	}
-#endif
-	return 0;
-}
-
-void *getSlab_1024(void) {
-#if 0
-	if (free_slab_1024<(max_slab_1024-1)) {
-		return &slab_1024[free_slab_1024++];
-	}
-#endif
-	return 0;
-};
-
-struct task *tpool;
-unsigned int tpool_free;
-
-struct task *get_task() {
-
-again:
-	if (tpool_free) {
-		struct task *tmp=tpool;
-		tpool_free--;
-		tpool=tmp->next2;
-		__builtin_memset(tmp,0,sizeof(struct task));
-		return tmp;
-	} else {
-		struct task *tmp=getSlab_256();
-		int num=256/sizeof(struct task);
-		int i;
-		if (!tmp) return 0;
-		tmp[0].next2=0;
-		for(i=1;i<num;i++) {
-			tmp[i-1].next2=&tmp[i];
-		}
-		tmp[i].next2=0;
-		tpool_free=num;
-		tpool=tmp;
-		goto again;
-	}
-	return 0;
-}
 
 struct task *t_array[256];
 
@@ -138,8 +67,6 @@ int allocate_task_id(struct task *t) {
         }
         return -1;
 }
-
-
 
 struct task *lookup_task_for_name(char *task_name) {
 	struct task *t=troot;
@@ -323,19 +250,26 @@ static int sys_drv_wakeup(struct device_handle *dh, int ev, void *user_ref) {
 		task->sel_data.nfds++;
 	}
 
+	if (task->blocker.ev!=ev) {
+		sys_printf("sys_drv_wakeup: masked ev\n");
+		return 0;
+	}
+
 	if (task==current) {
 		current->blocker.wake=1;
 		if (current->blocker.wakeup_tic) {
 			sys_timer_remove(&current->blocker);
 		}
 //		sys_printf("sys_drv_wakeup: wake up current\n");
-		goto out_err;
+		goto out;
+	} else {
+//		sys_printf("sys_drv_wakeup: wake up %s\n", task->name);
 	}
 
 	if (task->state!=TASK_STATE_RUNNING) {
 		sys_wakeup(&task->blocker);
 	}
-out_err:
+out:
 	return 0;
 }
 
@@ -350,7 +284,6 @@ void *handle_syscall(unsigned long int *svc_sp) {
 	 */
 
 	svc_number=get_svc_number(svc_sp);
-//	sys_printf("syscall_handler: svc %x\n", svc_number);
 	switch(svc_number) {
 		case SVC_CREATE_TASK: {
 			struct task_create_args *tca=
@@ -385,28 +318,8 @@ void *handle_syscall(unsigned long int *svc_sp) {
 				memcpy(uval,tca->val,tca->val_size);
 				stackp=(unsigned long int *)uval;
 			}
-			setup_return_stack(t,(void *)stackp,(unsigned long int)tca->fnc,0,uval,0);
-#if 0
-			*(--stackp)=0x01000000; 		 // xPSR
-			*(--stackp)=(unsigned long int)tca->fnc;    // r15
-			*(--stackp)=(unsigned long int)0;//svc_kill_self;     // r14
-			*(--stackp)=0;     // r12
-			*(--stackp)=0;     // r3
-			*(--stackp)=0;     // r2
-			*(--stackp)=0;     // r1
-			*(--stackp)=(unsigned long int)uval;    // r0
-////
-			*(--stackp)=0;     // r4
-			*(--stackp)=0;     // r5
-			*(--stackp)=0;     // r6
-			*(--stackp)=0;     // r7
-			*(--stackp)=0;     // r8
-			*(--stackp)=0;     // r9
-			*(--stackp)=0;     // r10
-			*(--stackp)=0;     // r11
+			setup_return_stack(t,(void *)stackp,(unsigned long int)tca->fnc,0,uval,8);
 
-			t->sp=(void *) stackp;
-#endif
 			t->state=TASK_STATE_READY;
 			t->name=tca->name;
 			SET_PRIO(t,tca->prio);
@@ -1037,6 +950,7 @@ void *sys_wakeup(struct blocker *so) {
 	if (so->next2) {
 		sys_printf("sys_wakeup:blocker has next2 link to %x in wakup\n", so->next2);
 	}
+
 	if (so->wakeup_tic) {
 		sys_timer_remove(so);
 	}
@@ -1260,9 +1174,7 @@ void start_sys(void) {
 	stackp=((unsigned long int)t)+4096;
 	stackp=stackp-8;
 	strcpy((void *)stackp,"usart0");
-	*((unsigned int *)(stackp-4))=stackp;
-	stackp-=4;
-	setup_return_stack(t,(void *)stackp,(unsigned long int)__usr_main,0, (void *)1, (void *)stackp);
+	setup_return_stack(t,(void *)stackp,(unsigned long int)__usr_main,0, (void *)stackp, (void *)8);
 	
 
 	t->next2=troot;
@@ -1276,7 +1188,8 @@ void start_sys(void) {
 	ready_last[GET_PRIO(t)]=t;
 	sys_printf("leaving start_sys: got task ptr %x\n", t);
 	clear_all_interrupts();
-	switch_on_return();
+	switch_on_return();  /* will switch in the task on return from next irq */
+	while(1);
 	
 //	thread_create(sys_mon,"usart0",0,3,"sys_mon");
 ////	thread_create(sys_mon,"stterm0",3,"sys_mon");

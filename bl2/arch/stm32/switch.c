@@ -87,6 +87,8 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 		ASSERT(0);
 	}
 	restore_cpu_flags(cpu_flags);
+	// Now interrupts are on again, current task on the way out
+	// may be awaken by pending irq. handle below.
 
 	if (!t) {
 		ASSERT(0);
@@ -100,7 +102,13 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 		/* fall through and set state ready */
 		current->blocker.wake=0;
 		current->state=TASK_STATE_RUNNING;
-//		sys_printf("in pendsv: readying blocked task\n");
+		if (t->prio_flags>current->prio_flags) {
+			CLR_TMARK(current);
+			sys_printf("in pendsv: readying blocked task\n");
+			t->next=ready[(t->prio_flags)&3];
+			ready[t->prio_flags&3]=t;
+			return 0;
+		}
 	}
 	/* Have next, move away current if still here, 
 	   timer and blocker move themselves */
@@ -118,6 +126,9 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 		}
 		ready_last[prio]=current;
 		restore_cpu_flags(cpu_flags);
+		if (t->prio_flags>current->prio_flags) {
+			sys_printf("pendsv: yielding out high prio proc\n");
+		}
 	}
 
 	map_next_stack_page((unsigned long int)t->estack,
