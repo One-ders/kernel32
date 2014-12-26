@@ -36,6 +36,20 @@
 #include <io.h>
 #include <sys.h>
 
+#define TICSPERHOUR	(100*60*60)
+#define TICSPERMIN	(100*60)
+#define TICSPERSEC	(100)
+
+char *ts_format(unsigned int tics, char *buf, int bsize) {
+	unsigned int h=tics/TICSPERHOUR;
+	unsigned int min=(tics-(h*TICSPERHOUR))/TICSPERMIN;
+	unsigned int sec=(tics-((h*TICSPERHOUR)+(min*TICSPERMIN)))/TICSPERSEC;
+	unsigned int msec=(tics-((h*TICSPERHOUR)+(min*TICSPERMIN)+(sec*TICSPERSEC)))*10;
+
+	sprintf(buf,"%d:%02d:%02d.%03d",h,min,sec,msec);
+	return buf;
+}
+
 int parse_fmt(const char *fmt, int *field_width, int *zero_fill) {
 	int i=0;
 	int val=0;
@@ -76,7 +90,7 @@ int fprintf(int fd, const char *fmt, ...) {
 			switch((c=fmt[i++])) {
 				case 's': {
 					char *s=va_arg(ap,char *);
-					int len=io_write(fd,s,__builtin_strlen(s));
+					int len=io_write(fd,s,strlen(s));
 					if ((prepend_num-len)>0) {
 						int j;
 						for(j=0;j<(prepend_num-len);j++) {
@@ -93,13 +107,18 @@ int fprintf(int fd, const char *fmt, ...) {
 				case 'd': {
 					char *s=itoa(va_arg(ap,unsigned int),numericbuf, 16,
 								prepend_zero, prepend_num);
-					io_write(fd,s,__builtin_strlen(s));
+					io_write(fd,s,strlen(s));
 					break;
 				}
 				case 'x': {
 					char *s=xtoa(va_arg(ap,unsigned int),numericbuf, 16,
 							prepend_zero, prepend_num);
-					io_write(fd,s,__builtin_strlen(s));
+					io_write(fd,s,strlen(s));
+					break;
+				}
+				case 't': {
+					char *s=ts_format(get_current_tic(),numericbuf, 16);
+					io_write(fd,s,strlen(s));
 					break;
 				}
 				default: {
@@ -116,6 +135,85 @@ int fprintf(int fd, const char *fmt, ...) {
 	return 0;
 }
 
+int sprintf(char *sbuf, const char *fmt, ...) {
+	int i=0;
+	va_list ap;
+	char numericbuf[16];
+	char *p=sbuf;
+
+	va_start(ap,fmt);
+	while(1) {
+		int c=fmt[i++];
+		if (!c) break;
+		else if (c=='\n') {
+			memcpy(p,"\n\r",2);
+			p=p+2;
+			continue;
+		} else if (c=='%') {
+			int prepend_zero=0, prepend_num=0;
+			i+=parse_fmt(&fmt[i],&prepend_num, &prepend_zero);
+			switch((c=fmt[i++])) {
+				case 's': {
+					char *s=va_arg(ap,char *);
+					int len=strlen(s);
+					memcpy(p,s,strlen(s));
+					p+=len;
+
+					if ((prepend_num-len)>0) {
+						int j;
+						for(j=0;j<(prepend_num-len);j++) {
+							memcpy(p," ",1);
+							p++;
+						}
+					}
+					break;
+				}
+				case 'c': {
+					int gruuk=va_arg(ap, int);
+					memcpy(p,(char *)&gruuk,1);
+					p++;
+					break;
+				}
+				case 'd': {
+					char *s=itoa(va_arg(ap,unsigned int),numericbuf, 16,
+								prepend_zero, prepend_num);
+					int len=strlen(s);
+					memcpy(p,s,len);
+					p+=len;
+					break;
+				}
+				case 'x': {
+					char *s=xtoa(va_arg(ap,unsigned int),numericbuf, 16,
+							prepend_zero, prepend_num);
+					int len=strlen(s);
+					memcpy(p,s,len);
+					p+=len;
+					break;
+				}
+				case 't': {
+					char *s=ts_format(get_current_tic(),numericbuf, 16);
+					int len=strlen(s);
+					memcpy(p,s,len);
+					p+=len;
+					break;
+				}
+				default: {
+					memcpy(p,"%",1);
+					p++;
+					memcpy(p,(char *)&c,1);
+					p++;
+				}
+			}
+		} else {
+			memcpy(p,(char *)&c,1);
+			p++;
+		}
+	}
+	va_end(ap);
+	return p-sbuf;
+}
+
+
 #define SET_CURSOR(BUF,X,Y) {BUF[0]=0x1b;BUF[1]='[';BUF[2]=X;BUF[3]=';';BUF[4]=Y;BUF[5]='H';BUF[6]=0;}
 #define FORW_CURSOR(BUF,X)	{BUF[0]=0x1b;BUF[1]='[';BUF[2]=X;BUF[3]='C';BUF[4]=0;}
 #define BACK_CURSOR(BUF,X)	{BUF[0]=0x1b;BUF[1]='[';BUF[2]=X;BUF[3]='D';BUF[4]=0;}
@@ -129,7 +227,7 @@ static int get_cursor(int fd,unsigned int *x, unsigned int *y) {
 	int col=0;
 
 	GET_CURSOR(buf);
-	io_write(fd,buf,__builtin_strlen(buf));
+	io_write(fd,buf,strlen(buf));
 	io_read(fd,buf,2);
 	while(1) {
 		int rc=io_read(fd,buf,1);
@@ -150,14 +248,14 @@ static int get_cursor(int fd,unsigned int *x, unsigned int *y) {
 static int forw_cursor(int fd) {
 	char buf[10];
 	FORW_CURSOR(buf,1+'0');
-	io_write(fd,buf,__builtin_strlen(buf));
+	io_write(fd,buf,strlen(buf));
 	return 0;
 }
 
 static int back_cursor(int fd) {
 	char buf[10];
 	BACK_CURSOR(buf,1+'0');
-	io_write(fd,buf,__builtin_strlen(buf));
+	io_write(fd,buf,strlen(buf));
 	return 0;
 }
 
@@ -175,7 +273,7 @@ int readline_r(int fd, char *prompt, char *buf, int buf_size) {
 	int tmp_h_ix=h_ix;
 	int state=STATE_C_NORMAL;
 
-	fprintf(fd,prompt,__builtin_strlen(prompt));
+	fprintf(fd,prompt,strlen(prompt));
 
 	while (1) {
 		int ch=0;
@@ -263,7 +361,7 @@ handle_arrow:
 						bix--;
 					}
 					__builtin_strcpy(buf,history[tmp_h_ix&0x7]);
-					bix=__builtin_strlen(buf);
+					bix=strlen(buf);
 					buf[bix]=0;
 					bix_max=bix;
 					io_write(fd,buf,bix);
@@ -282,7 +380,7 @@ handle_arrow:
 						bix--;
 					}
 					__builtin_strcpy(buf,history[tmp_h_ix&0x7]);
-					bix=__builtin_strlen(buf);
+					bix=strlen(buf);
 					buf[bix]=0;
 					bix_max=bix;
 					io_write(fd,buf,bix);

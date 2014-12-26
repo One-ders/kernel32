@@ -767,6 +767,10 @@ check_resched:
 			set_svc_ret(svc_sp,-1);
 			return 0;
 		}
+		case SVC_GETTIC: {
+			set_svc_ret(svc_sp,tq_tic);
+			return 0;
+		}
 		default:
 			sys_printf("bad syscall %x\n",svc_number);
 			set_svc_ret(svc_sp,-1);
@@ -849,7 +853,7 @@ void *sys_sleepon(struct blocker *so, unsigned int *tout) {
 	restore_cpu_flags(cpu_flags);
 	CLR_TMARK(current);
 
-	if (tout) {
+	if (tout&&*tout) {
 		current->state=TASK_STATE_TIMER;
 		sys_timer(so,*tout);
 	} else {
@@ -859,7 +863,7 @@ void *sys_sleepon(struct blocker *so, unsigned int *tout) {
 	DEBUGP(DLEV_SCHED,"sys sleepon %x task: %s\n", so, current->name);
 	switch_now();
 
-	if (tout) {
+	if (tout&&*tout) {
 		if (so->wakeup_tic!=tq_tic) {
 			*tout=(so->wakeup_tic-tq_tic)*10;
 		}

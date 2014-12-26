@@ -11,7 +11,7 @@ SYS_LIB=$(OBJ)/lib
 #LDFLAGS=-g -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -fno-builtin
 
 
-drv_all: $(SYS_INC) $(SYS_INC)/$(DRV_NAME).h $(SYS_LIB) $(SYS_LIB)/$(DRV_NAME).o
+all: $(SYS_INC) $(SYS_INC)/$(DRV_NAME).h $(SYS_LIB) $(SYS_LIB)/$(DRV_NAME).o
 
 $(SYS_INC):
 	mkdir $@

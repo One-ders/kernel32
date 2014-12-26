@@ -60,6 +60,7 @@ static int get_procdata(int fd, char *name, struct Env *env) {
 	struct procdata pd;
 	int rc;
 	int fd2;
+
 	if ((fd2=io_control(fd, DYNOPEN, name, 0))<0) {
 		fprintf(env->io_fd, "could not open proc data\n");
 		return -1;
@@ -91,6 +92,7 @@ static int ps_fnc(int argc, char **argv, struct Env *env) {
 		return 0;
 	}
 
+	fprintf(env->io_fd, "uptime: %t, current tic: %d\n", get_current_tic());
 	while(i<rc) {
 		get_procdata(fd,dents[i].name,env);
 		i++;
