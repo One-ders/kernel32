@@ -201,6 +201,27 @@ unsigned long int strtoul(char *str, char *endp, int base) {
 	return val;
 }
 
+char *ts_format(unsigned int tic, char *sbuf, int blen) {
+	unsigned int min=tic/6000;
+	unsigned int sec=(tic-(min*6000))/100;
+	unsigned int msec=(tic-((min*6000)+(sec*100)))*10;
+	char *buf=sbuf;
+	int len;
+
+//char *itoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_num) {
+
+	itoa(min,buf,blen,0,3);
+	len=strlen(buf);
+	buf[len]=':';
+	buf+=(len+1);
+	blen-=(len+1);
+	itoa(sec,buf,blen,0,2);
+	buf[2]='.';
+	buf+=3;
+	blen-=3;
+	itoa(msec,buf,blen,0,2);
+	return sbuf;
+}
 
 
 int parse_fmt(const char *fmt, int *field_width, int *zero_fill) {
@@ -308,6 +329,10 @@ int sys_printf(const char *fmt, ...) {
 							prepend_zero, prepend_num);
 					io_add_str(s);
 					break;
+				}
+				case 't': {
+					char *s=ts_format(tq_tic,numericbuf, 16);
+					io_add_str(s);
 				}
 				default: {
 					io_add_c('%');

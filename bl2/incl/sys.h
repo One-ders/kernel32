@@ -47,12 +47,12 @@
 #define DLEV_SCHED 4
 extern int dbglev;
 extern int sys_printf(const char *format, ...);
-#define DEBUGP(lev,a ...) { if (dbglev>lev) sys_printf(a);}
+#define DEBUGP(lev,a ...) { if (dbglev>lev) { sys_printf("%t: "); sys_printf(a);}}
 #else
 #define DEBUGP(lev,a ...)
 #endif
 
-#define ASSERT(a) { if (!(a)) {io_setpolled(1); sys_printf("assert stuck\n");} while (!(a)) ; }
+#define ASSERT(a) { if (!(a)) {io_setpolled(1); sys_printf("%t: assert stuck\n");} while (!(a)) ; }
 
 extern unsigned int sys_irqs;
 extern struct task *volatile ready[5];
@@ -248,6 +248,7 @@ struct dent {
 #define SVC_SETPRIO_TASK 14
 #define SVC_SETDEBUG_LEVEL 15
 #define SVC_REBOOT	16
+#define SVC_GETTIC	17
 
 struct task_create_args {
 	void *fnc;
@@ -277,35 +278,6 @@ struct driver {
 int driver_publish(struct driver *);
 int driver_unpublish(struct driver *);
 struct driver *driver_lookup(char *name);
-
-/********* Cmd funcs ************/
-
-#if 0
-struct Env {
-        int io_fd;
-};
-
-typedef int (*cmdFunc)(int,char **, struct Env *);
-
-struct cmd {
-        char *name;
-        cmdFunc fnc;
-};
-
-struct cmd_node {
-	char *name;
-	struct cmd *cmds;
-	struct cmd_node *next;
-};
-
-extern struct cmd_node *root_cmd_node;
-
-int generic_help_fnc(int argc, char **argv, struct Env *env);
-int install_cmd_node(struct cmd_node *, struct cmd_node *parent);
-
-void sys_mon(void *);
-
-#endif
 
 #if 0
 #define INIT_FUNC(a) void *init_func_##a __attribute__((section(".init_funcs"))) = a

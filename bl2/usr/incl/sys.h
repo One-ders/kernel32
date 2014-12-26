@@ -17,6 +17,7 @@ int unblock_task(char *name);
 int setprio_task(char *name,int prio);
 int set_debug_level(unsigned int dbglev);
 int _reboot_(unsigned int cookie);
+unsigned int get_current_tic(void);
 
 int io_open(const char *drvname);
 int io_read(int fd, void *buf, int size);

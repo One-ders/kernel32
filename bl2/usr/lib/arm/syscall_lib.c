@@ -49,6 +49,7 @@
 #define SVC_SETPRIO_TASK 14
 #define SVC_SETDEBUG_LEVEL 15
 #define SVC_REBOOT	16
+#define SVC_GETTIC	17
 
 #include <string.h>
 
@@ -97,6 +98,7 @@ int svc_unblock_task(char *name);
 int svc_setprio_task(char *name, int prio);
 int svc_set_debug_level(unsigned int dbglev);
 int svc_reboot(unsigned int cookie);
+unsigned int svc_gettic(void);
 
 
 __attribute__ ((noinline)) int svc_create_task(struct task_create_args *ta) {
@@ -184,6 +186,13 @@ __attribute__ ((noinline)) int svc_reboot(unsigned int cookie) {
 	return rc;
 }
 
+__attribute__ ((noinline)) unsigned int svc_gettic(void) {
+	register int rc asm("r0");
+	svc(SVC_GETTIC);
+	return rc;
+}
+
+
 /****************************************************************/
 
 int thread_create(void *fnc, void *val, unsigned int val_size,
@@ -222,6 +231,11 @@ int set_debug_level(unsigned int dbglev) {
 int _reboot_(unsigned int cookie) {
 	return svc_reboot(cookie);
 }
+
+unsigned int get_current_tic(void) {
+	return svc_gettic();
+}
+
 
 
 

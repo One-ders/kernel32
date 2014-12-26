@@ -35,7 +35,9 @@ myCore: os stm32f04 stm32 stddrv usb_serial stmusb hr_timer usr.drv.o usr.bin.o
 				$(OBJ)/os/end_sect.o \
 				$(OBJ)/usr/usr.bin.o
 
-usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/usr/blinky/blinky.o $(OBJ)/cec_a1_ctrl/cec_a1_ctrl.o
+#usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/usr/blinky/blinky.o $(OBJ)/cec_a1_ctrl/cec_a1_ctrl.o
+
+usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/usr/blinky/blinky.o $(OBJ)/cec_a1_mon/cec_a1_mon.o
 	$(LD) -o $(OBJ)/usr/usr.bin.o $(LDFLAGS_USR) $^
 	$(OBJCOPY) --prefix-symbols=__usr_ $(OBJ)/usr/usr.bin.o
 
@@ -67,12 +69,20 @@ $(OBJ)/usr/blinky: $(TOP)/usr/blinky
 	mkdir -p $@
 	lndir $< $@
 
+$(OBJ)/cec_a1_mon/cec_a1_mon.o: $(OBJ)/usr/lib/usrlib.o $(OBJ)/cec_a1_mon
+	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $(OBJ)/cec_a1_mon
+
+$(OBJ)/cec_a1_mon: $(TOP)/cec_a1_mon
+	mkdir -p $@
+	lndir $< $@
+
 $(OBJ)/cec_a1_ctrl/cec_a1_ctrl.o: $(OBJ)/usr/lib/usrlib.o $(OBJ)/cec_a1_ctrl
 	CFLAGS="$(CFLAGS_USR)" CFLAGS_DRV="$(CFLAGS)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $(OBJ)/cec_a1_ctrl
 
 $(OBJ)/cec_a1_ctrl: $(TOP)/cec_a1_ctrl
 	mkdir -p $@
 	lndir $< $@
+
 
 usr.drv.o: $(OBJ)/cec_a1_ctrl/cec_a1_ctrl.o
 	$(LD) -r -o $(OBJ)/usr/usr.drv.o $(OBJ)/cec_a1_ctrl/cec_a1_drivers.o
