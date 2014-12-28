@@ -76,7 +76,7 @@ struct timer_user {
 
 #define TIMERS	8
 
-static unsigned int current_tic;
+static unsigned int current_hr_tic;
 static unsigned int tic_step;
 static int in_irq;
 
@@ -101,13 +101,13 @@ int get_user(struct timer_user **ttu) {
 	return -1;
 }
 
-static unsigned int get_current_tic() {
-	return current_tic+TIM10->CNT;
+static unsigned int get_current_hr_tic() {
+	return current_hr_tic+TIM10->CNT;
 }
 
 static int adj_hwtimer() {
 	if (tout) {
-		int ct=get_current_tic();
+		int ct=get_current_hr_tic();
 		int n_tics_to_out=((int)tout->out_tic)-((int)ct);
 		if (n_tics_to_out<=0) {
 			return ct;
@@ -116,7 +116,7 @@ static int adj_hwtimer() {
 			tic_step=n_tics_to_out;
 			TIM10->ARR=tic_step;
 			TIM10->CNT=0;
-			current_tic=ct;
+			current_hr_tic=ct;
 		}
 	}
 	return 0;
@@ -128,13 +128,14 @@ void TIM1_UP_TIM10_IRQHandler(void) {
 	int rc;
 	int i;
 
-	enable_interrupts();
+//	enable_interrupts();
 	if (TIM10->CNT>0) {
+//		ASSERT(0);
 		sys_printf("took %d to get irq\n", TIM10->CNT);
 	}
 	sys_irqs++;
 
-	current_tic+=tic_step;
+	current_hr_tic+=tic_step;
 	TIM10->SR=0;
 	if (TIM10->CNT>0) {
 		sys_printf("took %d to get irq step 2\n", TIM10->CNT);
@@ -150,9 +151,9 @@ void TIM1_UP_TIM10_IRQHandler(void) {
 	}
 
 	in_irq=1;
-	if ((((int)current_tic)-((int)tout->out_tic))<0) {
+	if ((((int)current_hr_tic)-((int)tout->out_tic))<0) {
 		if ((rc=adj_hwtimer())) {
-			current_tic=rc;
+			current_hr_tic=rc;
 			TIM10->CNT=0;
 			sys_printf("next timeout too close, running now\n");
 			goto run_tout;
@@ -173,7 +174,7 @@ run_tout:
 	tprev=&tout;
 	i=0;
 	while(t) {
-		if ((((int)t->out_tic)-((int)current_tic))>0)  {
+		if ((((int)t->out_tic)-((int)current_hr_tic))>0)  {
 			break;
 		}
 		tprev=&t->next;
@@ -188,16 +189,16 @@ run_tout:
 	}
 #if 0
 	if (tout) {
-		if (tout->out_tic-current_tic<10) {
-			sys_printf("close next timeout %d, current %d\n", tout->out_tic,current_tic);
+		if (tout->out_tic-current_hr_tic<10) {
+			sys_printf("close next timeout %d, current %d\n", tout->out_tic,current_hr_tic);
 		}
 	}
 #endif
 
 	while(t) {
 		struct timer_user *tnext=t->next;
-		if (t->out_tic>current_tic) {
-			sys_printf("bad timeout; %d current_tic %d, tout_tic %d\n", i, current_tic,t->out_tic);
+		if (t->out_tic>current_hr_tic) {
+			sys_printf("bad timeout; %d current_hr_tic %d, tout_tic %d\n", i, current_hr_tic,t->out_tic);
 		}
 		i++;
 		t->out_tic=0;
@@ -210,9 +211,9 @@ run_tout:
 		TIM10->CNT=0;
 	} else {
 		if ((rc=adj_hwtimer())) {
-			current_tic=rc;
+			current_hr_tic=rc;
 			TIM10->CNT=0;
-//			sys_printf("rerunning timeouts, current tic %d, tout->tic %d\n", current_tic,tout->out_tic);
+//			sys_printf("rerunning timeouts, current tic %d, tout->tic %d\n", current_hr_tic,tout->out_tic);
 			goto run_tout;
 		}
 	}
@@ -268,7 +269,7 @@ static int hr_timer_set(struct timer_user *u, int val) {
 	}
 
 	cpu_flags=disable_interrupts();
-	ct=get_current_tic();
+	ct=get_current_hr_tic();
 	u->out_tic=ct+(val-1);
 	u->next=0;
 	timer_link_in(u);
@@ -291,7 +292,7 @@ static int hr_timer_clr(struct timer_user *u) {
 	unsigned long int cpu_flags;
 	if (!u->out_tic) return 0;
 	cpu_flags=disable_interrupts();
-	left=u->out_tic-get_current_tic();
+	left=u->out_tic-get_current_hr_tic();
 	u->out_tic=0;
 	timer_link_out(u);
 	if ((!tout)&&(tic_step!=60000)) {
@@ -333,7 +334,7 @@ static int hr_timer_control(struct device_handle *dh, int cmd, void *arg, int le
 			break;
 		case HR_TIMER_GET_TIC: {
 			unsigned int *ttic=((unsigned int *)arg);
-			*ttic=get_current_tic();
+			*ttic=get_current_hr_tic();
 			return 0;
 		}
 		default:
@@ -353,7 +354,7 @@ static int hr_timer_init(void *inst) {
 	TIM10->DIER=TIM_DIER_UIE;
 //	TIM10->CR1= TIM_CR1_CEN|TIM_CR1_ARPE;
 	TIM10->CR1= TIM_CR1_CEN;
-	NVIC_SetPriority(TIM1_UP_TIM10_IRQn,0x2);
+	NVIC_SetPriority(TIM1_UP_TIM10_IRQn,0x0);
 	NVIC_EnableIRQ(TIM1_UP_TIM10_IRQn);
 	return 0;
 }

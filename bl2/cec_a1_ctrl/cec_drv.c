@@ -478,10 +478,12 @@ static void handle_rec_tout(void) {
 				pindrv->ops->control(pin_dh,GPIO_RELEASE_PIN,0,0);
 			}
 			if (cecr_flags&CECR_EOM) {
-				cec_state=CEC_IDLE;
+				cec_state=CEC_TX_GUARD;
 				cec_sub_state=0;
+				uSec=2400*5;
+				timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
 				leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
-				wakeup_users(EV_READ|EV_WRITE);
+				wakeup_users(EV_READ);
 				break;
 			}
 			uSec=1200;
@@ -507,6 +509,7 @@ static int pin_irq(struct device_handle *dh, int ev, void *dum) {
 	switch(cec_state) {
 		case CEC_TX_GUARD:
 			timerdrv->ops->control(cec_timer_dh, HR_TIMER_CANCEL, 0, 0);
+			// fall through
 		case CEC_IDLE:
 			start_r_sync(pin_stat);
 			break;
