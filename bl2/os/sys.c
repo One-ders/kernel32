@@ -248,11 +248,11 @@ static int sys_drv_wakeup(struct device_handle *dh, int ev, void *user_ref) {
 			(task->sel_data.stfds)|=(1<<fd);
 		}
 		task->sel_data.nfds++;
-	}
-
-	if (task->blocker.ev!=ev) {
-		sys_printf("sys_drv_wakeup: masked ev\n");
-		return 0;
+	} else {
+		if (task->blocker.ev!=ev) {
+			sys_printf("sys_drv_wakeup: masked ev\n");
+			return 0;
+		}
 	}
 
 	if (task==current) {

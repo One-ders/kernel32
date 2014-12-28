@@ -6,12 +6,22 @@ typedef int IRQn_Type;
 #define PendSV_IRQn		-2
 #define SVCall_IRQn		-5
 
+#define EXTI0_IRQn		6
+#define EXTI1_IRQn		7
+#define EXTI2_IRQn		8
+#define EXTI3_IRQn		9
+#define EXTI4_IRQn		10
+
+#define EXTI9_5_IRQn		23
+
+
 #define TIM1_UP_TIM10_IRQn	25
 
 #define USART1_IRQn		37
 #define USART2_IRQn		38
 #define USART3_IRQn		39
 
+#define EXTI15_10_IRQn		40
 
 
 extern unsigned int SystemCoreClock;

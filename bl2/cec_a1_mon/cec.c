@@ -59,7 +59,7 @@ static int ack_mask;
 int cec_dump_data(int itf, char *pretext, unsigned char *buf, int len) {
         int i;
 	char *itf_str=(itf==CEC_BUS)?"CEC_BUS":(itf==A1_LINK)?"A1_LINK":"USB_BUS";
-        DPRINTF("from %s, %s: %x",itf_str,pretext, buf[0]);
+        DPRINTF("%t: from %s, %s: %02x",itf_str,pretext, buf[0]);
         for(i=1;i<len;i++) {
                 DPRINTF(", %02x",buf[i]);
         }
@@ -70,7 +70,8 @@ int cec_dump_data(int itf, char *pretext, unsigned char *buf, int len) {
 
 int cec_init_cec(void) {
 	unsigned int val_i=1;
-	ser_fd=io_open("usb_serial0");
+//	ser_fd=io_open("usb_serial0");
+	ser_fd=io_open("usart0");
 	fd_cec=io_open(CEC_DRV);
 	io_control(fd_cec,F_SETFL,(void *)O_NONBLOCK,0);
 	io_control(fd_cec,CEC_SET_PROMISC,&val_i,sizeof(val_i));
@@ -249,7 +250,7 @@ int distribute_msg(int itf, unsigned char *buf, int len) {
 	int rc1=0;
 	int found=0;
 
-	DUMP_DATA(itf, "distribute msg", buf,len);
+	DUMP_DATA(itf, "cec: ", buf,len);
 #if 0
 	if (to==0xf) { // Broadcast
 		int i;

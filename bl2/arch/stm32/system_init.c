@@ -153,7 +153,16 @@ void system_init(void) {
 void init_irq(void) {
 //      NVIC_SetPriority(SVCall_IRQn,0xe);
 	NVIC_SetPriority(SVCall_IRQn,0xf);  /* try to share level with pendsv */
-	NVIC_SetPriority(SysTick_IRQn,0xd);  /* preemptive tics... */
+	NVIC_SetPriority(SysTick_IRQn,0x1);  /* preemptive tics... */
+	NVIC_SetPriority(TIM1_UP_TIM10_IRQn,0x0);
+	NVIC_SetPriority(EXTI0_IRQn,0x2);
+	NVIC_SetPriority(EXTI1_IRQn,0x2);
+	NVIC_SetPriority(EXTI2_IRQn,0x2);
+	NVIC_SetPriority(EXTI3_IRQn,0x2);
+	NVIC_SetPriority(EXTI4_IRQn,0x2);
+	NVIC_SetPriority(EXTI9_5_IRQn,0x2);
+	NVIC_SetPriority(EXTI15_10_IRQn,0x2);
+	NVIC_SetPriority(USART3_IRQn,0xe);
 }
 
 void config_sys_tic(unsigned int ms) {

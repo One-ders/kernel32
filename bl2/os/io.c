@@ -260,7 +260,7 @@ int sys_printf(const char *fmt, ...) {
 	}
 
 //	io_setpolled(1);
-#if 1
+#if 0
 	if (!task_sleepable()) {
 		polled=1;
 		io_setpolled(1);
@@ -344,7 +344,7 @@ int sys_printf(const char *fmt, ...) {
 		
 	}
 	va_end(ap);
-#if 1
+#if 0
 	if (polled) {
 		io_setpolled(0);
 	}

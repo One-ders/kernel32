@@ -47,7 +47,7 @@
 #define DLEV_SCHED 4
 extern int dbglev;
 extern int sys_printf(const char *format, ...);
-#define DEBUGP(lev,a ...) { if (dbglev>lev) { sys_printf("%t: "); sys_printf(a);}}
+#define DEBUGP(lev,a ...) { if (dbglev>lev) sys_printf(a);}
 #else
 #define DEBUGP(lev,a ...)
 #endif
