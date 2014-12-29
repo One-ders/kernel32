@@ -223,7 +223,7 @@ static struct cmd_node my_cmd_node = {
 	cmd_root,
 };
 
-void init_blinky(void);
+//void init_blinky(void);
 
 void init_cec_a1();
 
@@ -240,7 +240,7 @@ void main(void *dum) {
 	if (!u_init) {
 		u_init=1;
 		install_cmd_node(&my_cmd_node,0);
-		init_blinky();
+//		init_blinky();
 		init_cec_a1();
 //		thread_create(main,"usb_serial0",12,1,"sys_mon:usb");
 	}
