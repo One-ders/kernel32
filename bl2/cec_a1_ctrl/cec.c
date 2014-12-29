@@ -188,6 +188,7 @@ int cec_bus_send(unsigned char *buf, int len) {
 
 static int handle_cec_data(int fd,int ev, void *dum) {
 	int rc;
+	int to;
 
 	rc=io_read(fd,(char *)cec_rbuf,sizeof(cec_rbuf));
 	if (rc<0) {
@@ -205,6 +206,19 @@ static int handle_cec_data(int fd,int ev, void *dum) {
                 }
         }
 
+	to=cec_rbuf[0]&0xf;
+	if (to==0xf) { // Broadcast
+		if ((cec_rbuf[1]==CEC_OPCODE_ROUTING_CHANGE)&&(rc>=6)) {
+//			unsigned int old_pa=(cec_rbuf[2]<<8)|cec_rbuf[3];
+			unsigned int new_pa=(cec_rbuf[4]<<8)|cec_rbuf[5];
+			if (new_pa==0x1000) {
+				wakeup_usb_dev();
+			}
+		} else if (cec_rbuf[1]==CEC_OPCODE_SET_MENU_LANGUAGE) {
+			wakeup_usb_dev();
+		}
+	}
+
 	distribute_msg(CEC_BUS, cec_rbuf,rc);
 	return 0;
 }
@@ -218,6 +232,7 @@ int distribute_msg(int itf, unsigned char *buf, int len) {
 	DUMP_DATA(itf, "distribute msg", buf,len);
 	if (to==0xf) { // Broadcast
 		int i;
+
 		for (i=0;i<15;i++) {
 			if (devt[i].callback&&(devt[i].bus!=itf)) {
 				rc=devt[i].callback(buf,len);

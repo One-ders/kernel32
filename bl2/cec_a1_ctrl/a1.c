@@ -115,15 +115,19 @@ static int handle_cec_data(unsigned char *buf, int size) {
 		case CEC_OPCODE_GIVE_SYSTEM_AUDIO_MODE_STATUS:
 			cec_send_system_audio_mode_status(A1_LINK,(5<<4)|fromAddr, 1);
 			break;
-		case CEC_OPCODE_SYSTEM_AUDIO_MODE_REQUEST:
-			if (size==4) {
-				a1_power_on();
-				cec_send_system_audio_mode_set(A1_LINK,(5<<4)|fromAddr,1);
+		case CEC_OPCODE_SYSTEM_AUDIO_MODE_REQUEST: {
+			if (size>=4) {
+				unsigned int paddr=(buf[2]<<8)|buf[3];
+				if (paddr==0x1000) {
+					a1_power_on();
+					cec_send_system_audio_mode_set(A1_LINK,(5<<4)|fromAddr,1);
+				}
 			} else {
 				a1_power_off();
 				cec_send_system_audio_mode_set(A1_LINK,(5<<4)|fromAddr,0);
 			}
 			break;
+		}
 		case CEC_OPCODE_ROUTING_CHANGE:
 			break;
 		case CEC_OPCODE_GIVE_OSD_NAME:
@@ -138,6 +142,9 @@ static int handle_cec_data(unsigned char *buf, int size) {
 			break;
 		case CEC_OPCODE_USER_CONTROL_PRESSED:
 			switch (param) {
+				case 0x40: /* Power */
+					a1_power_on();
+					break;
 				case 0x41:
 					a1_volume_up_pressed();
 					break;
@@ -163,6 +170,19 @@ static int handle_cec_data(unsigned char *buf, int size) {
 		case CEC_OPCODE_REPORT_PHYSICAL_ADDRESS:
 //			cec_send_physical_address(A1_LINK,(5<<4)|0xf, 0x1000, 5);
 			break;
+		case CEC_OPCODE_ACTIVE_SOURCE: {
+			if (size>=4) {
+				unsigned int paddr=(buf[2]<<8)|buf[3];
+				if (paddr==0x1000) {
+					a1_power_on();
+					cec_send_system_audio_mode_set(A1_LINK,(5<<4)|0x0,1);
+				} else {
+					cec_send_system_audio_mode_set(A1_LINK,(5<<4)|0x0,0);
+					a1_power_off();
+				}
+			}
+			break;
+		}
 		default:
 			printf("a1: unknown cec_cmd %x\n", cmd);
 			break;
@@ -187,6 +207,8 @@ int set_amp_avail(int state) {
 		}
 	}
 	if (state) {
+		a1_get_amp_name(0,0,0);
+		register_timer(500,a1_get_amp_name,0);
 		q_count=0;
 	}
 	return 0;
@@ -199,8 +221,8 @@ int a1_attach_amp(void) {
 		if (!cec_handle) {
 			cec_handle=cec_attach(A1_LINK, CECDEVICE_AUDIOSYSTEM, handle_cec_data);
 		}
-		cec_send_physical_address(A1_LINK,(cec_handle<<4)|0xf,0x1000, cec_handle);
-		cec_send_system_audio_mode_set(A1_LINK,cec_handle<<4|0xf,1);
+//		cec_send_physical_address(A1_LINK,(cec_handle<<4)|0xf,0x1000, cec_handle);
+//		cec_send_system_audio_mode_set(A1_LINK,cec_handle<<4|0xf,1);
 //	} else {
 //		printf("already have cec audio system\n");
 //	}
@@ -220,8 +242,6 @@ int set_power_state(int state) {
 			cec_send_standby(A1_LINK,0x5f);
 		}
 	}
-	a1_get_amp_name(0,0,0);
-	register_timer(500,a1_get_amp_name,0);
 	return 0;
 }
 

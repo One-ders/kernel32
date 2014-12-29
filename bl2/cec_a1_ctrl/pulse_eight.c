@@ -427,6 +427,7 @@ static int pe_data_in(unsigned char *buf, int len) {
 	sbuf[2]=buf[0];
 	rc=io_write(fd,(char *)sbuf,sizeof(sbuf));
 	if (rc!=sizeof(sbuf)) {
+		wakeup_usb_dev();
 		DPRINTF("pe_data_in: failed to write data on usb bus, rc=%d\n", rc);
 		return 0;
 	}
