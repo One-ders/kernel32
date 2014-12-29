@@ -56,11 +56,47 @@ struct devt {
 struct devt devt[16];
 static int ack_mask;
 
+const char *devstr[] = {"TV", "Rec1", "Rec2", "Tuner1",
+			"Playback1", "AudioSys", "Tuner2",
+			"Tuner2", "Tuner3", "Playback2",
+			"Rec3", "Tuner4", "Playback3",
+			"??", "??", "Any"};
+
+const char *cmdstr[] = {"FABORT", "??", "??", "??", "Image_view_on",
+/* 0x05 */		"TUNER_STEP_INC", "TUNER_STEP_DEC", "TUNER_DEV_STAT", "Give_Tuner_Stat", "Rec_ON",
+/* 0x0a */		"Rec_Stat", "Rec_off", "??", "TEXT_VIEW_ON", "??",
+/* 0x0f */		"Rec_TV_SCREEN", "??", "??", "??", "??",
+/* 0x14 */		"??", "??", "??", "??", "??",
+/* 0x19 */		"??", "Give_Deck_Stat", "Deck_Stat", "??", "??",
+/* 0x1e */		"??", "??", "??", "??", "??", 
+/* 0x23 */		"??", "??", "??", "??", "??",
+/* 0x28 */		"??", "??", "??", "??", "??",
+/* 0x2d */		"??", "??", "??", "??", "??",
+/* 0x32 */		"Set_Menu_Lang", "CLR_ANALOGUE_TIMER", "Set_Analogue_Timer", "Timer_Status", "Standby",
+/* 0x37 */		"??", "??", "??", "??", "??",
+/* 0x3c */		"??", "??", "??", "??", "??",
+/* 0x41 */		"Play", "Deck_Ctl", "Timer_cleared_stat", "User_ctrl_pressed", "User_ctrl_released",
+/* 0x46 */		"Give_osd_name", "Set_osd_name", "??", "??", "??",
+/* 0x4b */		"??", "??", "??", "??", "??",
+/* 0x50	*/		"??", "??", "??", "??", "??",
+};
+
+
+
 int cec_dump_data(int itf, char *pretext, unsigned char *buf, int len) {
         int i;
+	int cmd;
 	char *itf_str=(itf==CEC_BUS)?"CEC_BUS":(itf==A1_LINK)?"A1_LINK":"USB_BUS";
-        DPRINTF("%t: from %s, %s: %02x",itf_str,pretext, buf[0]);
-        for(i=1;i<len;i++) {
+        DPRINTF("%t: on %s, %s: %s(%x)-->%s(%x) :",itf_str,pretext, devstr[buf[0]>>4],buf[0]>>4,devstr[buf[0]&0xf], buf[0]&0xf);
+	if (len>1) {
+		cmd=buf[1];
+		if (cmd<sizeof(cmdstr)) {
+			DPRINTF(", %s(%02x)", cmdstr[cmd], cmd);
+		} else {
+			DPRINTF(", %s(%02x)", "??", cmd);
+		}
+	}
+        for(i=2;i<len;i++) {
                 DPRINTF(", %02x",buf[i]);
         }
         DPRINTF("\n");
