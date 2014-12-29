@@ -17,9 +17,6 @@ LDFLAGS=-g -T./stm32_flash.ld -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-in
 
 LDFLAGS_USR=-g -r $(OBJ)/usr/lib/usrlib.o
 
-#OBJECTS=start.o jz_serial.o jz4740.o
-#OBJECTS=traps.o nand_funcs.o c_start.o jz_serial.o $(TOP)/lib/lib.o
-
 all: myCore
 
 myCore: os stm32f04 stm32 stddrv usb_serial stmusb hr_timer usr.drv.o usr.bin.o
@@ -35,11 +32,13 @@ myCore: os stm32f04 stm32 stddrv usb_serial stmusb hr_timer usr.drv.o usr.bin.o
 				$(OBJ)/os/end_sect.o \
 				$(OBJ)/usr/usr.bin.o
 
-#usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/usr/blinky/blinky.o $(OBJ)/cec_a1_ctrl/cec_a1_ctrl.o
-
-usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/usr/blinky/blinky.o $(OBJ)/cec_a1_mon/cec_a1_mon.o
+usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/cec_a1_ctrl/cec_a1_ctrl.o
 	$(LD) -o $(OBJ)/usr/usr.bin.o $(LDFLAGS_USR) $^
 	$(OBJCOPY) --prefix-symbols=__usr_ $(OBJ)/usr/usr.bin.o
+
+#usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/usr/blinky/blinky.o $(OBJ)/cec_a1_mon/cec_a1_mon.o
+#	$(LD) -o $(OBJ)/usr/usr.bin.o $(LDFLAGS_USR) $^
+#	$(OBJCOPY) --prefix-symbols=__usr_ $(OBJ)/usr/usr.bin.o
 
 $(OBJ)/usr/lib/usrlib.o: $(OBJ)/usr/lib $(OBJ)/usr/lib/arm/syscall_lib.o
 	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $(OBJ)/usr/lib
