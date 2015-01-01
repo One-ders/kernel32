@@ -425,6 +425,9 @@ static void handle_rec_tout(void) {
 		case CEC_REC_EOM_N:
 			/* Rec fail */
 			sys_printf("Rec Failed in substate %d on tout\n", cec_sub_state);
+			if (cec_sub_state==CEC_REC_PLB_N) {
+				sys_printf("nr of rbytes %d, nr of rbits %d\n", cec_rx_ix, cec_rbi);
+			}
 			cec_state=CEC_IDLE;
 			cec_sub_state=0;
 			leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
