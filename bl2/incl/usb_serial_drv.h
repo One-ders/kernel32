@@ -30,4 +30,4 @@
  *
  * @(#)usb_serial_drv.h
  */
-#define USB_REMOTE_WAKEUP	0x10
+#define USB_REMOTE_WAKEUP	0x1001

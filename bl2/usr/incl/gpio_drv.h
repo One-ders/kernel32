@@ -32,8 +32,8 @@
  */
 #define GPIO_DRV "gpio_drv"
 
-#define GPIO_BIND_PIN			1
-#define GPIO_GET_BOUND_PIN		2
+#define GPIO_BIND_PIN			0x1001
+#define GPIO_GET_BOUND_PIN		0x1002
 #define PA				0x00
 #define PB				0x10
 #define PC				0x20
@@ -46,9 +46,9 @@
 
 #define GPIO_PIN(a,b)			(a|b)
 
-#define GPIO_SET_FLAGS			3
-#define GPIO_CLR_FLAGS			4
-#define GPIO_GET_FLAGS			5
+#define GPIO_SET_FLAGS			0x1003
+#define GPIO_CLR_FLAGS			0x1004
+#define GPIO_GET_FLAGS			0x1005
 
 #define GPIO_DIR(a,b)			((a&GPIO_DIR_MASK)|b)
 #define GPIO_DIR_MASK			0x3
@@ -81,10 +81,10 @@
 #define GPIO_IRQ_ENABLE(a)		(a|GPIO_IRQ)
 #define GPIO_IRQ_DISABLE(a)		(a&~GPIO_IRQ)
 
-#define	GPIO_SENSE_PIN			6
-#define GPIO_SET_PIN			7
-#define GPIO_SINK_PIN			8
-#define GPIO_RELEASE_PIN		9
+#define	GPIO_SENSE_PIN			0x1006
+#define GPIO_SET_PIN			0x1007
+#define GPIO_SINK_PIN			0x1008
+#define GPIO_RELEASE_PIN		0x1009
 
 /* free GPIO IO pins
  *	PA8,PA15.PB0,PB1,PB2,PB4,PB5,PB7,
