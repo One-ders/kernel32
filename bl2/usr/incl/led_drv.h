@@ -32,9 +32,9 @@
  */
 #define LED_DRV "led_drv"
 
-#define LED_CTRL_STAT		0x01
-#define LED_CTRL_ACTIVATE	0x02
-#define LED_CTRL_DEACTIVATE	0x03
+#define LED_CTRL_STAT		0x1001
+#define LED_CTRL_ACTIVATE	0x1002
+#define LED_CTRL_DEACTIVATE	0x1003
 
 #define LED_GREEN	(1<<12)
 #define LED_AMBER	(1<<13)

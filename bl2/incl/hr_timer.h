@@ -32,6 +32,6 @@
  */
 #define HR_TIMER "hr_timer"
 
-#define HR_TIMER_SET		1
-#define HR_TIMER_CANCEL		2
-#define HR_TIMER_GET_TIC	3
+#define HR_TIMER_SET		0x1001
+#define HR_TIMER_CANCEL		0x1002
+#define HR_TIMER_GET_TIC	0x1003

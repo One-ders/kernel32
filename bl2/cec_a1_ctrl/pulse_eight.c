@@ -388,6 +388,7 @@ static int handle_pe_cmd(int fd,unsigned char *buf, int len) {
 static int  handle_read_event(int fd, int ev, void *dum) {
 	unsigned char ch;
 	int rc;
+
 	while(((rc=io_read(fd,(char *)&ch,1))==1)) {
 		if (!bix) {
 			if (ch==0xff) {
