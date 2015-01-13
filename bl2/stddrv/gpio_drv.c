@@ -272,7 +272,7 @@ static int set_flags(struct pin_data *pdp, unsigned int flags) {
 
 	if (flags&GPIO_IRQ) {
 		int exticr=pdp->bpin>>2;
-		int exticrshift=pdp->bpin&0x3;
+		int exticrshift=(pdp->bpin&0x3)<<2;
 
 		if ((exti2pd[pdp->bpin]) && (exti2pd[pdp->bpin]!=pdp)) {
 			sys_printf("interrupt line cannot not be assigned, in use\n");
