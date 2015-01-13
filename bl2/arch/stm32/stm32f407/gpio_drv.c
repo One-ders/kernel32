@@ -34,8 +34,12 @@
 #include <stm32f407.h>
 #include <sys.h>
 #include <io.h>
+#include <string.h>
 
 #include "gpio_drv.h"
+
+
+static unsigned short int pinmem[256];
 
 struct GPIO_REG {
 	volatile unsigned int moder;
@@ -55,13 +59,31 @@ struct GPIO_REG *GPIO[9];
 #define GPIO_X 9
 static unsigned short int pinmap[GPIO_X];
 
+#define PIN_FLAGS_BUS		0x20000000
 #define PIN_FLAGS_ASSIGNED	0x40000000
 #define PIN_FLAGS_IN_USE	0x80000000
+
+// pin_flags 0xaabbccdd
+// aa == ASSIGNED and IN_USE and BUS
+// if !BUS
+// 	cc altfnc
+// 	dd pinflags
+//
+// if BUS
+// 	bb numpins in pin_array
+// 	cc altfnc
+// 	dd pinflags
+
 struct pin_data {
 	struct device_handle dh;
 	unsigned int pin_flags;
-	unsigned int bus;
-	unsigned int bpin;
+	union {
+		struct {
+			unsigned short int bus;
+			unsigned short int bpin;
+		};
+		unsigned short *pin_array;
+	};
 	/*=======================*/
 	void		*userdata;
 	DRV_CBH 	callback;
@@ -78,7 +100,7 @@ struct exti_regs {
 
 struct exti_regs * const exti_regs=(struct exti_regs *)(APB2+0x3c00);
 
-#define MAX_USERS 16
+#define MAX_USERS 32
 static struct pin_data pd[MAX_USERS];
 
 static struct pin_data *exti2pd[16];
@@ -95,6 +117,14 @@ static unsigned int get_user(struct pin_data **pdpptr) {
 		}
 	}
 	return -1;
+}
+
+static unsigned short int *pmp=pinmem;
+static unsigned short int *get_pinmem(int pins) {
+	unsigned short int *mem=pmp;
+	pmp+=pins;
+	memset(mem,0,pins*2);
+	return mem;
 }
 
 
@@ -151,9 +181,17 @@ void EXTI4_IRQHandler(void) {
 }
 
 void EXTI9_5_IRQHandler(void) {
+	unsigned short int stat=exti_regs->pr&0x03e0;
+	int i;
 	enable_interrupts();
-	sys_printf("exti9_5_irq\n");
-	exti_regs->pr=0x03e0;
+	for (i=5;i<10;i++) {
+		if (stat&&(1<<i)) {
+			if (exti2pd[i] && exti2pd[i]->callback) {
+				exti2pd[i]->callback(&exti2pd[i]->dh,EV_STATE,exti2pd[i]->userdata);
+			}
+		}
+	}
+	exti_regs->pr=stat;
 }
 
 void EXTI15_10_IRQHandler(void) {
@@ -173,7 +211,7 @@ static int assign_pin(struct pin_data *pdp, int pin) {
 	if (pdp->pin_flags&PIN_FLAGS_ASSIGNED) {
 		return -1;
 	}
-	sys_printf("lookup pin %d at bus %d\n",bpin,bus);
+//	sys_printf("lookup pin %d at bus %d\n",bpin,bus);
 
 	if (pinmap[bus]&(1<<bpin)) {
 		sys_printf("pin in use %x\n", pin);
@@ -184,9 +222,10 @@ static int assign_pin(struct pin_data *pdp, int pin) {
 		RCC->AHB1ENR|=(1<<bus);
 	}
 	pinmap[bus]|=(1<<bpin);
-	pdp->bus=bus;
-	pdp->bpin=bpin;
-	pdp->pin_flags|=PIN_FLAGS_ASSIGNED;
+	if (!(pdp->pin_flags&PIN_FLAGS_BUS)) {
+		pdp->bus=bus;
+		pdp->bpin=bpin;
+	}
 	return 0;
 }
 
@@ -224,51 +263,61 @@ static int release_pin(struct pin_data *pdp) {
 	return 0;
 }
 
-static int set_flags(struct pin_data *pdp, unsigned int flags) {
+static int set_flags(struct pin_data *pdp, unsigned int flags, unsigned int optpin) {
 	int dir=flags&GPIO_DIR_MASK;
 	int drive=(flags&GPIO_DRIVE_MASK)>>GPIO_DRIVE_SHIFT;
 	int speed=(flags&GPIO_SPEED_MASK)>>GPIO_SPEED_SHIFT;
+	int altfn=(flags&GPIO_ALTFN_MASK)>>GPIO_ALTFN_SHIFT;
+	int bus,pin;
+	if (pdp->pin_flags&PIN_FLAGS_BUS) {
+		bus=optpin>>4;
+		pin=optpin&0xf;
+	} else {
+		bus=pdp->bus;
+		pin=pdp->bpin;
+	}
+
 	if ((dir==GPIO_OUTPUT)||(dir==GPIO_BUSPIN)) {
 		sys_printf("pin is output or bus\n");
-		GPIO[pdp->bus]->moder&=~(3<<(pdp->bpin<<1));
+		GPIO[bus]->moder&=~(3<<(pin<<1));
 		if (dir==GPIO_OUTPUT) {
-			GPIO[pdp->bus]->moder|=(1<<(pdp->bpin<<1));
+			GPIO[bus]->moder|=(1<<(pin<<1));
 		}
 
 		if ((drive==GPIO_OPENDRAIN)||(dir==GPIO_BUSPIN)) {
-			GPIO[pdp->bus]->otyper|=(1<<pdp->bpin);
+			GPIO[bus]->otyper|=(1<<pin);
 		} else if (drive==GPIO_PUSHPULL) {
-			GPIO[pdp->bus]->otyper&=~(1<<pdp->bpin);
+			GPIO[bus]->otyper&=~(1<<pin);
 		}
 
-		GPIO[pdp->bus]->ospeedr&=~(3<<(pdp->bpin<<1));
-		GPIO[pdp->bus]->ospeedr|=(speed<<(pdp->bpin<<1));
+		GPIO[bus]->ospeedr&=~(3<<(pin<<1));
+		GPIO[bus]->ospeedr|=(speed<<(pin<<1));
 	}
 
 	if (dir==GPIO_BUSPIN) {    /* make sure output is low */
-		GPIO[pdp->bus]->bsrr=(1<<(pdp->bpin+16));
+		GPIO[bus]->bsrr=(1<<(pin+16));
 	}
 
 	if ((dir==GPIO_INPUT)||(dir==GPIO_BUSPIN)) {
 		sys_printf("pin is input or bus\n");
-		GPIO[pdp->bus]->moder&=~(3<<(pdp->bpin<<1));
+		GPIO[bus]->moder&=~(3<<(pin<<1));
 
 		switch(drive) {
 			case GPIO_FLOAT: {
 				sys_printf("gpio float\n");
-				GPIO[pdp->bus]->pupdr&=~(3<<(pdp->bpin<<1));
+				GPIO[bus]->pupdr&=~(3<<(pin<<1));
 				break;
 			}
 			case GPIO_PULLUP: {
 				sys_printf("gpio pullup\n");
-				GPIO[pdp->bus]->pupdr&=~(3<<(pdp->bpin<<1));
-				GPIO[pdp->bus]->pupdr|=(1<<(pdp->bpin<<1));
+				GPIO[bus]->pupdr&=~(3<<(pin<<1));
+				GPIO[bus]->pupdr|=(1<<(pin<<1));
 				break;
 			}
 			case GPIO_PULLDOWN: {
 				sys_printf("gpio_pulldown\n");
-				GPIO[pdp->bus]->pupdr&=~(3<<(pdp->bpin<<1));
-				GPIO[pdp->bus]->pupdr|=(2<<(pdp->bpin<<1));
+				GPIO[bus]->pupdr&=~(3<<(pin<<1));
+				GPIO[bus]->pupdr|=(2<<(pin<<1));
 				break;
 			}
 			default: {
@@ -277,35 +326,53 @@ static int set_flags(struct pin_data *pdp, unsigned int flags) {
 		}
 	}
 
-	if (flags&GPIO_IRQ) {
-		int exticr=pdp->bpin>>2;
-		int exticrshift=pdp->bpin&0x3;
+	if (dir==GPIO_ALTFN_PIN) {
+		sys_printf("pin is altfn\n");
+		GPIO[bus]->moder&=~(3<<(pin<<1));
+		GPIO[bus]->moder|=(2<<(pin<<1));
+		if (pin<8) {
+			GPIO[bus]->afrl&=~(0xf<<(pin<<2));
+			GPIO[bus]->afrl|=(altfn<<(pin<<2));
+		} else {
+			GPIO[bus]->afrh&=~(0xf<<((pin-8)<<2));
+			GPIO[bus]->afrh|=(altfn<<((pin-8)<<2));
+		}
+		if (speed) {
+			GPIO[bus]->ospeedr&=~(3<<(pin<<1));
+			GPIO[bus]->ospeedr|=(speed<<(pin<<1));
+		}
+	}
 
-		if ((exti2pd[pdp->bpin]) && (exti2pd[pdp->bpin]!=pdp)) {
+	if (flags&GPIO_IRQ) {
+		int exticr=pin>>2;
+		int exticrshift=(pin&0x3)<<2;
+
+		if ((exti2pd[pin]) && (exti2pd[pin]!=pdp)) {
 			sys_printf("interrupt line cannot not be assigned, in use\n");
 			return -1;
 		}	
-		exti2pd[pdp->bpin]=pdp;
 
-		if ((pdp->bpin>=0)&&(pdp->bpin<5)) {
-			NVIC_SetPriority(pdp->bpin+6,0x1);
-			NVIC_EnableIRQ(pdp->bpin+6);
-		} else if ((pdp->bpin>=5)&&(pdp->bpin<10)) {
+		exti2pd[pin]=pdp;
+
+		if ((pin>=0)&&(pin<5)) {
+			NVIC_SetPriority(pin+6,0x1);
+			NVIC_EnableIRQ(pin+6);
+		} else if ((pin>=5)&&(pin<10)) {
 			NVIC_SetPriority(23,0x1);
 			NVIC_EnableIRQ(23);
-		} else if ((pdp->bpin>=10)&&(pdp->bpin<16)) {
+		} else if ((pin>=10)&&(pin<16)) {
 			NVIC_SetPriority(40,0x1);
 			NVIC_EnableIRQ(40);
-		}	
-	
+		}
+
 
 		/* Syscfg exticr */
 		exti_cr[exticr]&=~(0xf<<exticrshift);
-		exti_cr[exticr]|=(pdp->bus<<exticrshift);
+		exti_cr[exticr]|=(bus<<exticrshift);
 
-		exti_regs->rtsr|=(1<<pdp->bpin);
-		exti_regs->ftsr|=(1<<pdp->bpin);
-		exti_regs->imr|=(1<<pdp->bpin);
+		exti_regs->rtsr|=(1<<pin);
+		exti_regs->ftsr|=(1<<pin);
+		exti_regs->imr|=(1<<pin);
 	}
 	return 0;
 }
@@ -321,6 +388,7 @@ static int clr_flags(struct pin_data *pdp, unsigned int flags) {
 
 
 /**********************************************************/
+static int gpio_init(void *inst);
 
 static struct device_handle *gpio_open(void *instance, DRV_CBH callback, void *userdata) {
 	struct pin_data *pd=0;
@@ -350,6 +418,7 @@ static int gpio_control(struct device_handle *dh, int cmd, void *arg1, int arg2)
 			if (arg2!=4) return -1;
 			pin=*((unsigned int *)arg1);
 			return assign_pin(pdp,pin);
+	pdp->pin_flags|=PIN_FLAGS_ASSIGNED;
 			break;
 		}
 		case GPIO_GET_BOUND_PIN: {
@@ -362,7 +431,7 @@ static int gpio_control(struct device_handle *dh, int cmd, void *arg1, int arg2)
 			unsigned int flags;
 			if (arg2!=4) return -1;
 			flags=*((unsigned int *)arg1);
-			set_flags(pdp,flags);
+			set_flags(pdp,flags,0);
 			return 0;
 		}
 		case GPIO_CLR_FLAGS: {
@@ -392,7 +461,54 @@ static int gpio_control(struct device_handle *dh, int cmd, void *arg1, int arg2)
 			return release_pin(pdp);
 			break;
 		}
-	
+		case GPIO_BUS_ASSIGN_PINS: {
+			struct pin_spec *ps=(struct pin_spec *)arg1;
+			int pins=arg2/sizeof(struct pin_spec);
+			int i;
+			pdp->pin_flags|=PIN_FLAGS_BUS;
+			pdp->pin_flags|=pins<<16;
+			pdp->pin_array=get_pinmem(pins);
+			for(i=0;i<pins;i++) {
+				assign_pin(pdp,ps[i].pin);
+				pdp->pin_array[i]=ps[i].pin;
+				set_flags(pdp,ps[i].flags,ps[i].pin);
+			}
+			pdp->pin_flags|=PIN_FLAGS_ASSIGNED;
+			break;
+		}
+		case GPIO_BUS_READ_BITS: {
+			break;
+		}
+		case GPIO_BUS_SET_BITS: {
+			unsigned int bits=*(unsigned int *)arg1;
+			unsigned int nrofpins;
+			int i;
+			if (!(pdp->pin_flags&PIN_FLAGS_BUS)) return -1;
+			nrofpins=(pdp->pin_flags>>16)&0xff;
+			for(i=0;i<nrofpins;i++) {
+				if (bits&(1<<i)) {
+					int bus=pdp->pin_array[i]>>4;
+					int pin=pdp->pin_array[i]&0xf;
+					GPIO[bus]->bsrr=(1<<pin);
+				}
+			}
+			break;
+		}
+		case GPIO_BUS_CLR_BITS: {
+			unsigned int bits=*(unsigned int *)arg1;
+			unsigned int nrofpins;
+			int i;
+			if (!(pdp->pin_flags&PIN_FLAGS_BUS)) return -1;
+			nrofpins=(pdp->pin_flags>>16)&0xff;
+			for(i=0;i<nrofpins;i++) {
+				if (bits&(1<<i)) {
+					int bus=pdp->pin_array[i]>>4;
+					int pin=pdp->pin_array[i]&0xf;
+					GPIO[bus]->bsrr=(1<<(pin+16));
+				}
+			}
+			break;
+		}
 	}
 	return 0;
 }
@@ -427,5 +543,7 @@ static struct driver gpio_drv = {
 void init_gpio_drv(void) {
 	driver_publish(&gpio_drv);
 }
+
+
 
 INIT_FUNC(init_gpio_drv);

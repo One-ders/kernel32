@@ -69,7 +69,7 @@ void put_page(void *p) {
 
 #define HSE_STARTUP_TIMEOUT	0x0500
 
-unsigned int  SystemCoreClock = 168000000;
+unsigned int  SystemCoreClock = SYS_CLOCK;
 
 void system_init(void) {
 	volatile unsigned int startup_cnt=0;

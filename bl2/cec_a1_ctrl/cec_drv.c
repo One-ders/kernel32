@@ -87,8 +87,12 @@ static struct driver *leddrv;
 static struct device_handle *pin_dh;
 static struct driver *pindrv;
 
+#ifdef LED_BLUE
 unsigned int blue=LED_BLUE;
+#endif
+#ifdef LED_GREEN
 unsigned int green=LED_GREEN;
+#endif
 
 #define CEC_IDLE	0
 #define CEC_R_INIT	1
@@ -167,7 +171,9 @@ static int start_r_sync(int pstate) {
 	cec_state=CEC_R_INIT;
 	cec_sub_state=CEC_RSYNC_LOW;
 	timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
+#ifdef LED_BLUE
 	leddrv->ops->control(led_dh,LED_CTRL_ACTIVATE,&blue,sizeof(blue));
+#endif
 	return 0;
 }
 
@@ -182,7 +188,9 @@ static int handle_r_init(int pstate) {
 			cec_state=CEC_IDLE;
 			cec_sub_state=CEC_RSYNC_IDLE;
 			timerdrv->ops->control(cec_timer_dh, HR_TIMER_CANCEL, 0, 0);
+#ifdef LED_BLUE
 			leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
+#endif
 			wakeup_users(EV_WRITE);
 			break;
 		}
@@ -194,7 +202,9 @@ static int handle_r_init(int pstate) {
 				cec_state=CEC_IDLE;
 				cec_sub_state=CEC_RSYNC_IDLE;
 				timerdrv->ops->control(cec_timer_dh, HR_TIMER_CANCEL, 0, 0);
+#ifdef LED_BLUE
 				leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
+#endif
 				wakeup_users(EV_WRITE);
 			}
 			break;
@@ -214,7 +224,9 @@ static int handle_r_init(int pstate) {
 				cec_state=CEC_IDLE;
 				cec_sub_state=CEC_RSYNC_IDLE;
 				timerdrv->ops->control(cec_timer_dh, HR_TIMER_CANCEL, 0, 0);
+#ifdef LED_BLUE
 				leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
+#endif
 			wakeup_users(EV_WRITE);
 			}
 			break;
@@ -233,7 +245,9 @@ static void handle_r_sync_tout() {
 			sys_printf("Start Bit Failed in substate %d tout, pin is %d\n", cec_sub_state,pin_stat);
 			cec_state=CEC_IDLE;
 			cec_sub_state=CEC_RSYNC_IDLE;
+#ifdef LED_BLUE
 			leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
+#endif
 			wakeup_users(EV_WRITE);
 			break;
 		}
@@ -313,7 +327,9 @@ static void handle_cec_rec(int pstat) {
 			sys_printf("Rec Failed in substate %d, on pinirq\n", cec_sub_state);
 			cec_state=CEC_IDLE;
 			cec_sub_state=0;
+#ifdef LED_BLUE
 			leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
+#endif
 			wakeup_users(EV_WRITE);
 			break;
 		case CEC_REC_PLB_N:
@@ -430,7 +446,9 @@ static void handle_rec_tout(void) {
 			}
 			cec_state=CEC_IDLE;
 			cec_sub_state=0;
+#ifdef LED_BLUE
 			leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
+#endif
 			wakeup_users(EV_WRITE);
 			break;
 		case CEC_REC_PLB_I:
@@ -462,7 +480,9 @@ static void handle_rec_tout(void) {
 				sys_printf("Rec Failed in substate REC_EOM_E on timeout\n");
 				cec_state=CEC_IDLE;
 				cec_sub_state=0;
+#ifdef LED_BLUE
 				leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
+#endif
 				wakeup_users(EV_WRITE);
 				break;
 			}
@@ -485,7 +505,9 @@ static void handle_rec_tout(void) {
 				cec_sub_state=0;
 				uSec=2400*5;
 				timerdrv->ops->control(cec_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
+#ifdef LED_BLUE
 				leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&blue,sizeof(blue));
+#endif
 				wakeup_users(EV_READ);
 				break;
 			}
@@ -614,7 +636,9 @@ static void handle_tx_tout(void) {
 			int uSec=2400*7;
 			cec_sub_state=0;
 			cec_state=CEC_TX_GUARD;
+#ifdef LED_GREEN
 			leddrv->ops->control(led_dh,LED_CTRL_DEACTIVATE,&green,sizeof(green));
+#endif
 			wakeup_users(EV_WRITE);
 			flags=GPIO_IRQ_ENABLE(0);
 			pindrv->ops->control(pin_dh,GPIO_SET_FLAGS,&flags,sizeof(flags));
@@ -756,8 +780,9 @@ static int send_cec(struct u_fd *u, unsigned char *data, int len) {
 		u->events|=EV_WRITE;
 		return -DRV_AGAIN;
 	}
-
+#ifdef LED_GREEN
 	leddrv->ops->control(led_dh,LED_CTRL_ACTIVATE,&green,sizeof(green));
+#endif
 	flags=GPIO_IRQ_ENABLE(0);
 	pindrv->ops->control(pin_dh,GPIO_CLR_FLAGS,&flags,sizeof(flags));
 	cect_flags=0;
@@ -914,8 +939,7 @@ static int cec_drv_start(void *inst) {
 		return -1;
 	}
 	/* */
-			/*PC4 pin for CEC */
-	pin=GPIO_PIN(PC,4);
+	pin=CEC_PIN;
 	rc=pindrv->ops->control(pin_dh,GPIO_BIND_PIN,&pin,sizeof(pin));
 	if (rc<0) {
 		sys_printf("pin_assignment failed\n");
