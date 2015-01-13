@@ -33,10 +33,16 @@
 #include <sys.h>
 #include <io.h>
 #include <devices.h>
+#include <gpio_drv.h>
 #include <stm32f407.h>
+#include <config.h>
 
 #include "usart_drv.h"
 
+
+static struct device_handle *txpin_dh;
+static struct device_handle *rxpin_dh;
+static struct driver	    *pindrv;
 
 
 #if 0
@@ -69,6 +75,9 @@ typedef struct
 
 #define RX_BSIZE 16
 
+static struct USART *usart;
+static unsigned int usart_irqn;
+
 struct usart_data {
 	int chip_dead;
 	char tx_buf[TXB_SIZE];
@@ -99,15 +108,21 @@ static struct user_data udata[MAX_USERS];
 static int (*usart_putc_fnc)(struct user_data *, int c);
 static int usart_putc(struct user_data *u, int c);
 
+#if USE_USART==1
+void USART1_IRQHandler(void) {
+#elif USE_USART==2
+void USART2_IRQHandler(void) {
+#elif USE_USART==3
 void USART3_IRQHandler(void) {
-	unsigned int st=USART3->SR;
+#endif
+	unsigned int st=usart->SR;
 
 	enable_interrupts();
 
 	if (st&USART_SR_LBD) {
 		usart_data0.chip_dead=1;
 		usart_data0.tx_out=usart_data0.tx_in;
-		USART3->SR&=~USART_SR_LBD;	
+		usart->SR&=~USART_SR_LBD;	
 		if (usart_data0.wblocker_list.first){
 			 sys_wakeup_from_list(&usart_data0.wblocker_list);
 		}
@@ -120,7 +135,7 @@ void USART3_IRQHandler(void) {
 //	sys_printf("got usart irq, status %x\n", USART3->SR);
 	if ((st&(USART_SR_TXE|USART_SR_TC))&&(usart_data0.tx_in-usart_data0.tx_out)) {
 		if (usart_putc_fnc==usart_putc) {
-			USART3->DR=usart_data0.tx_buf[IX(usart_data0.tx_out)];
+			usart->DR=usart_data0.tx_buf[IX(usart_data0.tx_out)];
 			usart_data0.tx_out++;
 			st&=~USART_SR_TC;	// Dont shut off transmitter if we send some data
 			if ((usart_data0.tx_in-usart_data0.tx_out)==0) {
@@ -129,19 +144,19 @@ void USART3_IRQHandler(void) {
 				}
 			}
 		} else {
-			USART3->CR1&=~(USART_CR1_TXEIE|USART_CR1_TCIE);
+			usart->CR1&=~(USART_CR1_TXEIE|USART_CR1_TCIE);
 		}
 	}  else if((st&USART_SR_TC)) {
 		if (usart_putc_fnc==usart_putc) {
-			USART3->CR1&=~(USART_CR1_TE|USART_CR1_TXEIE|USART_CR1_TCIE);
+			usart->CR1&=~(USART_CR1_TE|USART_CR1_TXEIE|USART_CR1_TCIE);
 			usart_data0.txr=0;
 		} else {
-			USART3->CR1&=~(USART_CR1_TXEIE|USART_CR1_TCIE);
+			usart->CR1&=~(USART_CR1_TXEIE|USART_CR1_TCIE);
 		}
 	}
 
 	if (st&USART_SR_RXNE) {
-		int c=USART3->DR;
+		int c=usart->DR;
 		usart_data0.rx_buf[usart_data0.rx_i%(RX_BSIZE)]=c;
 		usart_data0.rx_i++;
 		if (usart_data0.rblocker_list.first) {
@@ -149,7 +164,7 @@ void USART3_IRQHandler(void) {
 		}
 	}
 	if (st&USART_SR_ORE) {
-		USART3->DR=USART3->DR;
+		usart->DR=usart->DR;
 	}
 }
 
@@ -180,7 +195,7 @@ again:
 	ud->tx_in++;	
 	if (!ud->txr) {
 		ud->txr=1;
-		USART3->CR1|=(USART_CR1_TXEIE|USART_CR1_TCIE|USART_CR1_TE);
+		usart->CR1|=(USART_CR1_TXEIE|USART_CR1_TCIE|USART_CR1_TE);
 	}
 	return 1;
 }
@@ -189,12 +204,12 @@ static int usart_polled_putc(struct user_data *u, int c) {
 	struct usart_data *ud=u->drv_data;
 
 	if (ud->txr) {
-		while((!ud->chip_dead)&&!(((volatile short int)USART3->SR)&USART_SR_TXE));
+		while((!ud->chip_dead)&&!(((volatile short int)usart->SR)&USART_SR_TXE));
 	} else {
 		ud->txr=1;
-		USART3->CR1|=(USART_CR1_TE|USART_CR1_TCIE);
+		usart->CR1|=(USART_CR1_TE|USART_CR1_TCIE);
 	}
-	USART3->DR=c;
+	usart->DR=c;
 	return 1;
 }
 
@@ -309,7 +324,7 @@ static int usart_control(struct device_handle *dh,
 				usart_putc_fnc=usart_polled_putc;
 			} else {
 				usart_putc_fnc=usart_putc;
-				USART3->CR1|=(USART_CR1_TXEIE|USART_CR1_TCIE|USART_CR1_TE);
+				usart->CR1|=(USART_CR1_TXEIE|USART_CR1_TCIE|USART_CR1_TE);
 			}
 			break;
 		}
@@ -321,24 +336,48 @@ static int usart_control(struct device_handle *dh,
 }
 
 static int usart_init(void *instance) {
+	unsigned int brr;
 	struct usart_data *ud=(struct usart_data *)instance;
 	usart_putc_fnc=usart_putc;
 
+#if	USE_USART==1
+	usart=USART1;
+	RCC->APB2ENR|=RCC_APB2ENR_USART1EN;
+	usart_irqn=USART1_IRQn;
+	brr=0x2d9;	// 115200 at PCKL2=84Mhz over8=0
+#elif   USE_USART==2
+	usart=USART2;
+	RCC->APB1ENR|=RCC_APB1ENR_USART2EN;
+	usart_irqn=USART2_IRQn;
+//	brr=0x167;          // 115200 at PCKL1=42Mhz over8=0
+	brr=0x16D;          // 115200 at PCKL1=42Mhz over8=0
+#elif   USE_USART==3
+	usart=USART3;
 	RCC->APB1ENR|=RCC_APB1ENR_USART3EN;
+	usart_irqn=USART3_IRQn;
+//	brr=0x167;          // 115200 at PCKL1=42Mhz over8=0
+	brr=0x16D;          // 115200 at PCKL1=42Mhz over8=0
+#endif
+
+#if 0
 	RCC->AHB1ENR|=RCC_AHB1ENR_GPIOCEN;
+
 	/* USART3 uses PC10 for tx, PC11 for rx according to table 5 in  discovery documentation */
 //	GPIOC->AFRH = 0;
+
 	GPIOC->AFRH |= 0x00007000;  /* configure pin 11 to AF7 (USART3) */
 	GPIOC->AFRH |= 0x00000700;  /* confiure pin 10 to AF7 */
 	GPIOC->MODER |= (0x2 << 22);  /* set pin 11 to AF */
 	GPIOC->MODER |= (0x2 << 20);  /* set pin 10 to AF */
 	GPIOC->OSPEEDR |= (0x3 << 20); /* set pin 10 output high speed */
-	USART3->BRR=0x167;   /* 38400 baud at 8Mhz fpcl */
-	USART3->CR1=USART_CR1_UE;
+#endif
+	
+	usart->BRR=brr;
+	usart->CR1=USART_CR1_UE;
 	ud->txr=1;
-	USART3->CR1|=(USART_CR1_TXEIE|USART_CR1_TCIE|USART_CR1_TE|USART_CR1_RE|USART_CR1_RXNEIE);
-	NVIC_SetPriority(USART3_IRQn,0xd);
-	NVIC_EnableIRQ(USART3_IRQn);
+	usart->CR1|=(USART_CR1_TXEIE|USART_CR1_TCIE|USART_CR1_TE|USART_CR1_RE|USART_CR1_RXNEIE);
+	NVIC_SetPriority(usart_irqn,0xd);
+	NVIC_EnableIRQ(usart_irqn);
 
 	ud->wblocker_list.is_ready=tx_buf_empty;
 	ud->rblocker_list.is_ready=rx_data_avail;
@@ -346,6 +385,51 @@ static int usart_init(void *instance) {
 }
 
 static int usart_start(void *instance) {
+	int flags;
+	int rc;
+	int txpin;
+	int rxpin;
+
+	pindrv=driver_lookup(GPIO_DRV);
+	if (!pindrv) return 0;	
+	txpin_dh=pindrv->ops->open(pindrv->instance,0,0);
+	if (!txpin_dh) return -1;
+
+	rxpin_dh=pindrv->ops->open(pindrv->instance,0,0);
+	if (!rxpin_dh) return -1;
+
+	txpin=USART_TX_PIN;		// from config.h
+	rc=pindrv->ops->control(txpin_dh,GPIO_BIND_PIN,&txpin,sizeof(txpin));
+	if (rc<0) {
+		goto closeGPIO;
+	}
+
+	rxpin=USART_RX_PIN;		// from config.h
+	rc=pindrv->ops->control(rxpin_dh,GPIO_BIND_PIN,&rxpin,sizeof(rxpin));
+	if (rc<0) {
+		goto closeGPIO;
+	}
+
+	flags=GPIO_DIR(0,GPIO_ALTFN_PIN);
+	flags=GPIO_SPEED(flags,GPIO_SPEED_HIGH);
+	flags=GPIO_ALTFN(flags,7);
+	rc=pindrv->ops->control(txpin_dh,GPIO_SET_FLAGS, &flags, sizeof(flags));
+	if (rc<0) {
+		goto closeGPIO;
+	}
+
+	flags=GPIO_DIR(0,GPIO_ALTFN_PIN);
+	flags=GPIO_ALTFN(flags,7);
+	rc=pindrv->ops->control(rxpin_dh,GPIO_SET_FLAGS, &flags, sizeof(flags));
+	if (rc<0) {
+		goto closeGPIO;
+	}
+	
+	return 0;
+
+closeGPIO:
+	pindrv->ops->close(txpin_dh);
+	pindrv->ops->close(rxpin_dh);
 	return 0;
 }
 

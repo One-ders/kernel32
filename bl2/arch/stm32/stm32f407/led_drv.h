@@ -35,8 +35,3 @@
 #define LED_CTRL_STAT		0x1001
 #define LED_CTRL_ACTIVATE	0x1002
 #define LED_CTRL_DEACTIVATE	0x1003
-
-#define LED_GREEN	(1<<12)
-#define LED_AMBER	(1<<13)
-#define LED_RED		(1<<14)
-#define LED_BLUE	(1<<15)

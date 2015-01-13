@@ -1,7 +1,7 @@
 
-ODIR=$(OBJ)/arch/stm32/stm32f04
+ODIR=$(OBJ)/arch/stm32/stm32f407
 
-OUT=$(ODIR)/stm32f04.o
+OUT=$(ODIR)/stm32f407.o
 
 OBJECTS= \
 	$(ODIR)/startup_stm32f4xx.s \

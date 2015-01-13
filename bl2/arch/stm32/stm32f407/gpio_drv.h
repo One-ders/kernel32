@@ -50,15 +50,16 @@
 #define GPIO_CLR_FLAGS			0x1004
 #define GPIO_GET_FLAGS			0x1005
 
-#define GPIO_DIR(a,b)			((a&GPIO_DIR_MASK)|b)
-#define GPIO_DIR_MASK			0x3
+#define GPIO_DIR(a,b)			((a&~GPIO_DIR_MASK)|b)
+#define GPIO_DIR_MASK			0x7
 #define GPIO_INPUT 			0x00000001
 #define GPIO_OUTPUT			0x00000002
 #define GPIO_BUSPIN			0x00000003
+#define GPIO_ALTFN_PIN			0x00000004
 
 #define GPIO_DRIVE(a,b)			((a&~GPIO_DRIVE_MASK)|(b<<GPIO_DRIVE_SHIFT))
-#define GPIO_DRIVE_MASK			0xc
-#define GPIO_DRIVE_SHIFT		2
+#define GPIO_DRIVE_MASK			0x18
+#define GPIO_DRIVE_SHIFT		3
 #define GPIO_FLOAT			0
 #define GPIO_PUSHPULL			0
 #define GPIO_PULLUP			1
@@ -66,25 +67,38 @@
 #define GPIO_OPENDRAIN			3
 
 #define GPIO_SPEED(a,b)			((a&~GPIO_SPEED_MASK)|(b<<GPIO_SPEED_SHIFT))
-#define GPIO_SPEED_MASK			0x30
-#define GPIO_SPEED_SHIFT		4
+#define GPIO_SPEED_MASK			0x60
+#define GPIO_SPEED_SHIFT		5
 #define GPIO_SPEED_SLOW			0
 #define GPIO_SPEED_MEDIUM		1
 #define GPIO_SPEED_FAST			2
-#define GPIO_SPPED_HIGH			3
+#define GPIO_SPEED_HIGH			3
 #define GPIO_SPEED_2MHZ			GPIO_SPEED_SLOW
 #define GPIO_SPEED_25MHZ		GPIO_SPEED_MEDIUM
 #define GPIO_SPEED_50MHZ		GPIO_SPEED_FAST
 #define GPIO_SPEED_100MHZ		GPIO_SPEED_HIGH
 
-#define GPIO_IRQ			0x40
+#define GPIO_IRQ			0x80
 #define GPIO_IRQ_ENABLE(a)		(a|GPIO_IRQ)
 #define GPIO_IRQ_DISABLE(a)		(a&~GPIO_IRQ)
+
+#define GPIO_ALTFN(a,b)			((a&~GPIO_ALTFN_MASK)|(b<<GPIO_ALTFN_SHIFT))
+#define GPIO_ALTFN_MASK			0xf00
+#define GPIO_ALTFN_SHIFT		8
 
 #define	GPIO_SENSE_PIN			0x1006
 #define GPIO_SET_PIN			0x1007
 #define GPIO_SINK_PIN			0x1008
 #define GPIO_RELEASE_PIN		0x1009
+#define GPIO_BUS_ASSIGN_PINS		0x1010
+#define GPIO_BUS_READ_BITS		0x1011
+#define GPIO_BUS_SET_BITS		0x1012
+#define GPIO_BUS_CLR_BITS		0x1013
+
+struct pin_spec {
+	unsigned short int pin;
+	unsigned short int flags;
+};
 
 /* free GPIO IO pins
  *	PA8,PA15.PB0,PB1,PB2,PB4,PB5,PB7,
