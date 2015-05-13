@@ -1,4 +1,4 @@
-/* $FrameWorks: , v1.1 2014/04/07 21:44:00 anders Exp $ */
+/* $Leanaux: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
 /*
  * Copyright (c) 2014, Anders Franzen.
@@ -179,6 +179,7 @@ unsigned int get_svc_number(void *sp);
 unsigned long int get_svc_arg(void *sp, int arg_ix);
 void set_svc_ret(void *sp, long int val);
 unsigned long int get_stacked_pc(struct task *t);
+unsigned long int get_usr_pc(struct task *t);
 
 
 /*****************************************************/

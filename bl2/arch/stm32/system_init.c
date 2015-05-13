@@ -63,7 +63,12 @@ void put_page(void *p) {
 }
 
 #define PLL_M	8
+
+#ifdef MB1075B
+#define PLL_N	360
+#else
 #define PLL_N	336
+#endif
 #define PLL_P	2
 #define PLL_q	7
 
@@ -85,10 +90,17 @@ void system_init(void) {
 		 RCC_CR_CSSON |
 		 RCC_CR_PLLON);
 
+#ifdef MB1075B
 	RCC->PLLCFGR= 0x20000000 |
 			(RCC_PLLCFGR_PLLQ2 |
 			 (0xc0 << RCC_PLLCFGR_PLLN_SHIFT) |
 			RCC_PLLCFGR_PLLM4);
+#else
+	RCC->PLLCFGR= 0x20000000 |
+			(RCC_PLLCFGR_PLLQ2 |
+			 (0xc0 << RCC_PLLCFGR_PLLN_SHIFT) |
+			RCC_PLLCFGR_PLLM4);
+#endif
 
 	RCC->CR &= ~RCC_CR_HSEBYP;
 
@@ -113,9 +125,13 @@ void system_init(void) {
 		ASSERT(0);
 	}
 
-	/* Enable high perf mode, system clock to 168 MHz */
+	/* Enable high perf mode, system clock to 168/180 MHz */
 	RCC->APB1ENR |= RCC_APB1ENR_PWREN;
+#ifdef MB1075B
+	PWR->CR |= (3<<PWR_CR_VOS_SHIFT);
+#else
 	PWR->CR |= (1<<PWR_CR_VOS_SHIFT);
+#endif
 
 	/* HCLK = SYSCLK/1 */
 //	RCC->CFGR |= (1<<RCC_CFGR_HPRE_SHIFT);
@@ -136,6 +152,13 @@ void system_init(void) {
 
 	/* Enable the main PLL */
 	RCC->CR |= RCC_CR_PLLON;
+
+#ifdef MB1075B
+	PWR->CR |= PWR_CR_ODEN;
+	while(!(PWR->CSR&PWR_CSR_ODRDY));
+	PWR->CR |= PWR_CR_ODSW;
+	while(!(PWR->CSR&PWR_CSR_ODSWRDY));
+#endif
 
 	/* Wait for main PLL ready */
 	while(!(RCC->CR&RCC_CR_PLLRDY));

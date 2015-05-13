@@ -18,7 +18,7 @@ stm32.o: $(OBJ)/arch/stm32/stm32.o
 #
 #bsp.o:	startup_stm32f4xx.o system_stm32f4xx.o usart_drv.o stterm_drv.o
 
-$(OBJ)/arch/stm32/stm32.o: system_init.o mpu.o switch.o support_funcs.o ffs.S
+$(OBJ)/arch/stm32/stm32.o: system_init.o mpu.o switch.o support_funcs.o ffs.o
 	$(CC) $(LDFLAGS) -r -nostdlib -o $@ $^
 
 %.O: %.S

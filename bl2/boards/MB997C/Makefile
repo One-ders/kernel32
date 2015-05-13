@@ -1,6 +1,7 @@
 
+BOARD=MB997C
 TOP:=$(shell pwd)/../..
-OBJ:=$(TOP)/boards/discovery/obj
+OBJ:=$(TOP)/boards/$(BOARD)/obj
 GCC_BASE:=$(shell dirname `which arm-none-eabi-gcc`)/..
 
 export AS:=arm-none-eabi-as
@@ -8,7 +9,7 @@ export CC:=arm-none-eabi-gcc
 export LD:=arm-none-eabi-ld
 export OBJCOPY:=arm-none-eabi-objcopy
  
-CFLAGS=-I. -I$(TOP)/incl -I$(TOP)/boards/discovery -I$(TOP)/arch/stm32 -I$(TOP)/arch/stm32/incl -g -O2 -DDEBUG -Wall -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi=soft -fno-builtin
+CFLAGS=-I. -I$(TOP)/incl -I$(TOP)/boards/$(BOARD) -I$(TOP)/arch/stm32 -I$(TOP)/arch/stm32/incl -g -O2 -DDEBUG -Wall -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi=soft -fno-builtin
 
 CFLAGS_USR:=-I$(TOP)/usr/incl -I$(GCC_BASE)/lib/gcc/arm-none-eabi/4.8.3/include -g -Os -DDEBUG -fno-builtin -ffreestanding -nostdinc -Wall -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi=soft -fno-builtin
 
@@ -19,15 +20,15 @@ LDFLAGS_USR=-g -r $(OBJ)/usr/lib/usrlib.o
 
 all: myCore
 
-myCore: os stm32f04 stm32 stddrv usb_serial stmusb hr_timer usr.drv.o usr.bin.o
+myCore: os stm32f407 stm32 stddrv hr_timer usb_core usb_serial usr.drv.o usr.bin.o
 	$(CC) $(LDFLAGS) -o $@ $(OBJ)/os/init_sect.o \
 				$(OBJ)/os/os.o \
-				$(OBJ)/arch/stm32/stm32f04/stm32f04.o \
+				$(OBJ)/arch/stm32/stm32f407/stm32f407.o \
 				$(OBJ)/arch/stm32/stm32.o \
 				$(OBJ)/stddrv/stddrv.o \
-				$(OBJ)/lib/usb_serial_drv.o \
-				$(OBJ)/arch/stm32/stm32f04/hr_timer/hr_timer.o \
-				$(OBJ)/stmusb/stm_usb_drv.o \
+				$(OBJ)/arch/stm32/stm32f407/hr_timer/hr_timer.o \
+				$(OBJ)/arch/stm32/usb/usb_drv.o \
+				$(OBJ)/drivers/usb_serial/usb_serial_drv.o \
 				$(OBJ)/usr/usr.drv.o \
 				$(OBJ)/os/end_sect.o \
 				$(OBJ)/usr/usr.bin.o
@@ -132,21 +133,29 @@ $(OBJ)/arch/stm32: $(TOP)/arch/stm32
 	mkdir -p $@
 	lndir $< $@
 
-stm32f04: stm32 stm32f04do
-
-stm32f04do: $(OBJ)/arch/stm32/stm32f04
+usb_core: $(OBJ)/arch/stm32/usb
 	CFLAGS="$(CFLAGS)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
 
-$(OBJ)/arch/stm32/stm32f04: $(TOP)/arch/stm32/stm32f04
+$(OBJ)/arch/stm32/usb: $(TOP)/arch/stm32/usb
 	mkdir -p $@
 	lndir $< $@
 
-hr_timer: stm32f04 hr_timer_build
 
-hr_timer_build: $(OBJ)/arch/stm32/stm32f04/hr_timer
+stm32f407: stm32 stm32f407do
+
+stm32f407do: $(OBJ)/arch/stm32/stm32f407
 	CFLAGS="$(CFLAGS)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
 
-$(OBJ)/arch/stm32/stm32f04/hr_timer: $(TOP)/arch/stm32/stm32f04/hr_timer
+$(OBJ)/arch/stm32/stm32f407: $(TOP)/arch/stm32/stm32f407
+	mkdir -p $@
+	lndir $< $@
+
+hr_timer: stm32f407 hr_timer_build
+
+hr_timer_build: $(OBJ)/arch/stm32/stm32f407/hr_timer
+	CFLAGS="$(CFLAGS)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
+
+$(OBJ)/arch/stm32/stm32f407/hr_timer: $(TOP)/arch/stm32/stm32f407/hr_timer
 	mkdir -p $@
 	lndir $< $@
 

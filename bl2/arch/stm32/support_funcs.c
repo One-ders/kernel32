@@ -46,3 +46,37 @@ void setup_return_stack(struct task *t, void *stackp_v,
 unsigned long int get_stacked_pc(struct task *t) {
 	return ((struct fullframe *)t->sp)->r15;
 }
+
+unsigned long int get_usr_pc(struct task *t) {
+	unsigned long int *stackp=(unsigned long int *)t->estack;
+	unsigned int i;
+	unsigned long int rval;
+
+	map_tmp_stack_page(stackp,2048);
+	for(i=512;i>0;i--) {
+		if (stackp[i-1]==0xfffffff9) {
+			if (stackp[(i-1)+9]==0x21000000) {
+				rval=stackp[(i-1)+7];
+				unmap_tmp_stack_page();
+				return rval;
+			}
+		}
+	}
+	unmap_tmp_stack_page();
+	return 0;
+}
+
+int sys_udelay(unsigned int usec) {
+	unsigned int count=0;
+	unsigned int utime=(120*usec/7);
+	do {
+		if (++count>utime) {
+			return 0;
+		}
+	} while (1);
+}
+
+int sys_mdelay(unsigned int msec) {
+	sys_udelay(msec*1000);
+	return 0;
+}

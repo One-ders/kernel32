@@ -1,6 +1,9 @@
 
 #define SYS_CLOCK	180000000
 
+/* define board */
+#define MB1075B
+
 #define SDRAM_SIZE	256*1024
 #define BYTES_PER_LONG	4
 
@@ -139,6 +142,16 @@
 #define USE_USART	1
 #define USART_TX_PIN	GPIO_PIN(PA,9)
 #define USART_RX_PIN	GPIO_PIN(PA,10)
+
+/* Usb */
+#define USB_ID		GPIO_PIN(PB,12)
+#define USB_VBUS	GPIO_PIN(PB,13)
+#define USB_DM		GPIO_PIN(PB,14)
+#define USB_DP		GPIO_PIN(PB,15)
+#if 0
+#define USB_PSO		GPIO_PIN(PC,4)
+#define USB_QC		GPIO_PIN(PC,5)
+#endif
 
 /* Cec */
 #if 1
