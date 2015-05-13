@@ -34,6 +34,7 @@
 
 #include "sys.h"
 #include "io.h"
+#include "string.h"
 
 static struct driver *iodrv;
 static struct device_handle *dh;

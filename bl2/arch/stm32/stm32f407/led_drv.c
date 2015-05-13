@@ -107,7 +107,7 @@ static int led_start(void *inst) {
 	}
 	rc=pindrv->ops->control(pin_dh,GPIO_BUS_ASSIGN_PINS,pd,sizeof(pd));
 	started=1;
-	return 0;
+	return rc;
 }
 
 static struct driver_ops led_drv_ops = {

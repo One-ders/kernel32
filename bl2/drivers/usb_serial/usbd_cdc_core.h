@@ -56,9 +56,9 @@
 
 #define STANDARD_ENDPOINT_DESC_SIZE             0x09
 
-#define CDC_DATA_IN_PACKET_SIZE                 *(uint16_t *)(((USB_OTG_CORE_HANDLE *)core)->dev.pConfig_descriptor + 57)
+#define CDC_DATA_IN_PACKET_SIZE(a)                 *((uint16_t *)(a->dev.config_descriptor + 57))
 
-#define CDC_DATA_OUT_PACKET_SIZE                *(uint16_t *)(((USB_OTG_CORE_HANDLE *)core)->dev.pConfig_descriptor + 64)
+#define CDC_DATA_OUT_PACKET_SIZE(a)                *((uint16_t *)(a->dev.config_descriptor + 64))
 
 /*---------------------------------------------------------------------*/
 /*  CDC definitions                                                    */

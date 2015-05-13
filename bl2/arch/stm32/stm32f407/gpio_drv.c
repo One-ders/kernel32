@@ -330,16 +330,27 @@ static int set_flags(struct pin_data *pdp, unsigned int flags, unsigned int optp
 		sys_printf("pin is altfn\n");
 		GPIO[bus]->moder&=~(3<<(pin<<1));
 		GPIO[bus]->moder|=(2<<(pin<<1));
+		if (speed) {
+			GPIO[bus]->ospeedr&=~(3<<(pin<<1));
+			GPIO[bus]->ospeedr|=(speed<<(pin<<1));
+		}
+
+//		if ((drive==GPIO_OPENDRAIN)||(dir==GPIO_BUSPIN)) {
+
+		if (drive==GPIO_PUSHPULL) {
+			GPIO[bus]->otyper&=~(1<<pin);
+		} else {
+			GPIO[bus]->otyper|=(1<<pin);
+		}
+	}
+
+	if (altfn) {
 		if (pin<8) {
 			GPIO[bus]->afrl&=~(0xf<<(pin<<2));
 			GPIO[bus]->afrl|=(altfn<<(pin<<2));
 		} else {
 			GPIO[bus]->afrh&=~(0xf<<((pin-8)<<2));
 			GPIO[bus]->afrh|=(altfn<<((pin-8)<<2));
-		}
-		if (speed) {
-			GPIO[bus]->ospeedr&=~(3<<(pin<<1));
-			GPIO[bus]->ospeedr|=(speed<<(pin<<1));
 		}
 	}
 
@@ -415,10 +426,12 @@ static int gpio_control(struct device_handle *dh, int cmd, void *arg1, int arg2)
 	switch(cmd) {
 		case GPIO_BIND_PIN: {
 			unsigned int pin;
-			if (arg2!=4) return -1;
+			int rc=-1;
+			if (arg2!=4) return rc;
 			pin=*((unsigned int *)arg1);
-			return assign_pin(pdp,pin);
-	pdp->pin_flags|=PIN_FLAGS_ASSIGNED;
+			rc=assign_pin(pdp,pin);
+			if (rc<0) return rc;
+			pdp->pin_flags|=PIN_FLAGS_ASSIGNED;
 			break;
 		}
 		case GPIO_GET_BOUND_PIN: {

@@ -63,7 +63,7 @@ static int get_procdata(char *name, struct procdata *pd, int size) {
 			pd->prio_flags=p->prio_flags;
 			pd->active_tics=p->active_tics;
 			if (p->state!=1) {
-				pd->pc=get_stacked_pc(p);
+				pd->pc=get_usr_pc(p);
 			} else pd->pc=0;
 			return sizeof(struct procdata);
 		}

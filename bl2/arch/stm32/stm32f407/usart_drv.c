@@ -340,23 +340,39 @@ static int usart_init(void *instance) {
 	struct usart_data *ud=(struct usart_data *)instance;
 	usart_putc_fnc=usart_putc;
 
+#if 0
+	busckl*100/(baudr*16) = aabb
+	brr=(aa<<4)|((bb*16)/100)
+#endif
 #if	USE_USART==1
 	usart=USART1;
 	RCC->APB2ENR|=RCC_APB2ENR_USART1EN;
 	usart_irqn=USART1_IRQn;
+#ifdef MB1075B
+	brr=0x30d;	// 115200 at PCKL2=90Mhz over8=0
+#else
 	brr=0x2d9;	// 115200 at PCKL2=84Mhz over8=0
+#endif
 #elif   USE_USART==2
 	usart=USART2;
 	RCC->APB1ENR|=RCC_APB1ENR_USART2EN;
 	usart_irqn=USART2_IRQn;
 //	brr=0x167;          // 115200 at PCKL1=42Mhz over8=0
+#ifdef MB1075B
+	brr=0x187;          // 115200 at PCKL2=45Mhz over8=0
+#else
 	brr=0x16D;          // 115200 at PCKL1=42Mhz over8=0
+#endif
 #elif   USE_USART==3
 	usart=USART3;
 	RCC->APB1ENR|=RCC_APB1ENR_USART3EN;
 	usart_irqn=USART3_IRQn;
 //	brr=0x167;          // 115200 at PCKL1=42Mhz over8=0
+#ifdef MB1075B
+	brr=0x187;          // 115200 at PCKL2=45Mhz over8=0
+#else
 	brr=0x16D;          // 115200 at PCKL1=42Mhz over8=0
+#endif
 #endif
 
 #if 0
@@ -373,12 +389,6 @@ static int usart_init(void *instance) {
 #endif
 	
 	usart->BRR=brr;
-	usart->CR1=USART_CR1_UE;
-	ud->txr=1;
-	usart->CR1|=(USART_CR1_TXEIE|USART_CR1_TCIE|USART_CR1_TE|USART_CR1_RE|USART_CR1_RXNEIE);
-	NVIC_SetPriority(usart_irqn,0xd);
-	NVIC_EnableIRQ(usart_irqn);
-
 	ud->wblocker_list.is_ready=tx_buf_empty;
 	ud->rblocker_list.is_ready=rx_data_avail;
 	return 0;
@@ -389,6 +399,7 @@ static int usart_start(void *instance) {
 	int rc;
 	int txpin;
 	int rxpin;
+	struct usart_data *ud=(struct usart_data *)instance;
 
 	pindrv=driver_lookup(GPIO_DRV);
 	if (!pindrv) return 0;	
@@ -412,6 +423,7 @@ static int usart_start(void *instance) {
 
 	flags=GPIO_DIR(0,GPIO_ALTFN_PIN);
 	flags=GPIO_SPEED(flags,GPIO_SPEED_HIGH);
+	flags=GPIO_DRIVE(flags,GPIO_PUSHPULL);
 	flags=GPIO_ALTFN(flags,7);
 	rc=pindrv->ops->control(txpin_dh,GPIO_SET_FLAGS, &flags, sizeof(flags));
 	if (rc<0) {
@@ -424,6 +436,13 @@ static int usart_start(void *instance) {
 	if (rc<0) {
 		goto closeGPIO;
 	}
+
+	usart->CR1=USART_CR1_UE;
+	ud->txr=1;
+	usart->CR1|=(USART_CR1_TXEIE|USART_CR1_TCIE|USART_CR1_TE|USART_CR1_RE|USART_CR1_RXNEIE);
+	NVIC_SetPriority(usart_irqn,0xd);
+	NVIC_EnableIRQ(usart_irqn);
+
 	
 	return 0;
 

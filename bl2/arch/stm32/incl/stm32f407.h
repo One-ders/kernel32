@@ -23,6 +23,8 @@ typedef int IRQn_Type;
 
 #define EXTI15_10_IRQn		40
 
+#define OTG_FS_IRQn		67
+#define OTG_HS_IRQn		77
 
 extern unsigned int SystemCoreClock;
 
