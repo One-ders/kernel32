@@ -1,4 +1,4 @@
-/* $embedix/leanux: , v1.1 2014/04/07 21:44:00 anders Exp $ */
+/* $notix/leanaux: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
 /*
  * Copyright (c) 2014, Anders Franzen.
@@ -1140,13 +1140,14 @@ void init_sys(void) {
 	driver_start();
 }
 
+extern const char *ver;
 void start_up(void) {
         /* initialize the executive */
         init_sys();
         init_io();
 
         /* start the executive */
-        sys_printf("start_up, starting tasks\n");
+        sys_printf("notix git ver %s, starting tasks\n",ver);
         start_sys();
 }
 
