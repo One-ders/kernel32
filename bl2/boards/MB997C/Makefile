@@ -4,6 +4,8 @@ TOP:=$(shell pwd)/../..
 OBJ:=$(TOP)/boards/$(BOARD)/obj
 GCC_BASE:=$(shell dirname `which arm-none-eabi-gcc`)/..
 
+GIT_VERSION:=$(shell git describe --abbrev=4 --dirty --always --tags)
+
 export AS:=arm-none-eabi-as
 export CC:=arm-none-eabi-gcc
 export LD:=arm-none-eabi-ld
@@ -20,8 +22,9 @@ LDFLAGS_USR=-g -r $(OBJ)/usr/lib/usrlib.o
 
 all: myCore
 
-myCore: os stm32f407 stm32 stddrv hr_timer usb_core usb_serial usr.drv.o usr.bin.o
+myCore: os version stm32f407 stm32 stddrv hr_timer usb_core usb_serial usr.drv.o usr.bin.o
 	$(CC) $(LDFLAGS) -o $@ $(OBJ)/os/init_sect.o \
+				$(OBJ)/version.c \
 				$(OBJ)/os/os.o \
 				$(OBJ)/arch/stm32/stm32f407/stm32f407.o \
 				$(OBJ)/arch/stm32/stm32.o \
@@ -32,6 +35,10 @@ myCore: os stm32f407 stm32 stddrv hr_timer usb_core usb_serial usr.drv.o usr.bin
 				$(OBJ)/usr/usr.drv.o \
 				$(OBJ)/os/end_sect.o \
 				$(OBJ)/usr/usr.bin.o
+
+version:
+	echo "const char *ver=\"$(GIT_VERSION)\";" > $(OBJ)/version.c
+
 
 usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/cec_a1_ctrl/cec_a1_ctrl.o
 	$(LD) -o $(OBJ)/usr/usr.bin.o $(LDFLAGS_USR) $^
