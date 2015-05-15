@@ -41,7 +41,7 @@ unsigned int sys_irqs;
 struct task * volatile ready[5];
 struct task * volatile ready_last[5];
 
-struct task main_task = { "init_main", (void *)(0x20020000-0x1000), 256, 0, 0, 1, 3, (void *)(0x20020000-0x2000) };
+struct task main_task = { "init_main", (void *)(0x20020000), 256, 0, 0, 1, 3, (void *)(0x20020000-0x800) };
 //struct task main_task = { "init_main", (void *)(0x84000000-0x2000), 256, 0, 0, 1, 3, (void *)(0x84000000-0x3000) };
 struct task *troot =&main_task;
 struct task * volatile current = &main_task;
@@ -824,6 +824,7 @@ static void sys_timer_remove(struct blocker *b) {
 }
 
 int device_ready(struct blocker *b) {
+	if (b->ev&0x80) return 0;  // blocking from a list
 	return b->driver->ops->control(b->dh, IO_POLL, (void *)b->ev, 0);
 }
 
@@ -863,6 +864,7 @@ void *sys_sleepon(struct blocker *so, unsigned int *tout) {
 	DEBUGP(DLEV_SCHED,"sys sleepon %x task: %s\n", so, current->name);
 	switch_now();
 
+	so->ev&=~0x80; // Clear list sleep
 	if (tout&&*tout) {
 		if (so->wakeup_tic!=tq_tic) {
 			*tout=(so->wakeup_tic-tq_tic)*10;
@@ -891,6 +893,7 @@ void *sys_sleepon_update_list(struct blocker *b, struct blocker_list *bl_ptr) {
 		bl_ptr->first=b;
 	}
 	bl_ptr->last=b;
+	b->ev|=0x80;
 	restore_cpu_flags(cpu_flags);
 	rc=sys_sleepon(b,0);
 	if (!rc) { 
@@ -1177,6 +1180,7 @@ void start_sys(void) {
 	t->state=TASK_STATE_READY;
 	t->prio_flags=3;
 	stackp=((unsigned long int)t)+4096;
+	t->estack=((unsigned long int)t)+2048;
 	stackp=stackp-8;
 	strcpy((void *)stackp,"usart0");
 	setup_return_stack(t,(void *)stackp,(unsigned long int)__usr_main,0, (void *)stackp, (void *)8);

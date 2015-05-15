@@ -241,8 +241,11 @@ void main(void *dum) {
 		u_init=1;
 		install_cmd_node(&my_cmd_node,0);
 //		init_blinky();
+#ifdef TEST_USB_SERIAL
+		thread_create(main,"usb_serial0",12,1,"sys_mon:usb");
+#else
 		init_cec_a1();
-//		thread_create(main,"usb_serial0",12,1,"sys_mon:usb");
+#endif
 	}
 
 

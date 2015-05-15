@@ -179,12 +179,11 @@ void usbd_set_config(struct usb_dev_handle *pdev,
 	unsigned char cfgidx=req->wValue;
 	
 	if (cfgidx>USBD_CFG_MAX_NUM) {
-		sys_printf("set_config: cfgidx %d to high\n",cfgidx);
+//		sys_printf("set_config: cfgidx %d to high\n",cfgidx);
 		usbd_ctl_error(pdev,req);
 	} else {
 		switch(pdev->dev.dev_status) {
 			case USB_DEV_STAT_ADDRESSED:
-		sys_printf("set_config: cfgidx %d STAT_ADDRESSED\n",cfgidx);
 				if(cfgidx) {
 					pdev->dev.dev_config=cfgidx;
 					pdev->dev.dev_status=USB_DEV_STAT_CONFIGURED;
@@ -195,7 +194,7 @@ void usbd_set_config(struct usb_dev_handle *pdev,
 				}
 				break;
 			case USB_DEV_STAT_CONFIGURED:
-		sys_printf("set_config: cfgidx %d STAT_CONFIGURED\n",cfgidx);
+//		sys_printf("set_config: cfgidx %d STAT_CONFIGURED\n",cfgidx);
 				if (!cfgidx) {
 					pdev->dev.dev_status=USB_DEV_STAT_ADDRESSED;
 					pdev->dev.dev_config=cfgidx;
@@ -211,7 +210,7 @@ void usbd_set_config(struct usb_dev_handle *pdev,
 				}
 				break;
 			default:
-		sys_printf("set_config: cfgidx %d default err\n",cfgidx);
+//		sys_printf("set_config: cfgidx %d default err\n",cfgidx);
 				usbd_ctl_error(pdev,req);
 				break;
 		}
@@ -476,8 +475,8 @@ void usbd_parse_setup_req(struct usb_dev_handle *pdev,
 //	req->wLength	= ntohs(tmp);
 	req->wLength	= tmp;
 
-	sys_printf("parse_setup_req: bmReq(%d),bReq(%d),wVal(%d),wIx(%d),wLen(%d)\n",
-		req->bmRequest,req->bRequest,req->wValue,req->wIndex,req->wLength);
+//	sys_printf("parse_setup_req: bmReq(%d),bReq(%d),wVal(%d),wIx(%d),wLen(%d)\n",
+//		req->bmRequest,req->bRequest,req->wValue,req->wIndex,req->wLength);
 
 	pdev->dev.in_ep[0].ctl_data_len=req->wLength;
 	pdev->dev.dev_state=USB_DEV_EP0_SETUP;
@@ -621,7 +620,6 @@ int usbd_sof(struct usb_dev_handle *pdev) {
 }
 
 int usbd_set_cfg(struct usb_dev_handle *pdev, unsigned char cfgidx) {
-	sys_printf("usbd_set_cfg\n");
 	pdev->dev.class_cb->init(pdev->uref,cfgidx);
 	pdev->dev.usr_cb->dev_configured();
 	return 0;

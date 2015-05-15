@@ -48,21 +48,18 @@ unsigned long int get_stacked_pc(struct task *t) {
 }
 
 unsigned long int get_usr_pc(struct task *t) {
-	unsigned long int *stackp=(unsigned long int *)t->estack;
+	unsigned long int *estackp=(unsigned long int *)t->estack;
+	unsigned long int *stackp=t->sp;
+	unsigned long int *bstackp=estackp+512;
 	unsigned int i;
 	unsigned long int rval;
 
-	map_tmp_stack_page(stackp,2048);
-	for(i=512;i>0;i--) {
-		if (stackp[i-1]==0xfffffff9) {
-			if (stackp[(i-1)+9]==0x21000000) {
-				rval=stackp[(i-1)+7];
-				unmap_tmp_stack_page();
-				return rval;
-			}
+	for(;stackp<bstackp;stackp++) {
+		if (stackp[0]==0xfffffff9) {
+			rval=stackp[7];
+			return rval;
 		}
 	}
-	unmap_tmp_stack_page();
 	return 0;
 }
 
