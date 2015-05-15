@@ -50,7 +50,7 @@ unsigned int usb_dev_ep_open(struct usb_dev_handle *pdev,
 					unsigned char ep_type) {
 	struct usb_dev_ep *ep;
 
-	sys_printf("usb_dev_ep_open: epnum %d, max packet size %d, ep type %d\n", ep_addr, ep_max_packet_size, ep_type);
+//	sys_printf("usb_dev_ep_open: epnum %d, max packet size %d, ep type %d\n", ep_addr, ep_max_packet_size, ep_type);
 	if (ep_addr&0x80) {
 		ep=&pdev->dev.in_ep[ep_addr&0x7f];
 		ep->is_in=1;
@@ -217,25 +217,6 @@ static void usb_dev_set_ep_status(struct usb_dev_handle *pdev,
 	usb_core_dev_set_ep_status(pdev->regs,ep,status);
 }
 
-
-#if 0
-struct usb_device_funcs dev_funcs = {
-	.usb_dev_init=usb_dev_init,
-	.usb_dev_ep_open=usb_dev_ep_open,
-	.usb_dev_ep_close=usb_dev_ep_close,
-	.usb_dev_prepare_rx=usb_dev_prepare_rx,
-	.usb_dev_tx=usb_dev_tx,
-	.usb_dev_ep_stall=usb_dev_ep_stall,
-	.usb_dev_ep_clr_stall=usb_dev_ep_clr_stall,
-	.usb_dev_ep_flush=usb_dev_ep_flush,
-	.usb_dev_set_address=usb_dev_set_address,
-	.usb_dev_connect=usb_dev_connect,
-	.usb_dev_disconnect=usb_dev_disconnect,
-	.usb_dev_get_ep_status=usb_dev_get_ep_status,
-	.usb_dev_set_ep_status=usb_dev_set_ep_status
-};
-#endif
-
 unsigned int usb_dev_get_string(unsigned char *desc, 
 				unsigned char *unicode, 
 				unsigned short *len) {
@@ -274,7 +255,7 @@ unsigned int usb_dev_ctl_prepare_rx(struct usb_dev_handle *pdev,
 
 	pdev->dev.out_ep[0].total_data_len=len;
 	pdev->dev.out_ep[0].rem_data_len=len;
-	pdev->dev.dev_state=USB_DEV_EP0_DATA_IN;
+	pdev->dev.dev_state=USB_DEV_EP0_DATA_OUT;
 
 	usb_dev_prepare_rx(pdev,0,buf,len);
 	return 0;
