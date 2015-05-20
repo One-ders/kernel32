@@ -1,5 +1,4 @@
 
-#define TEST_USB_SERIAL
 
 #define SYS_CLOCK	168000000
 

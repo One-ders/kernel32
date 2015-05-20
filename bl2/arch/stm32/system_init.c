@@ -8,11 +8,6 @@ void _exit(int status) {
 }
 
 void build_free_page_list(void);
-
-void init_sys_arch(void) {
-	build_free_page_list();
-}
-
 static unsigned long free_page_map[SDRAM_SIZE/(PAGE_SIZE*sizeof(unsigned long))];
 
 extern unsigned long __bss_start__;
@@ -22,10 +17,18 @@ extern unsigned long __bss_end__;
 #define set_in_use(a,b) ((a)[((unsigned long int)(b))/32]&=~(1<<(((unsigned long int)(b))%32)))
 #define set_free(a,b) ((a)[((unsigned long int)(b))/32]|=(1<<(((unsigned long int)(b))%32)))
 
+#define SDRAM_START 0x20000000
+
+void init_sys_arch(void) {
+//	unsigned long int psize;
+	build_free_page_list();
+//	psize=(SDRAM_SIZE+SDRAM_START)-__bss_end__;
+//	sys_printf("psize=%x\n",psize);
+}
+
 void build_free_page_list() {
-	unsigned long int mptr=0x20000000;
+	unsigned long int mptr=SDRAM_START;
 	int i;
-	sys_printf("build_free_page_list\n");
 
 	for(i=0;i<(sizeof(free_page_map)/sizeof(unsigned long int));i++) {
 		free_page_map[i]=~0;

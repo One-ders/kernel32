@@ -35,6 +35,7 @@ int bsp_usb_init(struct usb_dev_handle *pdev) {
 	struct device_handle *pin_dh;
 	struct pin_spec ps[4];
 	unsigned int flags;
+	int altfn;
 
 	usb_dev=pdev;
 
@@ -42,13 +43,20 @@ int bsp_usb_init(struct usb_dev_handle *pdev) {
 	pin_dh=pindrv->ops->open(pindrv->instance,0,0);
 	if(!pin_dh) return 0;
 
+	if (pdev->regs==USB_OTG_HS_ADDR) {
+		altfn=12;
+	} else {
+		altfn=10;
+	}
+
+
 //      ps[0].pin=USB_VBUS;
 	ps[0].pin=USB_ID;
 	flags=GPIO_DIR(0,GPIO_ALTFN_PIN);
 //      flags=GPIO_DIR(0,GPIO_INPUT);
 	flags=GPIO_SPEED(flags,GPIO_SPEED_HIGH);
 	flags=GPIO_DRIVE(flags,GPIO_PUSHPULL);
-	flags=GPIO_ALTFN(flags,0xa);
+	flags=GPIO_ALTFN(flags,altfn);
 	ps[0].flags=flags;
 //      ps[1].pin=USB_ID;
 	ps[1].pin=USB_VBUS;
@@ -61,13 +69,13 @@ int bsp_usb_init(struct usb_dev_handle *pdev) {
 	flags=GPIO_DIR(0,GPIO_ALTFN_PIN);
 	flags=GPIO_SPEED(flags,GPIO_SPEED_HIGH);
 	flags=GPIO_DRIVE(flags,GPIO_PUSHPULL);
-	flags=GPIO_ALTFN(flags,0xa);
+	flags=GPIO_ALTFN(flags,altfn);
 	ps[2].flags=flags;
 	ps[3].pin=USB_DP;
 	flags=GPIO_DIR(0,GPIO_ALTFN_PIN);
 	flags=GPIO_SPEED(flags,GPIO_SPEED_HIGH);
 	flags=GPIO_DRIVE(flags,GPIO_PUSHPULL);
-	flags=GPIO_ALTFN(flags,0xa);
+	flags=GPIO_ALTFN(flags,altfn);
 	ps[3].flags=flags;
 
 	pindrv->ops->control(pin_dh,GPIO_BUS_ASSIGN_PINS,ps,sizeof(ps));

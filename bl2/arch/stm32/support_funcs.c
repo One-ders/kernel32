@@ -51,15 +51,26 @@ unsigned long int get_usr_pc(struct task *t) {
 	unsigned long int *estackp=(unsigned long int *)t->estack;
 	unsigned long int *stackp=t->sp;
 	unsigned long int *bstackp=estackp+512;
-	unsigned int i;
 	unsigned long int rval;
+	unsigned long int cpu_flags;
 
+	// We need to map in the stack page of the process we want to read.
+	// It is mpu protected while inactive.
+	// Also shut off irqs to prevent rescheduling, if we would
+	// get switched out, the aux stack page will not be present
+	// at switch in.
+	cpu_flags=disable_interrupts();
+	map_tmp_stack_page(estackp, 10);
 	for(;stackp<bstackp;stackp++) {
 		if (stackp[0]==0xfffffff9) {
 			rval=stackp[7];
+			unmap_tmp_stack_page();
+			restore_cpu_flags(cpu_flags);
 			return rval;
 		}
 	}
+	unmap_tmp_stack_page();
+	restore_cpu_flags(cpu_flags);
 	return 0;
 }
 

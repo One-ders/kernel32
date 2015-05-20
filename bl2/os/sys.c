@@ -304,9 +304,10 @@ void *handle_syscall(unsigned long int *svc_sp) {
 				return 0;
 			}
 
-			map_tmp_stack_page((unsigned long int)estack,9);
+			map_tmp_stack_page((unsigned long int)estack,10);
 
 			if (tca->prio>MAX_PRIO) {
+				unmap_tmp_stack_page();
 				set_svc_ret(svc_sp,-1);
 				return 0;
 			}
@@ -943,8 +944,8 @@ void *sys_wakeup(struct blocker *so) {
 		if (so->wakeup_tic) {
 			sys_timer_remove(so);
 		}
-//		sys_printf("waking up running process\n");
-//		ASSERT(0);
+		sys_printf("waking up running not current process\n");
+		ASSERT(0);
 		return 0;
 	}
 
@@ -1150,7 +1151,7 @@ void start_up(void) {
         init_io();
 
         /* start the executive */
-        sys_printf("notix git ver %s, starting tasks\n",ver);
+        sys_printf("Notix git ver %s, starting tasks\n",ver);
         start_sys();
 }
 

@@ -900,19 +900,25 @@ static int usb_serial_putc(struct user_data *ud, int c) {
 	usb_data->tx_in++;
 	restore_cpu_flags(cpu_flags);
 	if (!tx_started) return 1;
+	cpu_flags=disable_interrupts();
 	if(!usb_data->txr) {
 		int len=usb_data->tx_in;
 		usb_data->tx_in=0;
 		usb_data->txr=1;
 		usb_dev_tx(usb_data->core,0x82,((unsigned char *)usb_data->tx_buf),len);
 	}
+	restore_cpu_flags(cpu_flags);
 	return 1;
 }
 
 static int usb_serial_write(struct user_data *ud, char *buf, int len) {
 	int i;
+	int rc;
 	for(i=0;i<len;i++) {
-		if (usb_serial_putc(ud,buf[i])<0) return i;
+		if ((rc=usb_serial_putc(ud,buf[i]))<0) {
+			if (!i) return rc;
+			return i;
+		}
 	}
 	return len;
 }
