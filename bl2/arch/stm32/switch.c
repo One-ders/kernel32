@@ -48,7 +48,7 @@ void __attribute__ (( naked )) PendSV_Handler(void) {
 		"str r2,[r1,#4]\n\t"		/* save sp on prev task */
 		"ldr r1,.Label2\n\t"
 		"ldr r2,[r1,#0]\n\t"
-		"bic r2,r2,0x03000000\n\t"
+		"bic r2,r2,0x07000000\n\t"
 		"str r2,[r1,#0]\n\t"		/* map out prev task mem */
 		"ldr r1,.Label1\n\t"
 		"str r0,[r1,#0]\n\t"		/* store new task as current */
@@ -67,12 +67,20 @@ void __attribute__ (( naked )) PendSV_Handler(void) {
 	);
 }
 
+#define POLLPRINT(a) {io_setpolled(1);sys_printf(a);io_setpolled(0);}
+
+// For now, dont use any call that can block the thread,
+// theres is a bug when running this code from the kernel,
+// wrong irq level is set.
+
 void *PendSV_Handler_c(unsigned long int *save_sp) {
 	int i=0;
 	struct task *t;
 	unsigned long int cpu_flags;
 	sys_irqs++;
 
+	/* clr pendsv trap  cpu bug????*/
+//	 *((unsigned int volatile *)0xE000ED04) = 0x08000000;
 	cpu_flags=disable_interrupts();
 	while(i<MAX_PRIO) {
 		t=ready[i];
@@ -83,6 +91,7 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 		}
 		i++;
 	}
+
 	if (t==current) {
 		ASSERT(0);
 	}
@@ -93,10 +102,13 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 	if (!t) {
 		ASSERT(0);
 	}
+
 	if (t==current) {
 		ASSERT(0);
 	}
 
+	// from here as fix we run with irq off until ctx switch
+	cpu_flags=disable_interrupts();
 	if (current->blocker.wake) {
 		/* IO blocked task, is ready, so    */
 		/* fall through and set state ready */
@@ -104,12 +116,14 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 		current->state=TASK_STATE_RUNNING;
 		if (t->prio_flags>current->prio_flags) {
 			CLR_TMARK(current);
-			sys_printf("in pendsv: readying blocked task\n");
-			t->next=ready[(t->prio_flags)&3];
+			t->next=ready[t->prio_flags&3];
 			ready[t->prio_flags&3]=t;
+			restore_cpu_flags(cpu_flags);
 			return 0;
 		}
 	}
+
+//	restore_cpu_flags(cpu_flags);
 	/* Have next, move away current if still here, 
 	   timer and blocker move themselves */
 	if (current->state==TASK_STATE_RUNNING) {
@@ -117,7 +131,7 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 		ASSERT(!current->next);
 		CLR_TMARK(current);
 		if (prio>4) prio=4;
-		cpu_flags=disable_interrupts();
+//		cpu_flags=disable_interrupts();
 		current->state=TASK_STATE_READY;
 		if (ready[prio]) {
 			ready_last[prio]->next=current;
@@ -125,9 +139,9 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 			ready[prio]=current;
 		}
 		ready_last[prio]=current;
-		restore_cpu_flags(cpu_flags);
+//		restore_cpu_flags(cpu_flags);
 		if (t->prio_flags>current->prio_flags) {
-			sys_printf("pendsv: yielding out high prio proc\n");
+			POLLPRINT("pendsv: yielding out high prio proc\n");
 		}
 	}
 
@@ -172,6 +186,9 @@ __attribute__ ((naked)) int fake_pendSV(void) {
 }
 
 void switch_now(void) {
+//	if (!(ready[0]||ready[1]||ready[2]||ready[3])) {
+//		ASSERT(0);
+//	}
 	fake_pendSV();
 	if ((xpsr()&0x1ff)!=0x0b) {
 		ASSERT(0);
@@ -195,6 +212,7 @@ void __attribute__ (( naked )) UsageFault_Handler(void) {
         sys_printf("in usagefault handler\n");
         ASSERT(0);
 }
+
 
 void Error_Handler_c(void *sp);
 

@@ -37,7 +37,7 @@ myCore: os version stm32f407 stm32 stddrv hr_timer usb_core usb_serial usr.drv.o
 				$(OBJ)/usr/usr.bin.o
 
 version:
-	echo "const char *ver=\"$(GIT_VERSION)\";" > $(OBJ)/version.c
+	echo "const char *ver=\"$(BOARD)-$(GIT_VERSION)\";" > $(OBJ)/version.c
 
 
 usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/cec_a1_ctrl/cec_a1_ctrl.o

@@ -14,6 +14,8 @@
 #define AP_NONE (0)
 #define CACHE_MEM (0xd<<16)
 
+#define STM_STACK_SIZE 10	// = 2048 bytes
+
 struct MPU {
 	unsigned int TYPE;
 	volatile unsigned int CTRL;
@@ -55,7 +57,7 @@ int map_next_stack_page(unsigned long int new_addr, unsigned long int old_addr) 
 	unsigned long cpu_flags=disable_interrupts();
 	MPU->RBAR=new_addr|MPU_RBAR_VALID|1;
 	MPU->RBAR=old_addr|MPU_RBAR_VALID|2;
-	MPU->RASR=AP_FULL|CACHE_MEM|(9<<1)|1;
+	MPU->RASR=AP_FULL|CACHE_MEM|(STM_STACK_SIZE<<1)|1;
 	restore_cpu_flags(cpu_flags);
 	__DMB();
 	return 0;
@@ -64,7 +66,7 @@ int map_next_stack_page(unsigned long int new_addr, unsigned long int old_addr) 
 int unmap_tmp_stack_page() {
 //	MPU->RBAR=addr|MPU_RBAR_VALID|2;
 	MPU->RNR=2;
-	MPU->RASR=AP_NONE|CACHE_MEM|(9<<1)|1;
+	MPU->RASR=AP_NONE|CACHE_MEM|(10<<1)|1;
 	__DMB();
 	return 0;
 }

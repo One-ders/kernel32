@@ -124,7 +124,7 @@ int usb_config_core(struct usb_dev_handle *pdev) {
 	pdev->cfg.dev_endpoints         = 6;
 	pdev->cfg.total_fifo_size       = 1280; /* ints */
 	pdev->cfg.phy_itf               = USB_OTG_EMBEDDED_PHY;
-	pdev->cfg.dma_enable            = 1;
+	pdev->cfg.dma_enable            = 0;
 
 #ifdef USB_SOF_ENABLED
 	pdev->cfg.sof_output            = 1;
@@ -1163,10 +1163,10 @@ static unsigned int dev_write_empty_tx_fifo(struct usb_dev_handle *pdev,
 		ep->xfer_buf+=len;
 		ep->xfer_count+=len;
 
-		if (ep->xfer_count>=ep->xfer_len) {
-			/* mask out ep_empty irq, we dont need it for now*/
-			pdev->regs->dev.d_iep_empty_msk&=~(1<<ep->num);
-		}
+//		if (ep->xfer_count>=ep->xfer_len) {
+//			/* mask out ep_empty irq, we dont need it for now*/
+//			pdev->regs->dev.d_iep_empty_msk&=~(1<<ep->num);
+//		}
 		
 		space_avail=pdev->regs->dev.d_ep_in[epnum].txf_sts&EP_IN_TXF_STS_INEPTFSAV_MSK;
 	}
@@ -1288,6 +1288,7 @@ static unsigned int device_handle_inep_irq(struct usb_dev_handle *pdev) {
 		if (ep_intr&0x1) {
 			unsigned int diepint=dev_read_in_ep_irq(pdev->regs,epnum);
 			if (diepint&EP_IINT_XFER_DONE) {
+//				sys_printf("in ep irq ep %d, XFER_DONE\n",epnum);
 				fifoemptymsk=1<<epnum;
 				pdev->regs->dev.d_iep_empty_msk&=~fifoemptymsk;
 				pdev->regs->dev.d_ep_in[epnum].ints=EP_IINT_XFER_DONE;
@@ -1301,22 +1302,27 @@ static unsigned int device_handle_inep_irq(struct usb_dev_handle *pdev) {
 			}
 
 			if (diepint&EP_IINT_TIMEOUT) {
+				sys_printf("iep timeout ep %d\n",epnum);
 				pdev->regs->dev.d_ep_in[epnum].ints=EP_IINT_TIMEOUT;
 			}
 
 			if (diepint&EP_IINT_ITTXFE) {
+				sys_printf("iep ittxfe ep %d\n",epnum);
 				pdev->regs->dev.d_ep_in[epnum].ints=EP_IINT_ITTXFE;
 			}
 
 			if (diepint&EP_IINT_INEPNE) {
+				sys_printf("iep inepne ep %d\n",epnum);
 				pdev->regs->dev.d_ep_in[epnum].ints=EP_IINT_INEPNE;
 			}
 
 			if (diepint&EP_IINT_DISABLED) {
+				sys_printf("iep disable ep %d\n",epnum);
 				pdev->regs->dev.d_ep_in[epnum].ints=EP_IINT_DISABLED;
 			}
 
 			if (diepint&EP_IINT_TXFE) {
+//				sys_printf("in ep irq ep %d, TXFE\n",epnum);
 				dev_write_empty_tx_fifo(pdev, epnum);
 				pdev->regs->dev.d_ep_in[epnum].ints=EP_IINT_TXFE;
 			}
@@ -1337,6 +1343,7 @@ static unsigned int device_handle_outep_irq(struct usb_dev_handle *pdev) {
 		if (ep_intr&0x1) {
 			unsigned int doepint=dev_read_out_ep_irq(pdev->regs,epnum);
 			if (doepint&EP_OINT_XFER_DONE) {
+//				sys_printf("out ep irq ep %d, XFER_DONE\n",epnum);
 				pdev->regs->dev.d_ep_out[epnum].ints=EP_OINT_XFER_DONE;
 				if (pdev->cfg.dma_enable) {
 					unsigned int deptsiz;
@@ -1355,11 +1362,13 @@ static unsigned int device_handle_outep_irq(struct usb_dev_handle *pdev) {
 			
 			if (doepint&EP_OINT_DISABLED) {
 				pdev->regs->dev.d_ep_out[epnum].ints=EP_OINT_DISABLED;
+//				sys_printf("out ep irq ep %d, DISABLED\n",epnum);
 			}
 
 			if (doepint&EP_OINT_SETUP_DONE) {
 				usbd_setup(pdev);
 				pdev->regs->dev.d_ep_out[epnum].ints=EP_OINT_SETUP_DONE;
+//				sys_printf("out ep irq ep %d, SETUP_DONE\n",epnum);
 			}
 		}
 		epnum++;
@@ -1518,6 +1527,16 @@ unsigned int handle_device_irq(struct usb_dev_handle *pdev) {
 			return 0;
 		}
 
+//		if ((gint_status!=0x40000)&&(gint_status!=0x80000)&&
+//			(gint_status!=0x10)) {
+//			sys_printf("usb_irq: gint_stat=%x\n",gint_status);
+//		}
+//		if (gint_status&G_INT_STS_RXFLVL) {
+//			gint_status&=~G_INT_STS_RXFLVL;
+//			rc|=device_handle_rxfifo_irq(pdev);
+//		}
+
+
 		if (gint_status&G_INT_STS_OEPINT) {
 			gint_status&=~G_INT_STS_OEPINT;
 			rc|=device_handle_outep_irq(pdev);
@@ -1592,57 +1611,3 @@ unsigned int handle_device_irq(struct usb_dev_handle *pdev) {
 }
 
 /***************************************************************************/
-
-#if 0
-struct usb_core_fnc usb_core_fncs = {
-	.reset_core=reset_core,
-        .write_pkt=write_pkt,
-        .read_pkt=read_pkt,
-//        .init_core=init_core,
-//        .enable_gint=enable_gint,
-//        .disable_gint=disable_gint,
-//        .flush_tx_fifo=flush_tx_fifo,
-//        .flush_rx_fifo=flush_rx_fifo,
-//        .set_mode=set_mode,
-        .get_mode=get_mode,
-        .get_core_irq_stat=get_core_irq_stat,
-        .get_otg_irq_stat=get_otg_irq_stat,
-        /****                                     ****/
-        .host_init_core=host_init_core,
-        .host_enable_int=host_enable_int,
-        .host_stop=host_stop,
-        .isEvenFrame=isEvenFrame,
-        .drive_vbus=drive_vbus,
-        .init_fs_ls_p_clksel=init_fs_ls_p_clksel,
-        .read_hprt0=read_hprt0,
-        .get_host_all_channel_irq=get_host_all_channel_irq,
-        .reset_port=reset_port,
-        /****                                     ****/
-        .host_channel_init=host_channel_init,
-        .host_channel_start_tx=host_channel_start_tx,
-        .host_channel_halt=host_channel_halt,
-        .host_channel_do_ping=host_channel_do_ping,
-        /****                                    ****/
-        .dev_speed_init=dev_speed_init,
-//        .dev_core_init=dev_core_init,
-        .dev_enable_int=dev_enable_int,
-        .dev_get_speed=dev_get_speed,
-        .dev_EP0_activate=dev_EP0_activate,
-//        .dev_EP_activate=dev_EP_activate,
-//        .dev_EP_deactivate=dev_EP_deactivate,
-//        .dev_EP_start_xfer=dev_EP_start_xfer,
-//        .dev_EP0_start_xfer=dev_EP0_start_xfer,
-//        .dev_EP_set_stall=dev_EP_set_stall,
-//        .dev_EP_clr_stall=dev_EP_clr_stall,
-        .dev_read_all_out_ep_irq=dev_read_all_out_ep_irq,
-        .dev_read_out_ep_irq=dev_read_out_ep_irq,
-        .dev_read_all_in_ep_irq=dev_read_all_in_ep_irq,
-        .dev_EP0_out_start=dev_EP0_out_start,
-        .dev_remote_wakeup=dev_remote_wakeup,
-        .dev_ungate_clock=dev_ungate_clock,
-        .dev_stop=dev_stop,
-//        .dev_get_ep_status=dev_get_ep_status,
-//       .dev_set_ep_status=dev_set_ep_status
-};
-#endif
-

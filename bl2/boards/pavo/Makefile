@@ -1,6 +1,9 @@
 
+BOARD=pavo
 TOP:=$(shell pwd)/../..
-OBJ:=$(TOP)/boards/pavo/obj
+OBJ:=$(TOP)/boards/$(BOARD)/obj
+
+GIT_VERSION:=$(shell git describe --abbrev=4 --dirty --always --tags)
 
 export AS:=mipsel-linux-as
 export CC:=mipsel-linux-gcc
@@ -10,7 +13,7 @@ export OBJCOPY:=mipsel-linux-objcopy
 #include $(TOP)/os/Makefile
 
 #CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4740 -I/opt/cross/lib/gcc/mipsel-linux/4.9.1/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls
-CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/boards/pavo -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4740 -I/opt/cross/lib/gcc/mipsel-linux/4.9.1/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -DDEBUG
+CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/boards/$(BOARD) -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4740 -I/opt/cross/lib/gcc/mipsel-linux/4.9.1/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -DDEBUG
 CFLAGS_USR:=-I$(TOP)/usr/incl -I/opt/cross/lib/gcc/mipsel-linux/4.9.1/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls
 LDFLAGS:=-g -T./pavo.ld 
 LDFLAGS_USR:=-g $(OBJ)/usr/lib/start.o $(OBJ)/usr/lib/usrlib.o -T$(OBJ)/../pavo_usr.ld
@@ -49,8 +52,8 @@ uCore.bin: uCore
 ipl/boot.bin:
 	$(MAKE) -C ipl
 
-uCore: os mips jz c_start.o stddrv
-	$(LD) $(LDFLAGS) -o $@ $(OBJ)/lib/jz.o c_start.o $(OBJ)/lib/init_sect.o $(OBJ)/lib/mips.o $(OBJ)/lib/os.o $(OBJ)/stddrv/stddrv.o $(OBJ)/lib/end_sect.o
+uCore: os version mips jz c_start.o stddrv
+	$(LD) $(LDFLAGS) -o $@ $(OBJ)/lib/jz.o c_start.o $(OBJ)/version.o $(OBJ)/lib/init_sect.o $(OBJ)/lib/mips.o $(OBJ)/lib/os.o $(OBJ)/stddrv/stddrv.o $(OBJ)/lib/end_sect.o
 
 #traps.o: ../../mips/jz4740/traps.S
 #	$(CC) $(CFLAGS) -c -o $@ $<
@@ -65,6 +68,10 @@ c_start.o: ./c_start.c
 
 #jz_serial.o: ../../mips/jz4740/jz_serial.c
 #	$(CC) $(CFLAGS) -c -o $@ $<
+
+version: 
+	echo "const char *ver=\"$(BOARD)-$(GIT_VERSION)\";" > $(OBJ)/version.c
+	$(CC) -c -o $(OBJ)/version.o $(OBJ)/version.c
 
 os: $(OBJ)/os
 	CFLAGS="$(CFLAGS)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<

@@ -581,7 +581,7 @@ int usbd_run_test_mode(struct usb_dev_handle *pdev) {
 
 int usbd_reset(struct usb_dev_handle *pdev) {
 
-	sys_printf("usbd_reset\n");
+//	sys_printf("usbd_reset\n");
 	usb_dev_ep_open(pdev,0x00,
 			USB_DEV_MAX_EP0_SIZE,
 			EP_TYPE_CTRL);
@@ -597,14 +597,14 @@ int usbd_reset(struct usb_dev_handle *pdev) {
 }
 
 int usbd_resume(struct usb_dev_handle *pdev) {
-	sys_printf("usbd_resume\n");
+//	sys_printf("usbd_resume\n");
 	pdev->dev.usr_cb->dev_resumed();
 	pdev->dev.dev_status=pdev->dev.dev_old_status;
 	return 0;
 }
 
 int usbd_suspend(struct usb_dev_handle *pdev) {
-	sys_printf("usbd_suspend\n");
+//	sys_printf("usbd_suspend\n");
 	pdev->dev.dev_old_status=pdev->dev.dev_status;
 	pdev->dev.dev_status=USB_DEV_STAT_SUSPENDED;
 	pdev->dev.usr_cb->dev_suspended();
@@ -612,7 +612,7 @@ int usbd_suspend(struct usb_dev_handle *pdev) {
 }
 
 int usbd_sof(struct usb_dev_handle *pdev) {
-	sys_printf("usbd_sof\n");
+//	sys_printf("usbd_sof\n");
 	if (pdev->dev.class_cb->sof) {
 		pdev->dev.class_cb->sof(pdev->uref);
 	}
