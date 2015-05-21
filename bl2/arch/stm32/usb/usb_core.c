@@ -999,6 +999,7 @@ void dev_EP0_out_start(struct usb_dev_handle *pdev) {
 }
 
 void dev_remote_wakeup(struct usb_dev_handle *pdev) {
+	pdev->dev.remote_wakeup=1;  // FixME
 	if (pdev->dev.remote_wakeup) {
 		unsigned int dsts = pdev->regs->dev.d_sts;
 		if (dsts&DSTS_SUSP) {
