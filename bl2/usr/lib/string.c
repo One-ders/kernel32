@@ -48,7 +48,7 @@ int memcmp(const void *s1, const void *s2, size_t n) {
 char *strchr(const char *s, int c) {
 	c&=0xff;
 	do  {
-		if (*s==c) return s;
+		if (*s==c) return (char *)s;
 			else s++;
 	} while (*s);
 	return 0;
@@ -168,11 +168,18 @@ char *xtoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_nu
 	return buf;
 }
 
-unsigned long int strtoul(char *str, char *endp, int base) {
+unsigned long int strtoul(char *str, char **endp, int base) {
 	char *p=str;
 	int num=0;
 	int mode=0;
 	unsigned int val=0;
+	int conv=0;
+
+	if (endp) *endp=str;
+	while (isspace(*p)) {
+		p++;
+		if (!*p) return 0;
+	}
 
 	if (base) {
 		mode=base;
@@ -189,7 +196,7 @@ unsigned long int strtoul(char *str, char *endp, int base) {
 	}
 
 	while(*p) {
-		switch (*p) {
+		switch (__builtin_tolower(*p)) {
 			case '0':
 			case '1':
 			case '2':
@@ -211,9 +218,20 @@ unsigned long int strtoul(char *str, char *endp, int base) {
 				num=__builtin_tolower(*p)-'a';
 				num+=10;
 				break;
+			default:
+				num=20000;   // Signal to break while loop;
+				break;
 		}
+		if (num>=mode) {
+			break;
+		}
+		conv=1;
 		val=(val*mode)+num;
 		p++;
+	}
+
+	if (conv) {
+		if (endp) *endp=p;
 	}
 	return val;
 }

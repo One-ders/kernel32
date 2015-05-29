@@ -1,4 +1,4 @@
-/* $Notix/Leanaux: , v1.1 2014/04/07 21:44:00 anders Exp $ */
+/* $Nosix/Leanaux: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
 /*
  * Copyright (c) 2014, Anders Franzen.
@@ -147,6 +147,76 @@ static int lsdrv_fnc(int argc, char **argv, struct Env *env) {
         return 0;
 }
 
+static int kmem_fnc(int argc, char **argv, struct Env *env) {
+	int fd=io_open("kmem");
+	int rc=0;
+
+	if (fd<0) {
+		fprintf(env->io_fd,"could not open dev kmem\n");
+		return -1;
+	}
+
+	if (argc<2) {
+		fprintf(env->io_fd,"kmem needs arguments r (read) or w (write)\n");
+		rc = -1;
+		goto out;
+	}
+
+	if (strcmp(argv[1],"r")==0) {  // read command
+		unsigned long int address;
+		unsigned int nbytes=16;
+		char *nptr;
+		int i=0,j;
+		unsigned int nwords;
+
+		if (argc<3) {
+			fprintf(env->io_fd,"kmem read needs argument address\n");
+			rc = -1;
+			goto out;
+		}
+		nptr=argv[2];
+		address=strtoul(argv[2],&nptr,0);
+		if (nptr==argv[2]) {
+			fprintf(env->io_fd, "address value %s, not a number\n",argv[2]);
+			rc = -1;
+			goto out;
+		}
+		if (argc==4) {
+			nptr=argv[3];
+			nbytes=strtoul(argv[3],&nptr,0);
+			if (nptr==argv[3]) {
+				fprintf(env->io_fd, "nbytes value %s, not a number\n",argv[3]);
+				rc = -1;
+				goto out;
+			}
+		}
+
+		rc=io_lseek(fd,address,SEEK_SET);
+		if (rc<0) {
+			rc=-1;
+			goto out;
+		}
+		nwords=((nbytes+3)>>2);
+		while(i<nwords) {
+			fprintf(env->io_fd,"%08x:\t",address+(i<<2));
+			for(j=0;(j<4)&&i<nwords;i++,j++) {
+				unsigned int vbuf;
+				rc=io_read(fd,&vbuf,4);
+				if (rc<0) {
+					rc=-11;
+					goto out;
+				}
+				fprintf(env->io_fd,"%08x ", vbuf);
+			}
+			fprintf(env->io_fd,"\n");
+		}
+	} else {
+		fprintf(env->io_fd, "kmem: unknown operation %s\n", argv[1]);
+	}
+out:
+	io_close(fd);
+	return rc;
+}
 
 static int debug_fnc(int argc, char **argv, struct Env *env) {
 	int dbglev;
@@ -215,6 +285,7 @@ static struct cmd cmd_root[] = {
 		{"unblock",unblock_fnc},
 		{"setprio",setprio_fnc},
 		{"reboot",reboot_fnc},
+		{"kmem",kmem_fnc},
 		{0,0}
 };
 

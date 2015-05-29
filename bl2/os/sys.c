@@ -1,4 +1,4 @@
-/* $notix/leanaux: , v1.1 2014/04/07 21:44:00 anders Exp $ */
+/* $Nosix/leanaux: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
 /*
  * Copyright (c) 2014, Anders Franzen.
@@ -250,7 +250,7 @@ static int sys_drv_wakeup(struct device_handle *dh, int ev, void *user_ref) {
 		task->sel_data.nfds++;
 	} else {
 		if (task->blocker.ev!=ev) {
-			sys_printf("sys_drv_wakeup: masked ev\n");
+			sys_printf("sys_drv_wakeup: masked. b.ev(%x) r.ev(%x)\n",task->blocker.ev,ev);
 			return 0;
 		}
 	}
@@ -508,6 +508,19 @@ again:
 				return 0;
 			}
 			rc=driver->ops->control(dh,get_svc_arg(svc_sp,1),(void *)get_svc_arg(svc_sp,2),get_svc_arg(svc_sp,3));
+			set_svc_ret(svc_sp,rc);
+			return 0;
+		}
+		case SVC_IO_LSEEK: {
+			int fd=(int)get_svc_arg(svc_sp,0);
+			struct driver *driver=fd_tab[fd].driver;
+			struct device_handle *dh=fd_tab[fd].dev_handle;
+			int rc;
+			if (!driver) {
+				set_svc_ret(svc_sp,-1);
+				return 0;
+			}
+			rc=driver->ops->control(dh,IO_LSEEK,(void *)get_svc_arg(svc_sp,1),get_svc_arg(svc_sp,2));
 			set_svc_ret(svc_sp,rc);
 			return 0;
 		}
@@ -865,7 +878,10 @@ void *sys_sleepon(struct blocker *so, unsigned int *tout) {
 	DEBUGP(DLEV_SCHED,"sys sleepon %x task: %s\n", so, current->name);
 	switch_now();
 
-	so->ev&=~0x80; // Clear list sleep
+// Moved to architecture return, assymetric and uggly!!
+//	/* this is a thread newly awaken, clear out the 'list sleep' flag,
+//	 * it could have been set before sleep... */
+//	so->ev&=~0x80; // Clear list sleep
 	if (tout&&*tout) {
 		if (so->wakeup_tic!=tq_tic) {
 			*tout=(so->wakeup_tic-tq_tic)*10;
@@ -894,6 +910,10 @@ void *sys_sleepon_update_list(struct blocker *b, struct blocker_list *bl_ptr) {
 		bl_ptr->first=b;
 	}
 	bl_ptr->last=b;
+
+	/* secondary blocking from a device we depend on,
+	 * mask out the first level device, otherwise a wake
+	 * up will try to wake up wrong thread */
 	b->ev|=0x80;
 	restore_cpu_flags(cpu_flags);
 	rc=sys_sleepon(b,0);

@@ -1,4 +1,4 @@
-/* $Notix/Leanaux: , v1.1 2014/04/07 21:44:00 anders Exp $ */
+/* $Nosix/Leanaux: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
 /*
  * Copyright (c) 2014, Anders Franzen.
@@ -220,6 +220,7 @@ struct dyn_open_args {
 #define F_SETFL	8
 #define READDIR 9
 #define DYNOPEN 10
+#define IO_LSEEK 11
 
 #define O_NONBLOCK 1
 
@@ -234,22 +235,23 @@ struct dent {
 };
 
 #define SVC_CREATE_TASK 1
-#define SVC_SLEEP       2
-#define SVC_SLEEP_ON    3
-#define SVC_WAKEUP      4
-#define SVC_IO_OPEN     5
-#define SVC_IO_READ     6
-#define SVC_IO_WRITE    7
-#define SVC_IO_CONTROL  8
-#define SVC_IO_CLOSE    9
-#define SVC_IO_SELECT   10
-#define SVC_KILL_SELF   11
-#define SVC_BLOCK_TASK  12
-#define SVC_UNBLOCK_TASK 13
-#define SVC_SETPRIO_TASK 14
-#define SVC_SETDEBUG_LEVEL 15
-#define SVC_REBOOT	16
-#define SVC_GETTIC	17
+#define SVC_SLEEP       SVC_CREATE_TASK+1
+#define SVC_SLEEP_ON    SVC_SLEEP+1
+#define SVC_WAKEUP      SVC_SLEEP_ON+1
+#define SVC_IO_OPEN     SVC_WAKEUP+1
+#define SVC_IO_READ     SVC_IO_OPEN+1
+#define SVC_IO_WRITE    SVC_IO_READ+1
+#define SVC_IO_CONTROL  SVC_IO_WRITE+1
+#define SVC_IO_LSEEK    SVC_IO_CONTROL+1
+#define SVC_IO_CLOSE    SVC_IO_LSEEK+1
+#define SVC_IO_SELECT   SVC_IO_CLOSE+1
+#define SVC_KILL_SELF   SVC_IO_SELECT+1
+#define SVC_BLOCK_TASK  SVC_KILL_SELF+1
+#define SVC_UNBLOCK_TASK SVC_BLOCK_TASK+1
+#define SVC_SETPRIO_TASK SVC_UNBLOCK_TASK+1
+#define SVC_SETDEBUG_LEVEL SVC_SETPRIO_TASK+1
+#define SVC_REBOOT	SVC_SETDEBUG_LEVEL+1
+#define SVC_GETTIC	SVC_REBOOT+1
 
 struct task_create_args {
 	void *fnc;
