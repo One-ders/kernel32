@@ -7,6 +7,11 @@ typedef unsigned int fd_set;
 #define FD_ZERO(a)      ((*(b))=0)
 
 
+/* for lseek */
+#define SEEK_SET        0
+#define SEEK_CUR        1
+#define SEEK_END        2
+
 #define MAX_PRIO	4
 
 int thread_create(void *fnc, void *val, unsigned int val_size,
@@ -25,6 +30,7 @@ int io_write(int fd, const void *buf, int size);
 int io_control(int fd, int cmd, void *d, int sz);
 int io_close(int fd);
 int io_select(int nfds, fd_set *rfds, fd_set *wfds, fd_set *stfds, unsigned int *tout);
+unsigned long int io_lseek(int fd, unsigned long int offset, int whence);
 
 #define RD_CHAR 1
 #define WR_CHAR 2

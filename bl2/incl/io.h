@@ -1,4 +1,4 @@
-/* $FrameWorks: , v1.1 2014/04/07 21:44:00 anders Exp $ */
+/* $Nosix/Leanaux: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
 /*
  * Copyright (c) 2014, Anders Franzen.
@@ -30,6 +30,8 @@
  *
  * @(#)io.h
  */
+
+/*  for select */
 typedef unsigned int fd_set;
 
 #define FD_SET(a,b)	((*(b))|=(1<<a))
@@ -37,11 +39,16 @@ typedef unsigned int fd_set;
 #define FD_ISSET(a,b)	((*(b))&(1<<a))
 #define FD_ZERO(a)	((*(b))=0)
 
+/* for lseek */
+#define SEEK_SET	0
+#define SEEK_CUR	1
+#define SEEK_END	2
+
 void init_io(void);
 int io_add_c(const char c);
 int io_setpolled(int enabled);
 
 int sys_printf(const char *format, ...);
 
-unsigned long int strtoul(char *str, char *endp, int base);
+unsigned long int strtoul(char *str, char **endp, int base);
 

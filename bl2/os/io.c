@@ -1,4 +1,4 @@
-/* $FrameWorks: , v1.1 2014/04/07 21:44:00 anders Exp $ */
+/* $Nosix/Leanaux: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
 /*
  * Copyright (c) 2014, Anders Franzen.
@@ -152,11 +152,17 @@ char *xtoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_nu
 	return buf;
 }
 
-unsigned long int strtoul(char *str, char *endp, int base) {
+unsigned long int strtoul(char *str, char **endp, int base) {
 	char *p=str;
 	int num=0;
 	int mode=0;
 	unsigned int val=0;
+	int conv=0;
+
+	if (endp) *endp=str;
+	while(__builtin_isspace(*p++)) {
+		if (!*p) return 0;
+	}
 
 	if (base) {
 		mode=base;
@@ -195,9 +201,20 @@ unsigned long int strtoul(char *str, char *endp, int base) {
 				num=__builtin_tolower(*p)-'a';
 				num+=10;
 				break;
+			default:
+				num=20000; // Signal to break
+				break;
 		}
+		if (num>=mode) {
+			break;
+		}
+		conv=1;
 		val=(val*mode)+num;
 		p++;
+	}
+
+	if (conv) {
+		if (endp) *endp=p;
 	}
 	return val;
 }

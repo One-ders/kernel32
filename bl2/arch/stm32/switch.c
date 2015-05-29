@@ -152,6 +152,7 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 	} else {
 		*(save_sp-2)=0xfffffff9;
 	}
+	t->blocker.ev&=~0x80; // Clear list sleep
 	return t;
 }
 
