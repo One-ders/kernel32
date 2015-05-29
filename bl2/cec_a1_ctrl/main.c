@@ -78,7 +78,7 @@ static int debug_fnc(int argc, char **argv, struct Env *env) {
 
 	if (strcmp(argv[1],"on")==0) {
 		cec_debug=1;
-	} if (strcmp(argv[1],"off")==0) {
+	} else if (strcmp(argv[1],"off")==0) {
 		cec_debug=0;
 	} else {
 		goto out_err;

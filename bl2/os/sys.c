@@ -249,7 +249,7 @@ static int sys_drv_wakeup(struct device_handle *dh, int ev, void *user_ref) {
 		}
 		task->sel_data.nfds++;
 	} else {
-		if (task->blocker.ev!=ev) {
+		if (!(task->blocker.ev&ev)) {
 			sys_printf("sys_drv_wakeup: masked. b.ev(%x) r.ev(%x)\n",task->blocker.ev,ev);
 			return 0;
 		}
