@@ -22,14 +22,19 @@ void set_svc_ret(void *sp, long int val)  {
 	ff->v0=val;
 }
 
-void setup_registers(struct task *t, char *arg0) {
-	unsigned long int *stackp=(unsigned long int *)(((char *)t)+4096);
+void setup_return_stack(struct task *t, void *stackp_v,
+			unsigned long int fnc,
+			unsigned long int ret_fnc,
+			void *arg0,
+			void *arg1) {
+//	unsigned long int *stackp=(unsigned long int *)(((char *)t)+4096);
+	unsigned long int *stackp=(unsigned long int *)stackp_v;
 
 	sys_printf("t at %x, stackp at %x\n",
 			t, stackp);
 
 	curr_pgd=t->pgd;  /* repoint page table directory while loading */
-	strcpy(((void *)0x3f000),arg0);
+//	strcpy(((void *)0x3f000),arg0);
 	curr_pgd=current->pgd;
 	
 	*(--stackp)=0;		// hi
@@ -39,7 +44,8 @@ void setup_registers(struct task *t, char *arg0) {
 	*(--stackp)=0x04008000;	// cause
 
 	*(--stackp)=0xfc13;	// status
-	*(--stackp)=0;		// ra
+//	*(--stackp)=0;		// ra
+	*(--stackp)=fnc;	// ra
 	*(--stackp)=0;		// fp
 	*(--stackp)=0x80000000;	// user sp
 
@@ -70,9 +76,11 @@ void setup_registers(struct task *t, char *arg0) {
 	*(--stackp)=0;		// t0
 	*(--stackp)=0x80000000;	// a3
 	*(--stackp)=0;		// a2
-	*(--stackp)=0;		// a1
+//	*(--stackp)=0;		// a1
+	*(--stackp)=(unsigned long int)arg1; // a1
 
-	*(--stackp)=0x0000ff10; // a0
+//	*(--stackp)=0x0000ff10; // a0
+	*(--stackp)=(unsigned long int)arg0; // a0
 	*(--stackp)=0x00000000; // v1
 	*(--stackp)=0x00040000; // v0
 
@@ -80,4 +88,9 @@ void setup_registers(struct task *t, char *arg0) {
 	*(--stackp)=0;		// zero
 
 	t->sp=stackp;	// kernel sp
+}
+
+unsigned long int get_usr_pc(struct task *t) {
+	// tbd
+	return 0;
 }
