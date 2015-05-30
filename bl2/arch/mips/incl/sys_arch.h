@@ -36,3 +36,10 @@ void enable_interrupts(void) {
 }
 #endif
 
+static inline __attribute__ ((always_inline))
+void clear_all_interrupts(void) {
+	asm(	"mfc0	$t0,$12\n\t"
+		"ori	$t0,0x1f\n\t"
+		"xori	$t0,0x1e\n\t"
+		"mtc0	$t0,$12\n\t");
+}

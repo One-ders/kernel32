@@ -50,7 +50,7 @@ struct task *create_user_context(void) {
 		put_page(t_pgd);
 		return 0;
 	}
-	set_asid(t_id);
+	set_asid(t->id);
 	t->pgd=t_pgd;
 	return t;
 }

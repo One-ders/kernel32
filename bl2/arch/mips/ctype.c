@@ -5,3 +5,20 @@ int tolower(int c) {
 	}
 	return c;
 }
+
+int isspace(int c) {
+	switch (c) {
+		case ' ':
+		case '\f':
+		case '\n':
+		case '\r':
+		case '\t':
+		case '\v':
+			return 1;
+			break;
+		default:
+			break;
+	}
+	return 0;
+}
+

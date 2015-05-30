@@ -5,6 +5,8 @@ OUTPUT_ARCH(mips)
 ENTRY(_start)
 SECTIONS
 {
+
+	__usr_main = 0x40000;
         . = 0x80000000;
 
         . = ALIGN(4);
