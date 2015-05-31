@@ -7,6 +7,17 @@
 void _exit(int status) {
 }
 
+struct task main_task = {
+.name	=	"init_main",
+.sp	=	(void *)(0x20020000),
+.id	=	256,
+.next	=	0,
+.next2	=	0,
+.state	=	1,
+.prio_flags=	3,
+.estack	=	(void *)(0x20020000-0x800)
+};
+
 void build_free_page_list(void);
 static unsigned long free_page_map[SDRAM_SIZE/(PAGE_SIZE*sizeof(unsigned long))];
 
