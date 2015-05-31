@@ -13,6 +13,8 @@ struct task main_task = {
 .estack	=	(void *)(0x84000000-0x3000)
 };
 
+void *usr_init=0x40000;
+
 void _exit(int status) {
 }
 
@@ -229,7 +231,7 @@ int load_init(struct task *t) {
 	curr_pgd=t->pgd;  /* repoint page table directory while loading */
 	while(1) {
 		nand_load(nand_pos,4096,buf);
-//		sys_printf("read 4k nand at %x: %x, %x, %x\n",
+//		sys_printf("read 4k nand at %x: %x, %x, %x\n",\
 				nand_pos,buf[0],buf[1],buf[2]);
 		if (!parse_srec(buf,&ofs)) {
 			break;

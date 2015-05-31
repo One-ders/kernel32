@@ -18,6 +18,9 @@ struct task main_task = {
 .estack	=	(void *)(0x20020000-0x800)
 };
 
+extern int __usr_main(int argc, char **argv);
+void *usr_init=__usr_main;
+
 void build_free_page_list(void);
 static unsigned long free_page_map[SDRAM_SIZE/(PAGE_SIZE*sizeof(unsigned long))];
 

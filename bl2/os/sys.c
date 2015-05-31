@@ -1176,7 +1176,8 @@ void start_up(void) {
 extern void sys_mon(void *);
 extern int switch_flag;
 
-extern int (*__usr_main)(int argc, char **argv);
+//extern int __usr_main(int argc, char **argv);
+extern void *usr_init;
 
 void start_sys(void) {
 	
@@ -1202,7 +1203,7 @@ void start_sys(void) {
 	t->estack=((unsigned long int)t)+2048;
 	stackp=stackp-8;
 	strcpy((void *)stackp,"usart0");
-	setup_return_stack(t,(void *)stackp,(unsigned long int)__usr_main,0, (void *)stackp, (void *)8);
+	setup_return_stack(t,(void *)stackp,(unsigned long int)usr_init,0, (void *)stackp, (void *)8);
 	
 
 	t->next2=troot;

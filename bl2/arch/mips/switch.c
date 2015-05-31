@@ -11,9 +11,6 @@ void set_asid(unsigned int asid) {
 }
 
 
-unsigned int __usr_main = 0x00040000;
-
-
 #if 0
 struct task *t_array[256];
 
