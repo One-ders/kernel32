@@ -141,6 +141,7 @@ struct task {
 #define CLR_TMARK(a)            ((a)->prio_flags&=0xEF)
 
 
+extern struct task main_task;
 extern volatile unsigned int tq_tic;
 
 void start_up(void);

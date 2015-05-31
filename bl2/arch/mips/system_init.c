@@ -1,6 +1,18 @@
 
 #include <sys.h>
 
+
+struct task main_task = {
+.name	=	"init_main",
+.sp	=	(void *)(0x84000000-0x2000),
+.id	=	256,
+.next	=	0,
+.next2	=	0,
+.state	=	1,
+.prio_flags=	3,
+.estack	=	(void *)(0x84000000-0x3000)
+};
+
 void _exit(int status) {
 }
 
@@ -136,7 +148,7 @@ int handle_srec_start_addr(unsigned char *r, int len) {
 		(to_val(r[4])<<12)|(to_val(r[5])<<8)|
 		(to_val(r[6])<<4)|(to_val(r[7])<<0);
 
-	sys_printf("start_addr: %x\n", addr);
+//	sys_printf("start_addr: %x\n", addr);
 }
 
 
@@ -159,7 +171,7 @@ int parse_srec(unsigned char *srec_buf, int *ofs) {
 again:
 //	sys_printf("parse_srec: srec_buf@%x, end@%x\n", srec_buf,b_end);
 	if (srec_buf[0]!='S') {
-		sys_printf("parse_srec: weird srec leaving\n");
+		sys_printf("parse_srec: weird srec leaving, buf char %c(%x)\n",srec_buf[0],srec_buf[0]);
 		return 0;
 	}
 	
@@ -183,7 +195,7 @@ again:
 			handle_srec_start_addr(r,len);
 			return 0;
 		default:;
-//			sys_printf("srec type yeahh %d\n", type);
+			sys_printf("srec type yeahh %d\n", type);
 	}
 	if (b_start&&srec_buf!=b_start) {
 		srec_buf=b_start-*ofs;
@@ -217,7 +229,8 @@ int load_init(struct task *t) {
 	curr_pgd=t->pgd;  /* repoint page table directory while loading */
 	while(1) {
 		nand_load(nand_pos,4096,buf);
-//		sys_printf("read 4k nand\n");
+//		sys_printf("read 4k nand at %x: %x, %x, %x\n",
+				nand_pos,buf[0],buf[1],buf[2]);
 		if (!parse_srec(buf,&ofs)) {
 			break;
 		}

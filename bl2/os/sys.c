@@ -41,8 +41,6 @@ unsigned int sys_irqs;
 struct task * volatile ready[5];
 struct task * volatile ready_last[5];
 
-struct task main_task = { "init_main", (void *)(0x20020000), 256, 0, 0, 1, 3, (void *)(0x20020000-0x800) };
-//struct task main_task = { "init_main", (void *)(0x84000000-0x2000), 256, 0, 0, 1, 3, (void *)(0x84000000-0x3000) };
 struct task *troot =&main_task;
 struct task * volatile current = &main_task;
 
@@ -1178,7 +1176,7 @@ void start_up(void) {
 extern void sys_mon(void *);
 extern int switch_flag;
 
-extern int __usr_main(int argc, char **argv);
+extern int (*__usr_main)(int argc, char **argv);
 
 void start_sys(void) {
 	

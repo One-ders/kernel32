@@ -25,7 +25,7 @@ fsize=$(shell stat -c "%s" tmp/fot4)
 nblock=$(shell expr $(fsize) / 4096)
 
 uCore.img: tmp/fot5 usr.bin
-	cat tmp/fot5 obj/usr/sys_cmd/sys_cmd.srec > uCore.img
+	cat tmp/fot5 obj/usr/sys_cmd/sys_cmd.srec tmp/fot1 > uCore.img
 
 tmp/fot5: tmp/fot4
 	dd if=tmp/fot4 of=tmp/fot5 ibs=4096 count=$(nblock)
