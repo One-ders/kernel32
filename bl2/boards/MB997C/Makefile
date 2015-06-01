@@ -62,7 +62,7 @@ $(OBJ)/usr/lib/arm/syscall_lib.o: $(TOP)/usr/lib
 
 
 $(OBJ)/usr/sys_cmd/sys_cmd.o: $(OBJ)/usr/lib/usrlib.o $(OBJ)/usr/sys_cmd
-	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $(OBJ)/usr/sys_cmd
+	CFLAGS="$(CFLAGS_USR)" TOP="$(TOP)" OBJ="$(OBJ)" LDFLAGS="$(LDFLAGS_USR)" $(MAKE) -C $(OBJ)/usr/sys_cmd
 
 $(OBJ)/usr/sys_cmd: $(TOP)/usr/sys_cmd
 	mkdir -p $@

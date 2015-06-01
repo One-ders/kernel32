@@ -10,7 +10,7 @@ $(USR_SCMD)/sys_cmd.srec: $(USR_SCMD)/sys_cmd
 	$(OBJCOPY) -O srec $< $@
 	
 $(USR_SCMD)/sys_cmd: $(USR_SCMD)/sys_cmd.o
-	$(LD) -r -o $@ $(LDFLAGS) $<
+	$(LD) -o $@ $(LDFLAGS) $<
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<

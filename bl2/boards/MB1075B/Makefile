@@ -48,7 +48,7 @@ usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/cec_a1_ctrl/cec_a1_ctrl.o
 #	$(OBJCOPY) --prefix-symbols=__usr_ $(OBJ)/usr/usr.bin.o
 
 $(OBJ)/usr/lib/usrlib.o: $(OBJ)/usr/lib $(OBJ)/usr/lib/arm/syscall_lib.o
-	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $(OBJ)/usr/lib
+	CFLAGS="$(CFLAGS_USR)" TOP="$(TOP)" OBJ="$(OBJ)" $(MAKE) -C $(OBJ)/usr/lib
 
 $(OBJ)/usr/lib: $(TOP)/usr/lib
 	mkdir -p $@
@@ -61,7 +61,7 @@ $(OBJ)/usr/lib/arm/syscall_lib.o: $(TOP)/usr/lib
 
 
 $(OBJ)/usr/sys_cmd/sys_cmd.o: $(OBJ)/usr/lib/usrlib.o $(OBJ)/usr/sys_cmd
-	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $(OBJ)/usr/sys_cmd
+	CFLAGS="$(CFLAGS_USR)" TOP="$(TOP)" OBJ="$(OBJ)"  LDFLAGS="$(LDFLAGS_USR)" $(MAKE) -C $(OBJ)/usr/sys_cmd
 
 $(OBJ)/usr/sys_cmd: $(TOP)/usr/sys_cmd
 	mkdir -p $@
