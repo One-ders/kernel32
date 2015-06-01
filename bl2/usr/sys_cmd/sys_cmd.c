@@ -192,7 +192,7 @@ static int kmem_fnc(int argc, char **argv, struct Env *env) {
 		}
 
 		rc=io_lseek(fd,address,SEEK_SET);
-		if (rc<0) {
+		if (rc==-1) {
 			rc=-1;
 			goto out;
 		}

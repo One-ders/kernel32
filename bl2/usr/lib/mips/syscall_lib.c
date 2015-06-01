@@ -1,4 +1,4 @@
-/* $FrameWorks: , v1.1 2014/04/07 21:44:00 anders Exp $ */
+/* $Nosix: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
 /*
  * Copyright (c) 2014, Anders Franzen.
@@ -34,20 +34,23 @@
 #include <sys.h>
 
 #define SVC_CREATE_TASK 1
-#define SVC_SLEEP       2
-#define SVC_SLEEP_ON    3
-#define SVC_WAKEUP      4
-#define SVC_IO_OPEN     5
-#define SVC_IO_READ     6
-#define SVC_IO_WRITE    7
-#define SVC_IO_CONTROL  8
-#define SVC_IO_CLOSE    9
-#define SVC_IO_SELECT   10
-#define SVC_KILL_SELF   11
-#define SVC_BLOCK_TASK  12
-#define SVC_UNBLOCK_TASK 13
-#define SVC_SETPRIO_TASK 14
-#define SVC_SETDEBUG_LEVEL 15
+#define SVC_SLEEP       SVC_CREATE_TASK+1
+#define SVC_SLEEP_ON    SVC_SLEEP+1
+#define SVC_WAKEUP      SVC_SLEEP_ON+1
+#define SVC_IO_OPEN     SVC_WAKEUP+1
+#define SVC_IO_READ     SVC_IO_OPEN+1
+#define SVC_IO_WRITE    SVC_IO_READ+1
+#define SVC_IO_CONTROL  SVC_IO_WRITE+1
+#define SVC_IO_LSEEK	SVC_IO_CONTROL+1
+#define SVC_IO_CLOSE    SVC_IO_LSEEK+1
+#define SVC_IO_SELECT   SVC_IO_CLOSE+1
+#define SVC_KILL_SELF   SVC_IO_SELECT+1
+#define SVC_BLOCK_TASK  SVC_KILL_SELF+1
+#define SVC_UNBLOCK_TASK SVC_BLOCK_TASK+1
+#define SVC_SETPRIO_TASK SVC_UNBLOCK_TASK+1
+#define SVC_SETDEBUG_LEVEL SVC_SETPRIO_TASK+1
+#define SVC_REBOOT	SVC_SETDEBUG_LEVEL+1
+#define SVC_GETTIC	SVC_REBOOT+1
 
 
 #include <string.h>
@@ -93,12 +96,15 @@ int svc_io_open(const char *);
 int svc_io_read(int fd, void *b, int size);
 int svc_io_write(int fd, const void *b, int size);
 int svc_io_control(int fd, int cmd, void *b, int s);
+unsigned long int svc_io_lseek(int fd, unsigned long int offs, int whence);
 int svc_io_close(int fd);
 int svc_io_select(struct sel_args *sel_args);
 int svc_block_task(char *name);
 int svc_unblock_task(char *name);
 int svc_setprio_task(char *name, int prio);
 int svc_set_debug_level(unsigned int dbglev);
+int svc_reboot(unsigned int cookie);
+unsigned int svc_gettic(void);
 
 
 __attribute__ ((noinline)) int svc_create_task(struct task_create_args *ta) {
@@ -145,6 +151,12 @@ __attribute__ ((noinline)) int svc_io_control(int fd, int cmd, void *b, int s) {
 	return rc;
 }
 
+__attribute__ ((noinline)) unsigned long int svc_io_lseek(int fd, unsigned long int offs, int whence) {
+	register int rc asm("v0");
+	svc(SVC_IO_LSEEK);
+	return rc;
+}
+
 __attribute__ ((noinline)) int svc_io_close(int fd) {
 	register int rc asm("v0");
 	svc(SVC_IO_CLOSE);
@@ -180,6 +192,20 @@ __attribute__ ((noinline)) int svc_set_debug_level(unsigned int dbglev) {
 	svc(SVC_SETDEBUG_LEVEL);
 	return rc;
 }
+
+__attribute__ ((noinline)) int svc_reboot(unsigned int cookie) {
+	register int rc asm("v0");
+	svc(SVC_REBOOT);
+	return rc;
+}
+
+__attribute__ ((noinline)) unsigned int svc_gettic(void) {
+	register int rc asm("v0");
+	svc(SVC_GETTIC);
+	return rc;
+}
+
+
 
 
 
@@ -219,6 +245,15 @@ int set_debug_level(unsigned int dbglev) {
 	return svc_set_debug_level(dbglev);
 }
 
+int _reboot_(unsigned int cookie) {
+        return svc_reboot(cookie);
+}
+
+unsigned int get_current_tic(void) {
+        return svc_gettic();
+}
+
+
 
 /**********************************************************************/
 /*  Driver service calls                                              */
@@ -237,6 +272,10 @@ int io_write(int fd, const void *buf, int size) {
 
 int io_control(int fd, int cmd, void *d, int sz) {
 	return svc_io_control(fd,cmd,d,sz);
+}
+
+unsigned long int io_lseek(int fd, unsigned long int offset, int whence) {
+        return svc_io_lseek(fd,offset,whence);
 }
 
 int io_close(int fd) {

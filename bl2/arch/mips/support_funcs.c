@@ -35,19 +35,20 @@ void setup_return_stack(struct task *t, void *stackp_v,
 
 	curr_pgd=t->pgd;  /* repoint page table directory while loading */
 //	strcpy(((void *)0x3f000),arg0);
+	strcpy(((void *)0x7ffffff8),arg0);
 	curr_pgd=current->pgd;
 	
 	*(--stackp)=0;		// hi
 	*(--stackp)=0;		// lo
 
-	*(--stackp)=0x40000;	// epc
+	*(--stackp)=fnc;	// epc
 	*(--stackp)=0x04008000;	// cause
 
 	*(--stackp)=0xfc13;	// status
-//	*(--stackp)=0;		// ra
-	*(--stackp)=fnc;	// ra
+	*(--stackp)=0;		// ra
 	*(--stackp)=0;		// fp
-	*(--stackp)=0x80000000;	// user sp
+//	*(--stackp)=0x80000000;	// user sp
+	*(--stackp)=0x80000000-((unsigned int)arg1); // user sp
 
 	*(--stackp)=0;		// gp
 	*(--stackp)=0;		// k1
@@ -74,15 +75,15 @@ void setup_return_stack(struct task *t, void *stackp_v,
 	*(--stackp)=0;		// t1
 
 	*(--stackp)=0;		// t0
-	*(--stackp)=0x80000000;	// a3
+	*(--stackp)=0x80000000-((unsigned int)arg1);	// a3
 	*(--stackp)=0;		// a2
-//	*(--stackp)=0;		// a1
-	*(--stackp)=(unsigned long int)arg1; // a1
+	*(--stackp)=0;		// a1
+//	*(--stackp)=(unsigned long int)arg1; // a1
 
-//	*(--stackp)=0x0000ff10; // a0
-	*(--stackp)=(unsigned long int)arg0; // a0
+	*(--stackp)=0x0000ff10; // a0
+//	*(--stackp)=(unsigned long int)arg0; // a0
 	*(--stackp)=0x00000000; // v1
-	*(--stackp)=0x00040000; // v0
+	*(--stackp)=fnc; // v0
 
 	*(--stackp)=0;		// at
 	*(--stackp)=0;		// zero
