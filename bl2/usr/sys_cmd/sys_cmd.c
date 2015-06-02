@@ -306,7 +306,7 @@ void main(void *dum) {
 	if (fd<0) return;
 
 	env.io_fd=fd;
-	io_write(fd,"Starting sys_mon\n",17);
+	fprintf(fd,"Starting sys_mon\n");
 
 	if (!u_init) {
 		u_init=1;
