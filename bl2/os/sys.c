@@ -1169,7 +1169,7 @@ void start_up(void) {
         init_io();
 
         /* start the executive */
-        sys_printf("Notix git ver %s, starting tasks\n",ver);
+        sys_printf("Nosix git ver %s, starting tasks\n",ver);
         start_sys();
 }
 
@@ -1195,7 +1195,7 @@ void start_sys(void) {
 		while(1);
 	}
 #endif
-	
+
 	t->name="sys_mon";
 	t->state=TASK_STATE_READY;
 	t->prio_flags=3;
@@ -1204,7 +1204,6 @@ void start_sys(void) {
 	stackp=stackp-8;
 	strcpy((void *)stackp,"usart0");
 	setup_return_stack(t,(void *)stackp,(unsigned long int)usr_init,0, (void *)stackp, (void *)8);
-	
 
 	t->next2=troot;
 	troot=t;
@@ -1219,7 +1218,7 @@ void start_sys(void) {
 	clear_all_interrupts();
 	switch_on_return();  /* will switch in the task on return from next irq */
 	while(1);
-	
+
 //	thread_create(sys_mon,"usart0",0,3,"sys_mon");
 ////	thread_create(sys_mon,"stterm0",3,"sys_mon");
 ////	thread_create(sys_mon,"usb_serial0",2,"sys_mon");
