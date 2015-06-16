@@ -26,47 +26,47 @@
 #define SDRAM_RCD_DELAY			2
 
 /* SDRAM Pins */
-#define FMC_A0  PF0
-#define FMC_A1  PF1
-#define FMC_A2  PF2
-#define FMC_A3  PF3
-#define FMC_A4  PF4
-#define FMC_A5  PF5
-#define FMC_A6  PF12
-#define FMC_A7  PF13
-#define FMC_A8  PF14
-#define FMC_A9  PF15
-#define FMC_A10 PG0
-#define FMC_A11 PG1
+#define FMC_A0  GPIO_PIN(PF,0)
+#define FMC_A1  GPIO_PIN(PF,1)
+#define FMC_A2  GPIO_PIN(PF,2)
+#define FMC_A3  GPIO_PIN(PF,3)
+#define FMC_A4  GPIO_PIN(PF,4)
+#define FMC_A5  GPIO_PIN(PF,5)
+#define FMC_A6  GPIO_PIN(PF,12)
+#define FMC_A7  GPIO_PIN(PF,13)
+#define FMC_A8  GPIO_PIN(PF,14)
+#define FMC_A9  GPIO_PIN(PF,15)
+#define FMC_A10 GPIO_PIN(PG,0)
+#define FMC_A11 GPIO_PIN(PG,1)
 
-#define FMC_BA0 PG4
-#define FMC_BA1 PG5
+#define FMC_BA0 GPIO_PIN(PG,4)
+#define FMC_BA1 GPIO_PIN(PG,5)
 
-#define FMC_D0  PD14
-#define FMC_D1  PD15
-#define FMC_D2  PD0
-#define FMC_D3  PD1
-#define FMC_D4  PE7
-#define FMC_D5  PE8
-#define FMC_D6  PE9
-#define FMC_D7  PE10
-#define FMC_D8  PE11
-#define FMC_D9  PE12
-#define FMC_D10 PE13
-#define FMC_D11 PE14
-#define FMC_D12 PE15
-#define FMC_D13 PD8
-#define FMC_D14 PD9
-#define FMC_D15 PD10
+#define FMC_D0  GPIO_PIN(PD,14)
+#define FMC_D1  GPIO_PIN(PD,15)
+#define FMC_D2  GPIO_PIN(PD,0)
+#define FMC_D3  GPIO_PIN(PD,1)
+#define FMC_D4  GPIO_PIN(PE,7)
+#define FMC_D5  GPIO_PIN(PE,8)
+#define FMC_D6  GPIO_PIN(PE,9)
+#define FMC_D7  GPIO_PIN(PE,10)
+#define FMC_D8  GPIO_PIN(PE,11)
+#define FMC_D9  GPIO_PIN(PE,12)
+#define FMC_D10 GPIO_PIN(PE,13)
+#define FMC_D11 GPIO_PIN(PE,14)
+#define FMC_D12 GPIO_PIN(PE,15)
+#define FMC_D13 GPIO_PIN(PD,8)
+#define FMC_D14 GPIO_PIN(PD,9)
+#define FMC_D15 GPIO_PIN(PD,10)
 
-#define FMC_NBL0 PE0
-#define FMC_NBL1 PE1
-#define FMC_SDCLK  PG8
-#define FMC_SDNWE  PC0
-#define FMC_SDNRAS PF11
-#define FMC_SDNCAS PG15
-#define FMC_SDNE1  PB6
-#define FMC_SDCKE1 PB5
+#define FMC_NBL0 GPIO_PIN(PE,0)
+#define FMC_NBL1 GPIO_PIN(PE,1)
+#define FMC_SDCLK  GPIO_PIN(PG,8)
+#define FMC_SDNWE  GPIO_PIN(PC,0)
+#define FMC_SDNRAS GPIO_PIN(PF,11)
+#define FMC_SDNCAS GPIO_PIN(PG,15)
+#define FMC_SDNE1  GPIO_PIN(PB,6)
+#define FMC_SDCKE1 GPIO_PIN(PB,5)
 
 #if 0
 

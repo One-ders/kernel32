@@ -457,9 +457,11 @@ again:
 				}
 				return 0;
 			}
-			if (rc>=0) done+=rc;
-			if ((done!=get_svc_arg(svc_sp,2))&&(!(fdd->flags&O_NONBLOCK))) {
-				goto again;
+			if (rc>=0) {
+				done+=rc;
+				if ((done!=get_svc_arg(svc_sp,2))&&(!(fdd->flags&O_NONBLOCK))) {
+					goto again;
+				}
 			}
 			set_svc_ret(svc_sp,done);
 			return 0;
