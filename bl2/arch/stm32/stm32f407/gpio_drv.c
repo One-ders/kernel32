@@ -1,4 +1,4 @@
-/* $FrameWorks: , v1.1 2014/04/07 21:44:00 anders Exp $ */
+/* $Nosix: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
 /*
  * Copyright (c) 2014, Anders Franzen.
@@ -539,7 +539,7 @@ static int gpio_start(void *inst) {
 	return 0;
 }
 
-static struct driver_ops gpio_drv_ops = {
+struct driver_ops gpio_drv_ops = {
 	gpio_open,
 	gpio_close,
 	gpio_control,

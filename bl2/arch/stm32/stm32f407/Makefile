@@ -8,6 +8,7 @@ OBJECTS= \
 	$(ODIR)/gpio_drv.o \
 	$(ODIR)/usart_drv.o \
 	$(ODIR)/iwdg_drv.o \
+	$(ODIR)/extmem_drv.o \
 	$(ODIR)/led_drv.o
 	
 all: $(ODIR) $(OUT)

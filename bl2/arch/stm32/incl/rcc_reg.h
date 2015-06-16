@@ -103,7 +103,7 @@
 #define RCC_AHB2RSTR_OTGFSRST	0x00000080
 
 /* RCC AHB3 peripheral reset register */
-#define RCC_AHB3RSTR_FSMCRST	0x00000001
+#define RCC_AHB3RSTR_FMCRST	0x00000001
 
 /* RCC APB1 peripheral reset register */
 #define RCC_APB1RSTR_TIM2RST	0x00000001
@@ -173,7 +173,7 @@
 #define RCC_AHB2ENR_OTGFSEN	0x00000080
 
 /* RCC AHB3 peripheral clock enable register */
-#define RCC_AHB3ENR_FSMCEN	0x00000001
+#define RCC_AHB3ENR_FMCEN	0x00000001
 
 /* RCC APB1 peripheral clock enable register */
 #define RCC_APB1ENR_TIM2EN	0x00000001
@@ -247,7 +247,7 @@
 #define RCC_AHB2LPENR_OTGFSLPEN	0x00000080
 
 /* RCC AHB3 peripheral clock enable in low power mode register */
-#define RCC_AHB3LPENR_FSMCLPEN	0x00000001
+#define RCC_AHB3LPENR_FMCLPEN	0x00000001
 
 /* RCC APB1 peripheral clock enable in low power mode register */
 #define RCC_APB1LPENR_TIM2LPEN	0x00000001

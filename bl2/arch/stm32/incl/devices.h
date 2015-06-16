@@ -8,6 +8,7 @@
 #include <flash_reg.h>
 #include <iwdg_reg.h>
 #include <usb_otg_reg.h>
+#include <fmc_reg.h>
 
 
 #define RCC	((struct RCC *)(AHB1+0x3800))
@@ -59,3 +60,5 @@
 #define PWR	((struct POWER *)(APB1+0x7000))
 
 #define FLASH	((struct FLASH *)(AHB1+0x3c00))
+
+#define FMC	((struct FMC *)(AHB3+0x0000))

@@ -235,3 +235,64 @@ unsigned long int strtoul(char *str, char **endp, int base) {
 	}
 	return val;
 }
+
+void getopt_data_init(struct getopt_data *gd) {
+	gd->optind=1;
+	gd->opterr=0;
+	gd->nextchar=0;
+}
+
+int getopt_r(int argc, char *argv[], const char *optstring, struct getopt_data* gd) {
+	char *oarg;
+
+	gd->optarg=0;
+	gd->optopt=0;
+	if (gd->nextchar) {
+		oarg=gd->nextchar;
+	} else {
+		if (gd->optind<argc) {
+			oarg=argv[gd->optind];
+			if (*oarg=='-') {
+				oarg++;
+				gd->optind++;
+			} else {
+				return -1;
+			}
+		} else {
+			return -1;
+		}
+	}
+
+	gd->nextchar=oarg+1;
+	if (!*gd->nextchar) gd->nextchar=0;
+
+	switch (*oarg) {
+		case '-': return -1;
+		default: {
+			char *pos=strchr(optstring,*oarg);
+			if (!pos) {
+				gd->optopt=*oarg;
+				return '?';
+			} else {
+				if (pos[1]==':') { /* opt with arg */
+					if (gd->nextchar) {
+						gd->optarg=gd->nextchar;
+						gd->nextchar=0;
+						return *pos;
+					} else if ((gd->optind<argc)&&argv[gd->optind]){
+						gd->optarg=argv[gd->optind++];
+						gd->nextchar=0;
+						return *pos;
+					} else {
+						gd->nextchar=0;
+						gd->optopt=*oarg;
+						return '?';
+					}
+				} else {
+					return pos[0];
+				}
+			}
+		}
+	}
+	return -1;
+}

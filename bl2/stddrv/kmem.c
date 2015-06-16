@@ -53,6 +53,13 @@ static int kmem_control(struct device_handle *dh, int cmd, void *arg1, int arg2)
 			udh->fpos+=arg2;
 			return arg2;
 		}
+		case WR_CHAR: {
+			sys_printf("kmem wr: %08x <- %08x\n",
+					udh->fpos, *(unsigned long int *)arg1);
+			memcpy((void *)udh->fpos,arg1,arg2);
+			udh->fpos+=arg2;
+			return arg2;
+		}
 		case IO_LSEEK: {
 			switch(arg2) {
 				case 0:

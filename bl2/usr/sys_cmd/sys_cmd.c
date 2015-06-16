@@ -150,42 +150,62 @@ static int lsdrv_fnc(int argc, char **argv, struct Env *env) {
 static int kmem_fnc(int argc, char **argv, struct Env *env) {
 	int fd=io_open("kmem");
 	int rc=0;
+	int r=0,w=0;
+	struct getopt_data gd;
+	char *nptr;
+	int opt;
+	unsigned long int address=0;
 
 	if (fd<0) {
 		fprintf(env->io_fd,"could not open dev kmem\n");
 		return -1;
 	}
 
-	if (argc<2) {
-		fprintf(env->io_fd,"kmem needs arguments r (read) or w (write)\n");
-		rc = -1;
-		goto out;
+	getopt_data_init(&gd);
+
+	while((opt=getopt_r(argc,argv,"r:w:",&gd))!=-1) {
+		switch(opt) {
+			case 'r':
+				nptr=gd.optarg;
+				address=strtoul(gd.optarg,&nptr,0);
+				if (nptr==gd.optarg) {
+					fprintf(env->io_fd, "address value %s, not a number\n",gd.optarg);
+					rc = -1;
+					goto out;
+				}
+				r=1;
+				fprintf(env->io_fd,"read addr %x\n",address);
+				break;
+			case 'w':
+				nptr=gd.optarg;
+				address=strtoul(gd.optarg,&nptr,0);
+				if (nptr==gd.optarg) {
+					fprintf(env->io_fd, "address value %s, not a number\n",gd.optarg);
+					rc = -1;
+					goto out;
+				}
+				w=1;
+				fprintf(env->io_fd,"write addr %x\n",address);
+				break;
+			default: {
+				fprintf(env->io_fd, "kmem arg error %c\n",opt);
+				rc=-1;
+				goto out;
+			}
+		}
 	}
 
-	if (strcmp(argv[1],"r")==0) {  // read command
-		unsigned long int address;
+
+	if (r) {  // read command
 		unsigned int nbytes=16;
-		char *nptr;
 		int i=0,j;
 		unsigned int nwords;
 
-		if (argc<3) {
-			fprintf(env->io_fd,"kmem read needs argument address\n");
-			rc = -1;
-			goto out;
-		}
-		nptr=argv[2];
-		address=strtoul(argv[2],&nptr,0);
-		if (nptr==argv[2]) {
-			fprintf(env->io_fd, "address value %s, not a number\n",argv[2]);
-			rc = -1;
-			goto out;
-		}
-		if (argc==4) {
-			nptr=argv[3];
-			nbytes=strtoul(argv[3],&nptr,0);
-			if (nptr==argv[3]) {
-				fprintf(env->io_fd, "nbytes value %s, not a number\n",argv[3]);
+		if (gd.optind<argc) {
+			nptr=argv[gd.optind];
+			nbytes=strtoul(argv[gd.optind],&nptr,0);
+			if (nptr==argv[gd.optind]) {
+				fprintf(env->io_fd, "nbytes value %s, not a number\n",argv[gd.optind]);
 				rc = -1;
 				goto out;
 			}
@@ -193,9 +213,9 @@ static int kmem_fnc(int argc, char **argv, struct Env *env) {
 
 		rc=io_lseek(fd,address,SEEK_SET);
 		if (rc==-1) {
-			rc=-1;
 			goto out;
 		}
+
 		nwords=((nbytes+3)>>2);
 		while(i<nwords) {
 			fprintf(env->io_fd,"%08x:\t",address+(i<<2));
@@ -210,8 +230,32 @@ static int kmem_fnc(int argc, char **argv, struct Env *env) {
 			}
 			fprintf(env->io_fd,"\n");
 		}
+	} else if (w) {
+		unsigned long int value;
+
+		if (gd.optind<argc) {
+			nptr=argv[gd.optind];
+			value=strtoul(argv[gd.optind],&nptr,0);
+			if (nptr==argv[gd.optind]) {
+				fprintf(env->io_fd, "value %s, not a number\n",argv[gd.optind]);
+				rc = -1;
+				goto out;
+			}
+		}
+
+		rc=io_lseek(fd,address,SEEK_SET);
+		if (rc==-1) {
+			goto out;
+		}
+
+		fprintf(env->io_fd,"%08x:\t=%08x",address,value);
+		rc=io_write(fd,&value,4);
+		if (rc<0) {
+			rc=-1;
+			goto out;
+		}
 	} else {
-		fprintf(env->io_fd, "kmem: unknown operation %s\n", argv[1]);
+		fprintf(env->io_fd, "kmem: unknown operation\n");
 	}
 out:
 	io_close(fd);
