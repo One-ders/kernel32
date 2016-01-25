@@ -87,13 +87,6 @@
 #define CGU_CPCCR_CKOEN		0x40000000
 #define CGU_CPCCR_I2CS 		0x80000000
 
-#define __cgu_get_cdiv() \
-	 ((REG_CGU_CPCCR&CGU_CPCCR_CDIV_MASK)>>CGU_CPCCR_CDIV_SHIFT)
-#define __cgu_get_hdiv() \
-	 ((REG_CGU_CPCCR&CGU_CPCCR_HDIV_MASK)>>CGU_CPCCR_HDIV_SHIFT)
-#define __cgu_get_mdiv() \
-	 ((REG_CGU_CPCCR&CGU_CPCCR_MDIV_MASK)>>CGU_CPCCR_MDIV_SHIFT)
-
 #define CGU_CPPCR_PLLST_MASK	0x000000ff
 #define CGU_CPPCR_PLLST_SHIFT   0
 #define CGU_CPPCR_PLLEN		0x00000100
@@ -106,9 +99,11 @@
 #define CGU_CPPCR_PLLM_MASK	0xff800000
 #define CGU_CPPCR_PLLM_SHIFT	23
 
-#define REG_PMC_LCR		*((volatile unsigned int *)APB_BUS + 0x04)
-#define REG_PMC_CLKGR		*((volatile unsigned int *)APB_BUS + 0x20)
-#define REG_PMC_SCR		*((volatile unsigned int *)APB_BUS + 0x24)
+
+
+#define REG_PMC_LCR		*((volatile unsigned int *)(APB_BUS+0x04))
+#define REG_PMC_CLKGR		*((volatile unsigned int *)(APB_BUS+0x20))
+#define REG_PMC_SCR		*((volatile unsigned int *)(APB_BUS+0x24))
 
 #define PMC_LCR_LPM_MASK	0x00000003
 #define PMC_LCR_LPM_SHIFT	0
@@ -116,13 +111,35 @@
 #define PMC_LCR_DUTY_MASK	0x000000f8
 #define PMC_LCR_DUTY_SHIFT	3
 
+#define PMC_CLKGR_UART1         0x00008000
+#define PMC_CLKGR_UHC           0x00004000
+#define PMC_CLKGR_IPU           0x00002000
+#define PMC_CLKGR_DMAC          0x00001000
+#define PMC_CLKGR_UDC           0x00000800
+#define PMC_CLKGR_LCD           0x00000400
+#define PMC_CLKGR_CIM           0x00000200
+#define PMC_CLKGR_SADC          0x00000100
+#define PMC_CLKGR_MSC           0x00000080
+#define PMC_CLKGR_AIC           0x00000040
+#define PMC_CLKGR_AIC2          0x00000020
+#define PMC_CLKGR_SSI           0x00000010
+#define PMC_CLKGR_I2C           0x00000008
+#define PMC_CLKGR_RTC           0x00000004
+#define PMC_CLKGR_TCU           0x00000002
+#define PMC_CLKGR_UART0         0x00000001
+
+#define __pmc_start_tcu()       (REG_PMC_CLKGR &= ~PMC_CLKGR_TCU)
+#define __pmc_start_lcd()       (REG_PMC_CLKGR &= ~PMC_CLKGR_LCD)
+#define __pmc_stop_lcd()        (REG_PMC_CLKGR |= PMC_CLKGR_LCD)
+
+
 #define	PMC_SCR_O1SE		0x00000010
 #define PMC_SCR_SPENDD		0x00000040
 #define PMC_SCR_SPENDH		0x00000080
 #define	PMC_SCR_O1ST_MASK	0x0000ff00
 #define PMC_SCR_O1ST_SHIFT	8
 
-#define REG_RCM_RSR		*((volatile unsigned int *)APB_BUS + 0x08)
+#define REG_RCM_RSR		*((volatile unsigned int *)(APB_BUS+0x08))
 
 #define RCM_RSR_PR		0x00000001
 #define RCM_RSR_WR		0x00000002
@@ -157,6 +174,38 @@
 #define REG_GPIO_PxFLG(port)	*((volatile unsigned int *)(APB_BUS + port + 0x10080))
 #define REG_GPIO_PxFLGC(port)	*((volatile unsigned int *)(APB_BUS + port + 0x10014))
 
+
+#define __gpio_port_as_output(p, o)             \
+do {                                            \
+    REG_GPIO_PxFUNC(p) = (1 << (o));            \
+    REG_GPIO_PxSELC(p) = (1 << (o));            \
+    REG_GPIO_PxDIRS(p) = (1 << (o));            \
+} while (0)
+
+#define __gpio_as_output(n)                     \
+do {                                            \
+        unsigned int p, o;                      \
+        p = (n) / 32;                           \
+        o = (n) % 32;                           \
+        __gpio_port_as_output((p<<8), o);       \
+} while (0)
+
+#define __gpio_set_pin(n)                       \
+do {                                            \
+        unsigned int p, o;                      \
+        p = (n) / 32;                           \
+        o = (n) % 32;                           \
+        REG_GPIO_PxDATS((p<<8)) = (1 << o);     \
+} while (0)
+
+#define __gpio_clear_pin(n)                     \
+do {                                            \
+        unsigned int p, o;                      \
+        p = (n) / 32;                           \
+        o = (n) % 32;                           \
+        REG_GPIO_PxDATC((p<<8)) = (1 << o);     \
+} while (0)
+
 /*
  * D0 ~ D31, A0 ~ A16, DCS#, RAS#, CAS#, CKE#, 
  * RDWE#, CKO#, WE0#, WE1#, WE2#, WE3#
@@ -173,6 +222,40 @@ do {                                            \
         REG_GPIO_PxSELC(PORT_C) = 0x07000000;        \
         REG_GPIO_PxPES(PORT_C) = 0x07000000;         \
 } while (0)
+
+/*
+ *  * LCD_D0~LCD_D15, LCD_PCLK, LCD_HSYNC, LCD_VSYNC, LCD_DE
+ *   */
+#define __gpio_as_lcd_16bit()                   \
+do {                                            \
+        REG_GPIO_PxFUNS(PORT_C) = 0x003cffff;        \
+        REG_GPIO_PxSELC(PORT_C) = 0x003cffff;        \
+        REG_GPIO_PxPES(PORT_C) = 0x003cffff;         \
+} while (0)
+
+/*
+ *  * LCD_D0~LCD_D17, LCD_PCLK, LCD_HSYNC, LCD_VSYNC, LCD_DE
+ *   */
+#define __gpio_as_lcd_18bit()                   \
+do {                                            \
+        REG_GPIO_PxFUNS(PORT_C) = 0x003fffff;        \
+        REG_GPIO_PxSELC(PORT_C) = 0x003fffff;        \
+        REG_GPIO_PxPES(PORT_C) = 0x003fffff;         \
+} while (0)
+
+/*
+ *  * LCD_PS, LCD_REV, LCD_CLS, LCD_SPL
+ *   */
+#define __gpio_as_lcd_special()                 \
+do {                                            \
+        REG_GPIO_PxFUNS(PORT_B) = 0x00060000;        \
+        REG_GPIO_PxSELC(PORT_B) = 0x00060000;        \
+        REG_GPIO_PxPES(PORT_B)  = 0x00060000;        \
+        REG_GPIO_PxFUNS(PORT_C) = 0x00c00000;        \
+        REG_GPIO_PxSELC(PORT_C) = 0x00c00000;        \
+        REG_GPIO_PxPES(PORT_C)  = 0x00c00000;        \
+} while (0)
+
 
 /*
  * UART0_TxD, UART_RxD0

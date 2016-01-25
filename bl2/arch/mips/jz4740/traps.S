@@ -194,8 +194,12 @@ ret_from_irq:
 	sw	v0,0(k0)	# update current
 	lui	k0,%hi(curr_pgd)
 	addiu	k0,k0,%lo(curr_pgd)
-	lw	v1,10*4(v0)	# read page table dir
+	lw	v1,10*4(v0)	# read address space
+	lw	v1,0*4(v1)	# read page table dir
 	sw	v1,0(k0)
+	lw	v1,10*4(v0)	# read address space
+	lw	v1,1*4(v1)	# read address space id
+	mtc0	v1,CP0_ENTRYHI
 #
 	lw	sp,1*4(v0)      # get stack pointer for new thread
 	addiu	k0,sp,(32*4)+(5*4) # return space for regs
@@ -311,9 +315,9 @@ _handle_tlb1:
 _handle_tlb2:
 	.set push
 	.set noat
-	mfc0	k0, CP0_BADVADDR
-5:	j	5b
-	ssnop
+#	mfc0	k0, CP0_BADVADDR
+#5:	j	5b
+#	ssnop
 	lui	k0,%hi(irq_lev)
 	addiu	k0,k0,%lo(irq_lev)
 	lw	k0,0(k0)

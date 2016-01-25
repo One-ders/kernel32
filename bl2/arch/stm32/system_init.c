@@ -27,11 +27,11 @@ static unsigned long free_page_map[SDRAM_SIZE/(PAGE_SIZE*sizeof(unsigned long))]
 extern unsigned long __bss_start__;
 extern unsigned long __bss_end__;
 
-#define PHYS2PAGE(a)    ((((unsigned long int)(a))&0x1fffffff)>>12)
+#define SDRAM_START 0x20000000
+#define PHYS2PAGE(a)    ((((unsigned long int)(a))&(SDRAM_START-1))>>12)
 #define set_in_use(a,b) ((a)[((unsigned long int)(b))/32]&=~(1<<(((unsigned long int)(b))%32)))
 #define set_free(a,b) ((a)[((unsigned long int)(b))/32]|=(1<<(((unsigned long int)(b))%32)))
 
-#define SDRAM_START 0x20000000
 
 void init_sys_arch(void) {
 //	unsigned long int psize;
@@ -69,7 +69,7 @@ void *get_page(void) {
 					i,j);
 			j--;
 			free_page_map[i]&=~(1<<j);
-			return (void *)(0x20000000 + (i*32*4096) + (j*4096));
+			return (void *)(SD_RAM_START + (i*32*4096) + (j*4096));
 		}
 	}
 	return 0;

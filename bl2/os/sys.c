@@ -290,14 +290,16 @@ void *handle_syscall(unsigned long int *svc_sp) {
 			unsigned char *estack=((unsigned char *)t)+2048;
 			unsigned long int *stackp=(unsigned long int *)(estack+2048);
 			unsigned char *uval=tca->val;
+
+			if (!t) {
+				set_svc_ret(svc_sp,-1);
+				return 0;
+			}
+
 			memset(t,0,sizeof(struct task));
 			if (allocate_task_id(t)<0) {
 				sys_printf("proc table full\n");
 				put_page(t);
-				set_svc_ret(svc_sp,-1);
-				return 0;
-			}
-			if ((!t)||(!estack)) {
 				set_svc_ret(svc_sp,-1);
 				return 0;
 			}
@@ -317,6 +319,8 @@ void *handle_syscall(unsigned long int *svc_sp) {
 				memcpy(uval,tca->val,tca->val_size);
 				stackp=(unsigned long int *)uval;
 			}
+			t->asp=current->asp;
+			t->asp->ref++;
 			setup_return_stack(t,(void *)stackp,(unsigned long int)tca->fnc,0,uval,8);
 
 			t->state=TASK_STATE_READY;
@@ -785,9 +789,30 @@ check_resched:
 			set_svc_ret(svc_sp,tq_tic);
 			return 0;
 		}
+		case SVC_SBRK: {
+#ifdef MMU
+			long int incr=get_svc_arg(svc_sp,0);
+			void *ret=sys_sbrk(current,incr);
+			set_svc_ret(svc_sp,ret);
+#else
+			set_svc_ret(svc_sp,0);
+#endif
+			return 0;
+		}
+		case SVC_BRK: {
+#ifdef MMU
+			void *nbrk=get_svc_arg(svc_sp,0);
+			int ret=sys_brk(current,nbrk);
+			set_svc_ret(svc_sp,ret);
+#else
+			set_svc_ret(svc_sp,-1);
+#endif
+			return 0;
+		}
 		default:
 			sys_printf("bad syscall %x\n",svc_number);
 			set_svc_ret(svc_sp,-1);
+			while(1);
 			break;
 	}
 	return 0;
@@ -1036,7 +1061,10 @@ void *sys_wakeup_from_list(struct blocker_list *bl) {
 int dbglev=0;
 #endif
 
-
+#define DRV_SYS_STAT_COLD	0
+#define DRV_SYS_STAT_INITED 	1
+#define DRV_SYS_STAT_STARTED 	2
+static int drv_sys_stat=0;
 
 
 int driver_publish(struct driver *drv) {
@@ -1046,13 +1074,35 @@ int driver_publish(struct driver *drv) {
 		drv->next=drv_root;	
 		drv_root=drv;
 	}
+	
+	/* next two blocks are for late registers */
+	if (!(drv->stat&DRV_SYS_STAT_INITED)) {
+		drv->stat|=DRV_SYS_STAT_INITED;
+		if (drv->ops->init) {
+			drv->ops->init(drv->instance);
+		}
+	}
+	
+	if (!(drv->stat&DRV_SYS_STAT_STARTED)) {
+		drv->stat|=DRV_SYS_STAT_STARTED;
+		if (drv->ops->start) {
+			drv->ops->start(drv->instance);
+		}
+	}
+
 	return 0;
 }
 
 int driver_init() {
 	struct driver *d=drv_root;
+
+	if (drv_sys_stat&DRV_SYS_STAT_INITED) {
+		return 0;
+	}
+	drv_sys_stat|=DRV_SYS_STAT_INITED;
 	while(d) {
-		if (d->ops->init) {
+		if (d->ops->init&&!(d->stat&DRV_SYS_STAT_INITED)) {
+			d->stat|=DRV_SYS_STAT_INITED;
 			d->ops->init(d->instance);
 		}
 		d=d->next;
@@ -1062,8 +1112,13 @@ int driver_init() {
 
 int driver_start() {
 	struct driver *d=drv_root;
+	if (drv_sys_stat&DRV_SYS_STAT_STARTED) {
+		return 0;
+	}
+	drv_sys_stat|=DRV_SYS_STAT_STARTED;
 	while(d) {
-		if (d->ops->start) {
+		if (d->ops->start&&!(d->stat&DRV_SYS_STAT_STARTED)) {
+			d->stat|=DRV_SYS_STAT_STARTED;
 			d->ops->start(d->instance);
 		}
 		d=d->next;
@@ -1097,6 +1152,36 @@ struct driver  *driver_lookup(char *name) {
 	return 0;
 }
 
+void driver_user_data_init(struct device_handle **root,
+			struct device_handle *handlers,
+			unsigned int num_handlers) {
+	int i;
+	struct device_handle **p=root;
+	sys_printf("driver_u_d_i: root=%x, handlers=%x, num_h=%d\n",
+				root,handlers,num_handlers);
+	for(i=0;i<num_handlers;i++) {
+		(*p)=&handlers[i];
+		p=&handlers[i].next;
+	}
+}
+
+struct device_handle *driver_user_get_udata(struct device_handle *root) {
+	struct device_handle *res;
+	if ((res=root->next)) {
+		root->next=root->next->next;
+		return res;
+	}
+	return 0;
+}
+
+void driver_user_put_udata(struct device_handle *root, 
+				struct device_handle *dh) {
+	dh->next=root->next;
+	root->next=dh;
+}
+
+
+
 /**********************************************/
 
 static struct driver *my_usart;
@@ -1125,6 +1210,10 @@ static int console_init(void *instance) {
 
 static int console_start(void *instance) {
 	my_usart=driver_lookup("usart0");
+	if (!my_usart) {
+		sys_printf("dont have usart\n");
+		return 0;
+	}
 	my_usart_dh=my_usart->ops->open(my_usart->instance,0,0);
 	return 0;
 }
@@ -1157,6 +1246,7 @@ void init_sys(void) {
 
 	config_sys_tic(10);
 	for(i=init_func_begin;i<init_func_end;i++) {
+		sys_printf("calling %x:%x\n",i,*i);
 		((ifunc)*i)();
 	}
 	
@@ -1167,8 +1257,9 @@ void init_sys(void) {
 extern const char *ver;
 void start_up(void) {
         /* initialize the executive */
-        init_sys();
         init_io();
+        init_sys();
+//        init_io();
 
         /* start the executive */
         sys_printf("Nosix git ver %s, starting tasks\n",ver);

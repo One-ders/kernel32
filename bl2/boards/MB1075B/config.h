@@ -8,8 +8,6 @@
 #define SDRAM_SIZE	256*1024
 #define BYTES_PER_LONG	4
 
-#define PAGE_SIZE	4096
-
 #define HAVE_SDRAM
 #define SDRAM_BITS_PER_COLUMNS 	8
 #define SDRAM_BITS_PER_ROW 	11

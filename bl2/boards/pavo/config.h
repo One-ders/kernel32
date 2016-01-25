@@ -19,6 +19,10 @@
 
 #define CONFIG_BAUDRATE         57600
 
+#define GPIO_DISP_OFF_N         118 /* GPD22 */
+#define GPIO_LED_EN             124 /* GPD28 */
+
+
 /*-----------------------------------------------------------------------
  * SDRAM Info.
  */
@@ -39,7 +43,6 @@
 #define SDRAM_TREF              15625   /* Refresh period: 4096 refresh cycles/64ms */
 
 #define SDRAM_SIZE		(64*1024*1024)
-#define PAGE_SIZE		4096
 #define	BYTES_PER_LONG		4
 
 /*-----------------------------------------------------------------------

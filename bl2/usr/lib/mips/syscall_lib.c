@@ -51,6 +51,8 @@
 #define SVC_SETDEBUG_LEVEL SVC_SETPRIO_TASK+1
 #define SVC_REBOOT	SVC_SETDEBUG_LEVEL+1
 #define SVC_GETTIC	SVC_REBOOT+1
+#define SVC_SBRK	SVC_GETTIC+1
+#define SVC_BRK		SVC_SBRK+1
 
 
 #include <string.h>
@@ -105,6 +107,8 @@ int svc_setprio_task(char *name, int prio);
 int svc_set_debug_level(unsigned int dbglev);
 int svc_reboot(unsigned int cookie);
 unsigned int svc_gettic(void);
+void *svc_sbrk(long int incr);
+int svc_brk(void *nbrk);
 
 
 __attribute__ ((noinline)) int svc_create_task(struct task_create_args *ta) {
@@ -205,7 +209,17 @@ __attribute__ ((noinline)) unsigned int svc_gettic(void) {
 	return rc;
 }
 
+__attribute__ ((noinline)) void *svc_sbrk(long int incr) {
+	register void *rc asm("v0");
+	svc(SVC_SBRK);
+	return rc;
+}
 
+__attribute__ ((noinline)) int svc_brk(void *nbrk) {
+	register int rc asm("v0");
+	svc(SVC_BRK);
+	return rc;
+}
 
 
 
@@ -294,3 +308,10 @@ int io_select(int nfds, fd_set *rfds, fd_set *wfds, fd_set *stfds, unsigned int 
 	return svc_io_select(&sel_args);
 }
 
+void *sbrk(long int incr) {
+	return svc_sbrk(incr);
+}
+
+int brk(void *nbrk) {
+	return svc_brk(nbrk);
+}

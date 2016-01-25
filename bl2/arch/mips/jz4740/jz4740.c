@@ -1,5 +1,6 @@
 
 #include <config.h>
+#include <devices.h>
 
 void flush_cache_all(void);
 

@@ -425,4 +425,6 @@ void init_usart_drv(void) {
 	usart_data0.regs=(struct UART_regs *)UART0_BASE;
 	driver_publish(&usart0);
 }
+
+INIT_FUNC(init_usart_drv);
 #endif

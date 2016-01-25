@@ -50,8 +50,11 @@ struct user_data {
 extern struct user_data udata[];
 
 void c_start(void) {
-        nand_load(0x1000, 0x4000,
-                (unsigned char *)0x80000000);
+//        nand_load(0x1000, 0x4000,
+//                (unsigned char *)0x80000000);
+
+	nand_load(0x1000, 0x500, (unsigned char *)0x80000000);
+	nand_load(0x2000, 0x3000,(unsigned char *)0x80001000);
 
 	__builtin_memset(&__bss_start__,0,
 		ULINT(&__bss_end__)-ULINT(&__bss_start__));
@@ -71,9 +74,9 @@ void c_start(void) {
 		"mtc0	$t0,$13\n\t"
 		:::"t0","t1");
 	
-	init_usart_drv();
-	driver_init();
-	driver_start();
+//	init_usart_drv();
+//	driver_init();
+//	driver_start();
 
 	enable_interrupts();
 	start_up();

@@ -32,6 +32,9 @@ int io_close(int fd);
 int io_select(int nfds, fd_set *rfds, fd_set *wfds, fd_set *stfds, unsigned int *tout);
 unsigned long int io_lseek(int fd, unsigned long int offset, int whence);
 
+void *sbrk(long int incr);
+int brk(void *);
+
 #define RD_CHAR 1
 #define WR_CHAR 2
 #define IO_POLL 3
