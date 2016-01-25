@@ -253,7 +253,7 @@ int fb_set_user_cmap(struct fb_cmap_user *cmap, struct fb_info *info) {
 	if (copy_from_user(umap.red, cmap->red, size) ||
 		copy_from_user(umap.green, cmap->green, size) ||
 		copy_from_user(umap.blue, cmap->blue, size) ||
-		(cmap->transp && 
+		(cmap->transp &&
 			copy_from_user(umap.transp, cmap->transp, size))) {
 		fb_dealloc_cmap(&umap);
 		return -EFAULT;

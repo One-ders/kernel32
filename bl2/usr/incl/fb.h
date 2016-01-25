@@ -163,7 +163,7 @@ struct fb_fix_screeninfo {
         unsigned int smem_len;                 /* Length of frame buffer mem */
         unsigned int type;                     /* see FB_TYPE_*                */
         unsigned int type_aux;                 /* Interleave for interleaved Planes */
-        unsigned int visual;                   /* see FB_VISUAL_*              */ 
+        unsigned int visual;                   /* see FB_VISUAL_*              */
         unsigned short int xpanstep;                 /* zero if no hardware panning  */
         unsigned short int ypanstep;                 /* zero if no hardware panning  */
         unsigned short int ywrapstep;                /* zero if no hardware ywrap    */
@@ -185,8 +185,8 @@ struct fb_fix_screeninfo {
 struct fb_bitfield {
         unsigned int offset;                   /* beginning of bitfield        */
         unsigned int length;                   /* length of bitfield           */
-        unsigned int msb_right;                /* != 0 : Most significant bit is */ 
-                                        /* right */ 
+        unsigned int msb_right;                /* != 0 : Most significant bit is */
+                                        /* right */
 };
 
 #define FB_NONSTD_HAM           1       /* Hold-And-Modify (HAM)        */
@@ -249,7 +249,7 @@ struct fb_var_screeninfo {
         struct fb_bitfield red;         /* bitfield in fb mem if true color, */
         struct fb_bitfield green;       /* else only length is significant */
         struct fb_bitfield blue;
-        struct fb_bitfield transp;      /* transparency                 */      
+        struct fb_bitfield transp;      /* transparency                 */
 
         unsigned int nonstd;                   /* != 0 Non standard pixel format */
 
@@ -497,7 +497,7 @@ struct fb_cursor_user {
  * Register/unregister for framebuffer events
  */
 
-/*      The resolution of the passed in fb_info about to change */ 
+/*      The resolution of the passed in fb_info about to change */
 #define FB_EVENT_MODE_CHANGE            0x01
 /*      The display on this fb_info is beeing suspended, no access to the
  *      framebuffer is allowed any more after that call returns
@@ -801,12 +801,12 @@ struct fb_info {
 
 #ifdef CONFIG_FB_BACKLIGHT
         /* assigned backlight device */
-        /* set before framebuffer registration, 
+        /* set before framebuffer registration,
  *            remove after unregister */
         struct backlight_device *bl_dev;
 
         /* Backlight level curve */
-        struct mutex bl_curve_mutex;    
+        struct mutex bl_curve_mutex;
         unsigned char bl_curve[FB_BACKLIGHT_LEVELS];
 #endif
 #ifdef CONFIG_FB_DEFERRED_IO
@@ -822,25 +822,25 @@ struct fb_info {
         struct fb_tile_ops *tileops;    /* Tile Blitting */
 #endif
         char *screen_base;      /* Virtual address */
-        unsigned long screen_size;      /* Amount of ioremapped VRAM or 0 */ 
-        void *pseudo_palette;           /* Fake palette of 16 colors */ 
+        unsigned long screen_size;      /* Amount of ioremapped VRAM or 0 */
+        void *pseudo_palette;           /* Fake palette of 16 colors */
 #define FBINFO_STATE_RUNNING    0
 #define FBINFO_STATE_SUSPENDED  1
         unsigned int state;                      /* Hardware state i.e suspend */
         void *fbcon_par;                /* fbcon use-only private area */
         /* From here on everything is device dependent */
-        void *par;      
+        void *par;
 };
 
    /*
  *      *  `Generic' versions of the frame buffer device operations
  *           */
 
-extern int fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var); 
-extern int fb_pan_display(struct fb_info *info, struct fb_var_screeninfo *var); 
+extern int fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var);
+extern int fb_pan_display(struct fb_info *info, struct fb_var_screeninfo *var);
 extern int fb_blank(struct fb_info *info, int blank);
-extern void cfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect); 
-extern void cfb_copyarea(struct fb_info *info, const struct fb_copyarea *area); 
+extern void cfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect);
+extern void cfb_copyarea(struct fb_info *info, const struct fb_copyarea *area);
 extern void cfb_imageblit(struct fb_info *info, const struct fb_image *image);
 /*
  *  * Drawing operations where framebuffer is in system RAM

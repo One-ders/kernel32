@@ -36,20 +36,20 @@ static struct device_handle *fb_open(void *instance,
 	ud=(struct my_userdata *)driver_user_get_udata(root);
 	if (!ud) return 0;
 
-        ud->fb_data=fb_data; 
+        ud->fb_data=fb_data;
 	ud->ppos=0;
-	
+
 
 	if (fi->fbops->fb_open) {
 		rc=fi->fbops->fb_open(fi,1);
 	}
-	
+
 	if (rc) {
 		driver_user_put_udata(root,DEVICE_H(ud));
 		return 0;
 	}
 
-	sys_printf("fb_open: OK\n");	
+	sys_printf("fb_open: OK\n");
 
 	return DEVICE_H(ud);
 }
@@ -58,7 +58,7 @@ static int fb_close(struct device_handle *dh) {
 	return 0;
 }
 
-static int fb_control(struct device_handle *dh, 
+static int fb_control(struct device_handle *dh,
 			int cmd, void *arg, int arg_len) {
 
 	struct my_userdata *ud=DEVICE_UDATA(struct my_userdata,dh);
@@ -89,7 +89,7 @@ static int fb_control(struct device_handle *dh,
 				err=-EFBIG;
 				arg_len=total_size;
 			}
-	
+
 			if (arg_len+p>total_size) {
 				if (!err) {
 					err=-ENOSPC;
@@ -103,7 +103,7 @@ static int fb_control(struct device_handle *dh,
 			if (fi->fbops->fb_sync) {
 				fi->fbops->fb_sync(fi);
 			}
-			
+
 			while(arg_len) {
 				c=(arg_len>PAGE_SIZE)?PAGE_SIZE:arg_len;
 				src=buffer;

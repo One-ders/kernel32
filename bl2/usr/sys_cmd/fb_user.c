@@ -12,7 +12,7 @@ int fb_test(void *dum) {
 	char *fbp;
 	int x=0,y=0;
 	int location=0;
-	
+
 	fb_fd=io_open("fb0");
 
 	if (fb_fd<0) {

@@ -51,7 +51,7 @@ static inline unsigned long fb_rev_pixels_in_long(unsigned long val,
 }
 
 
-static inline unsigned int fb_shifted_pixels_mask_u32(unsigned int index, 
+static inline unsigned int fb_shifted_pixels_mask_u32(unsigned int index,
 							unsigned int bswapmask)
 {
         unsigned int mask;
@@ -72,7 +72,7 @@ static inline unsigned int fb_shifted_pixels_mask_u32(unsigned int index,
         return mask;
 }
 
-static inline unsigned long fb_shifted_pixels_mask_long(unsigned int index, 
+static inline unsigned long fb_shifted_pixels_mask_long(unsigned int index,
 							unsigned int bswapmask)
 {
         unsigned long mask;

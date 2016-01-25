@@ -37,7 +37,7 @@ void setup_return_stack(struct task *t, void *stackp_v,
 		v_stack = 0x80000000;
 	} else {
 		unsigned long int brk=(t->asp->brk-1)>>PAGE_SHIFT;
-		brk+=2; 
+		brk+=2;
 		t->asp->brk=brk<<PAGE_SHIFT;
 		v_stack = t->asp->brk;
 	}
@@ -119,4 +119,3 @@ int sys_mdelay(unsigned int msec) {
         sys_udelay(msec*1000);
         return 0;
 }
-

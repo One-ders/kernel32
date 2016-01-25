@@ -5,7 +5,7 @@
 struct lcd_desc {
         unsigned int next_desc; /* LCDDAx */
         unsigned int databuf;   /* LCDSAx */
-        unsigned int frame_id;  /* LCDFIDx */ 
+        unsigned int frame_id;  /* LCDFIDx */
         unsigned int cmd;       /* LCDCMDx */
 };
 

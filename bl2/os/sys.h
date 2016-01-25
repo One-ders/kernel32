@@ -110,7 +110,7 @@ struct address_space {
 	unsigned long int *pgd;		/* 00-03 */
 	int		id;		/* 04-07 */
 	unsigned long int brk;
-	int		ref;	
+	int		ref;
 #endif
 };
 
@@ -313,7 +313,7 @@ void driver_user_data_init(struct device_handle **root,
 
 struct device_handle *driver_user_get_udata(struct device_handle *root);
 
-void driver_user_put_udata(struct device_handle *root, 
+void driver_user_put_udata(struct device_handle *root,
 				struct device_handle *dh);
 
 #if 0

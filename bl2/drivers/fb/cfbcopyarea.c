@@ -24,7 +24,7 @@ bitcpy(unsigned long *dst, int dst_idx, const unsigned long *src,
 
 	if (!shift) {
 		// Same alignment for source and dest
-	
+
 		if (dst_idx+n <= bits) {
 			// Single word
 			if (last) first &= last;
