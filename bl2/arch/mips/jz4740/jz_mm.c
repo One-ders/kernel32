@@ -60,7 +60,7 @@ void *get_pages(unsigned int order) {
 	int have_slots=0;
 	int start_slot=0;
 	int last_slot=0;
-	
+
 	sys_printf("get_pages: num=%d,need_slots=%x\n", num, need_slots);
 	for(i=0;i<(sizeof(free_page_map)/sizeof(unsigned long int));i++) {
 		if (free_page_map[i]==0xffffffff) {
@@ -89,7 +89,7 @@ void *get_pages(unsigned int order) {
 		free_page_map[last_slot]&=~(1<<i);
 	}
 
-	
+
 	return (void *)(0x80000000 + (start_slot*32*4096));
 }
 

@@ -66,10 +66,10 @@ int io_add_str(const char *str) {
 
 static char tiob[256];
 int io_add_strn(const char *bytes, int len) {
-	if (!dh) { 
+	if (!dh) {
 		memcpy(tiob,bytes,len);
-		tiob[len]=0; 
-		return p_str(tiob); 
+		tiob[len]=0;
+		return p_str(tiob);
 	}
 	return iodrv->ops->control(dh, WR_CHAR, (char *)bytes, len);
 }

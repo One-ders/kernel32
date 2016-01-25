@@ -767,7 +767,7 @@ int fb_mode_is_equal(const struct fb_videomode *mode1,
  * var->xres and var->yres.  If more than 1 videomode is found, will return
  * the videomode with the highest refresh rate
  */
-const struct fb_videomode 
+const struct fb_videomode
 *fb_find_best_mode(const struct fb_var_screeninfo *var,
 			struct modelist *head) {
 	struct fb_modelist *modelist;
@@ -802,7 +802,7 @@ const struct fb_videomode
  * If more than 1 videomode is found, will return the videomode with
  * the closest refresh rate.
  */
-const struct fb_videomode 
+const struct fb_videomode
 *fb_find_nearest_mode(const struct fb_videomode *mode,
 			struct modelist *head) {
 	struct fb_modelist *modelist;
@@ -839,7 +839,7 @@ const struct fb_videomode
  * RETURNS:
  * struct fb_videomode, NULL if none found
  */
-const struct fb_videomode 
+const struct fb_videomode
 *fb_match_mode(const struct fb_var_screeninfo *var,
 		struct modelist *head) {
 	struct fb_modelist *modelist;
@@ -862,7 +862,7 @@ const struct fb_videomode
  * NOTES:
  * Will only add unmatched mode entries
  */
-int fb_add_videomode(const struct fb_videomode *mode, 
+int fb_add_videomode(const struct fb_videomode *mode,
 			struct modelist *head) {
         struct fb_modelist *modelist;
         struct fb_videomode *m;

@@ -1074,7 +1074,7 @@ int driver_publish(struct driver *drv) {
 		drv->next=drv_root;	
 		drv_root=drv;
 	}
-	
+
 	/* next two blocks are for late registers */
 	if (!(drv->stat&DRV_SYS_STAT_INITED)) {
 		drv->stat|=DRV_SYS_STAT_INITED;
@@ -1082,7 +1082,7 @@ int driver_publish(struct driver *drv) {
 			drv->ops->init(drv->instance);
 		}
 	}
-	
+
 	if (!(drv->stat&DRV_SYS_STAT_STARTED)) {
 		drv->stat|=DRV_SYS_STAT_STARTED;
 		if (drv->ops->start) {
@@ -1174,7 +1174,7 @@ struct device_handle *driver_user_get_udata(struct device_handle *root) {
 	return 0;
 }
 
-void driver_user_put_udata(struct device_handle *root, 
+void driver_user_put_udata(struct device_handle *root,
 				struct device_handle *dh) {
 	dh->next=root->next;
 	root->next=dh;

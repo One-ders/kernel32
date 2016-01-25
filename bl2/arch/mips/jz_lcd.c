@@ -85,7 +85,7 @@ struct jzfb_info {
 
 // pavo have SAMSUNG_LTP400WQF02
 static struct jzfb_info jzfb = {
- 	CFG_MODE_18B|CFG_HSYNC_N|CFG_VSYNC_N,
+	CFG_MODE_18B|CFG_HSYNC_N|CFG_VSYNC_N,
 	480,
 	272,
 	18,
@@ -169,7 +169,7 @@ static int lcd_disable_ofu_intr() {
 	return 0;
 }
 
-static int jzfb_setcolreg(unsigned int regno, unsigned int red, 
+static int jzfb_setcolreg(unsigned int regno, unsigned int red,
 			  unsigned int green, unsigned int blue,
 			  unsigned int transp, struct fb_info *info) {
 
@@ -297,7 +297,7 @@ static int jzfb_mmap(struct fb_info *info, struct vm_area_struct *vma) {
 #if 0
 	vma->vm_pgoff = off >> PAGE_SHIFT;
 	vma->vm_flags |= VM_IO;
-	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);   
+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
 	if (io_remap_pfn_range(vma, vma->vm_start, off >> PAGE_SHIFT,
                                vma->vm_end - vma->vm_start,
@@ -528,7 +528,7 @@ static int jzfb_set_var(struct fb_var_screeninfo *var, int con,
 	/*
 	 * If we are setting all the virtual consoles, also set the
 	 * defaults used to create new consoles.
- 	 */
+	 */
 	fb_set_cmap(&cfb->fb.cmap, &cfb->fb);
 	sys_printf("jzfb_set_var: after fb_set_cmap...\n");
 
@@ -545,9 +545,9 @@ static struct lcd_cfb_info *fb_alloc_fb_info(void) {
 	jzlcd_info=cfb;
 
 	memset(cfb,0,sizeof(struct lcd_cfb_info));
-	
+
 	cfb->currcon=-1;
-	
+
 	strcpy(cfb->fb.fix.id,"jz-lcd");
 	cfb->fb.fix.type	= FB_TYPE_PACKED_PIXELS;
 	cfb->fb.fix.type_aux	= 0;
@@ -886,7 +886,7 @@ static int lcd_hw_init(void) {
 
 		/* Screen setting */
 		LCDC->vat = ((jzfb.blw + jzfb.w + jzfb.hsw + jzfb.elw) << 16) |
- 				(stnH + jzfb.vsw + jzfb.bfw + jzfb.efw);
+				(stnH + jzfb.vsw + jzfb.bfw + jzfb.efw);
 		LCDC->dah = (jzfb.blw << 16) | (jzfb.blw + jzfb.w);
                 LCDC->dav = (0 << 16) | (stnH);
 
@@ -905,13 +905,13 @@ static int lcd_hw_init(void) {
 #if defined(CONFIG_JZLCD_INNOLUX_AT080TN42)
 		LCDC->dav = (0 << 16) | ( jzfb.h );
 #else
-		LCDC->dav = ((jzfb.vsw + jzfb.bfw) << 16) | 
+		LCDC->dav = ((jzfb.vsw + jzfb.bfw) << 16) |
 				(jzfb.vsw + jzfb.bfw + jzfb.h);
 #endif /*#if defined(CONFIG_JZLCD_INNOLUX_AT080TN42)*/
 		LCDC->vat =(((jzfb.blw+jzfb.w+jzfb.elw+jzfb.hsw))<<16) |
 			 (jzfb.vsw + jzfb.bfw + jzfb.h + jzfb.efw);
 		LCDC->hsync = (0 << 16) | jzfb.hsw;
-		LCDC->dah = ((jzfb.hsw + jzfb.blw) << 16) | 
+		LCDC->dah = ((jzfb.hsw + jzfb.blw) << 16) |
 				(jzfb.hsw + jzfb.blw + jzfb.w);
 		break;
 	}
@@ -1081,7 +1081,7 @@ static int jz_lcd_start(void *inst) {
 #endif
 
 	__lcd_display_pin_init();
-	
+
 	cfb=fb_alloc_fb_info();
 	if (!cfb) goto out_err;
 
@@ -1089,7 +1089,7 @@ static int jz_lcd_start(void *inst) {
 	if (rc) goto out_err;
 
 	jzfb_set_var(&cfb->fb.var, -1, &cfb->fb);
-	
+
 	lcd_descriptor_init();
 
 	rc=lcd_hw_init();
@@ -1128,7 +1128,7 @@ static int jz_lcd_start(void *inst) {
 out_err:
 	fb_unmap_smem(cfb);
 	fb_free_fb_info(cfb);
-	
+
 	return rc;
 }
 static struct driver_ops jz_lcd_drv_ops = {

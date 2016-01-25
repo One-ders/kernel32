@@ -6,16 +6,16 @@
 #define MAX_DATA_LEN	0x200
 #define MAX_HOST_TX_FIFOS	15
 
-#define RX_FIFO_FS_SIZE 	128 
+#define RX_FIFO_FS_SIZE 	128
 #define TX0_FIFO_FS_SIZE	32
 #define TX1_FIFO_FS_SIZE	64
 #define TX2_FIFO_FS_SIZE	64
 #define TX3_FIFO_FS_SIZE	64
 
 
-#define RX_FIFO_HS_SIZE		512 
-#define TX0_FIFO_HS_SIZE	32 
-#define TX1_FIFO_HS_SIZE	64 
+#define RX_FIFO_HS_SIZE		512
+#define TX0_FIFO_HS_SIZE	32
+#define TX1_FIFO_HS_SIZE	64
 #define TX2_FIFO_HS_SIZE	64
 #define TX3_FIFO_HS_SIZE	64
 #define TX4_FIFO_HS_SIZE	0

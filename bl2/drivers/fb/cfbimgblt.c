@@ -100,7 +100,7 @@ static inline void color_imageblit(const struct fb_image *image,
         }
 }
 
-static inline void slow_imageblit(const struct fb_image *image, 
+static inline void slow_imageblit(const struct fb_image *image,
 				struct fb_info *p,
 				unsigned char *dst1, unsigned int fgcolor,
 				unsigned int bgcolor,
@@ -168,7 +168,7 @@ static inline void slow_imageblit(const struct fb_image *image,
         }
 }
 
-static inline void fast_imageblit(const struct fb_image *image, 
+static inline void fast_imageblit(const struct fb_image *image,
 				struct fb_info *p,
 				unsigned char *dst1, unsigned int fgcolor,
 				unsigned int bgcolor)
@@ -212,7 +212,7 @@ static inline void fast_imageblit(const struct fb_image *image,
 			shift -= ppw;
                         end_mask = tab[(*src >> shift) & bit_mask];
                         FB_WRITEL((end_mask & eorx)^bgx, dst++);
-                        if (!shift) { shift = 8; src++; }       
+                        if (!shift) { shift = 8; src++; }
                 }
                 dst1 += p->fix.line_length;
                 s += spitch;

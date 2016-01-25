@@ -19,12 +19,12 @@
 #define  USB_LEN_EP_DESC                                0x07
 #define  USB_LEN_OTG_DESC                               0x03
 
-#define  USBD_IDX_LANGID_STR                            0x00 
-#define  USBD_IDX_MFC_STR                               0x01 
+#define  USBD_IDX_LANGID_STR                            0x00
+#define  USBD_IDX_MFC_STR                               0x01
 #define  USBD_IDX_PRODUCT_STR                           0x02
-#define  USBD_IDX_SERIAL_STR                            0x03 
-#define  USBD_IDX_CONFIG_STR                            0x04 
-#define  USBD_IDX_INTERFACE_STR                         0x05 
+#define  USBD_IDX_SERIAL_STR                            0x03
+#define  USBD_IDX_CONFIG_STR                            0x04
+#define  USBD_IDX_INTERFACE_STR                         0x05
 
 #define  USB_REQ_TYPE_STANDARD                          0x00
 #define  USB_REQ_TYPE_CLASS                             0x20
@@ -114,7 +114,7 @@ struct usb_device_funcs {
 	void (*usb_dev_connect)(void);
 	void (*usb_dev_disconnect)(void);
 	unsigned int (*usb_dev_get_ep_status)(unsigned char epnum);
-	void (*usb_dev_set_ep_status)(unsigned char epnum, 
+	void (*usb_dev_set_ep_status)(unsigned char epnum,
 						unsigned int status);
 };
 
@@ -137,19 +137,19 @@ struct usb_device_cb {
 };
 
 struct usb_device {
-	unsigned char *(*get_device_descriptor)(void *uref, 
+	unsigned char *(*get_device_descriptor)(void *uref,
 				unsigned char speed, unsigned short int *len);
-	unsigned char *(*get_lang_id_descriptor)(void *uref, 
+	unsigned char *(*get_lang_id_descriptor)(void *uref,
 				unsigned char speed, unsigned short int *len);
-	unsigned char *(*get_mfc_descriptor)(void *uref, 
+	unsigned char *(*get_mfc_descriptor)(void *uref,
 				unsigned char speed, unsigned short int *len);
-	unsigned char *(*get_prod_descriptor)(void *uref, 
+	unsigned char *(*get_prod_descriptor)(void *uref,
 				unsigned char speed, unsigned short int *len);
-	unsigned char *(*get_serial_descriptor)(void *uref, 
+	unsigned char *(*get_serial_descriptor)(void *uref,
 				unsigned char speed, unsigned short int *len);
-	unsigned char *(*get_config_descriptor)(void *uref, 
+	unsigned char *(*get_config_descriptor)(void *uref,
 				unsigned char speed, unsigned short int *len);
-	unsigned char *(*get_itf_descriptor)(void *uref, 
+	unsigned char *(*get_itf_descriptor)(void *uref,
 				unsigned char speed, unsigned short int *len);
 };
 
@@ -173,12 +173,12 @@ struct usb_dev_class {
 	unsigned int (*iso_in_incomplete)(void *uref);
 	unsigned int (*iso_out_incomplete)(void *uref);
 	unsigned char *(*get_config_descriptor)(void *uref,
-			unsigned char speed, unsigned short int *length);		
+			unsigned char speed, unsigned short int *length);
 	unsigned char *(*get_other_cf_descriptor)(void *uref,
-			unsigned char speed, unsigned short int *length);		
+			unsigned char speed, unsigned short int *length);
 	unsigned char *(*get_usr_str_descriptor)(void *uref,
 			unsigned char speed, unsigned char index,
-			unsigned short int *length);		
+			unsigned short int *length);
 };
 
 struct usb_dev_usr {

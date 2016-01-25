@@ -110,7 +110,7 @@ struct address_space {
 	unsigned long int *pgd;		/* 00-03 */
 	int		id;		/* 04-07 */
 	unsigned long int brk;
-	int		ref;	
+	int		ref;
 #endif
 };
 
@@ -166,7 +166,7 @@ void init_sys_arch(void);
 void setup_return_stack(struct task *t, void *stackp,
 					unsigned long int fnc,
 					unsigned long int ret_fnc,
-					void *arg0, 
+					void *arg0,
 					void *arg1);
 int unmap_stack_memory(unsigned long int addr);
 int map_stack_page(unsigned long int addr,unsigned int size);
@@ -313,7 +313,7 @@ void driver_user_data_init(struct device_handle **root,
 
 struct device_handle *driver_user_get_udata(struct device_handle *root);
 
-void driver_user_put_udata(struct device_handle *root, 
+void driver_user_put_udata(struct device_handle *root,
 				struct device_handle *dh);
 
 #if 0
