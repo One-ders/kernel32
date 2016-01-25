@@ -37,7 +37,15 @@
 #include "string.h"
 
 static struct driver *iodrv;
-static struct device_handle *dh;
+static struct device_handle *dh=0;
+
+typedef int (*P_STR)(char *);
+P_STR p_str=0x800009a4;
+
+typedef int (*P_CHAR)(char );
+P_CHAR p_char=0x80000948;
+
+
 
 int io_cb_handler(struct device_handle *dh, int ev, void *dum) {
 	return 0;
@@ -47,17 +55,22 @@ void io_push() {
 }
 
 int io_add_c(const char c) {
-	if (!dh) return 0;
+	if (!dh) return p_char(c);
 	return iodrv->ops->control(dh, WR_CHAR, (char *)&c,1);
 }
 
 int io_add_str(const char *str) {
-	if (!dh) return 0;
+	if (!dh) return p_str(str);
 	return iodrv->ops->control(dh, WR_CHAR, (char *)str, __builtin_strlen(str));
 }
 
+static char tiob[256];
 int io_add_strn(const char *bytes, int len) {
-	if (!dh) return 0;
+	if (!dh) { 
+		memcpy(tiob,bytes,len);
+		tiob[len]=0; 
+		return p_str(tiob); 
+	}
 	return iodrv->ops->control(dh, WR_CHAR, (char *)bytes, len);
 }
 

@@ -13,7 +13,7 @@ export OBJCOPY:=mipsel-linux-objcopy
 #include $(TOP)/os/Makefile
 
 #CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4740 -I/opt/cross/lib/gcc/mipsel-linux/4.9.1/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls
-CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/boards/$(BOARD) -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4740 -I/opt/cross/lib/gcc/mipsel-linux/4.9.1/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -DDEBUG
+CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/boards/$(BOARD) -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl/jz4740 -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4740 -I/opt/cross/lib/gcc/mipsel-linux/4.9.1/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -D__KERNEL__ -DDEBUG
 CFLAGS_USR:=-I$(TOP)/usr/incl -I/opt/cross/lib/gcc/mipsel-linux/4.9.1/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls
 LDFLAGS:=-g -T./pavo.ld 
 LDFLAGS_USR:=-g $(OBJ)/usr/lib/start.o $(OBJ)/usr/lib/usrlib.o -T$(OBJ)/../pavo_usr.ld
@@ -52,8 +52,8 @@ uCore.bin: uCore
 ipl/boot.bin:
 	$(MAKE) -C ipl
 
-uCore: os version mips jz c_start.o stddrv
-	$(LD) $(LDFLAGS) -o $@ $(OBJ)/lib/jz.o c_start.o $(OBJ)/version.o $(OBJ)/lib/init_sect.o $(OBJ)/lib/mips.o $(OBJ)/lib/os.o $(OBJ)/stddrv/stddrv.o $(OBJ)/lib/end_sect.o
+uCore: os version mips jz c_start.o mm stddrv stdlib fb
+	$(LD) $(LDFLAGS) -o $@ $(OBJ)/lib/init_sect.o $(OBJ)/lib/jz.o c_start.o $(OBJ)/version.o $(OBJ)/lib/mips.o $(OBJ)/lib/os.o $(OBJ)/lib/mm.o $(OBJ)/stddrv/stddrv.o $(OBJ)/stdlib/stdlib.o $(OBJ)/lib/fb.o  $(OBJ)/lib/end_sect.o
 
 #traps.o: ../../mips/jz4740/traps.S
 #	$(CC) $(CFLAGS) -c -o $@ $<
@@ -91,6 +91,29 @@ stddrv: $(OBJ)/stddrv
 	CFLAGS="$(CFLAGS)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
 
 $(OBJ)/stddrv: $(TOP)/stddrv
+	mkdir -p $@
+	lndir $< $@
+
+stdlib: $(OBJ)/stdlib
+	CFLAGS="$(CFLAGS)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
+
+$(OBJ)/stdlib: $(TOP)/stdlib
+	mkdir -p $@
+	lndir $< $@
+
+
+fb: $(OBJ)/drivers/fb
+	CFLAGS="$(CFLAGS)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
+
+$(OBJ)/drivers/fb: $(TOP)/drivers/fb
+	mkdir -p $@
+	lndir $< $@
+
+
+mm: $(OBJ)/mm
+	CFLAGS="$(CFLAGS)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
+
+$(OBJ)/mm: $(TOP)/mm
 	mkdir -p $@
 	lndir $< $@
 

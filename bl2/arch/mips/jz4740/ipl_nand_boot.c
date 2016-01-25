@@ -367,6 +367,8 @@ void nand_boot(void) {
 	nand_load(CFG_NAND_U_BOOT_OFFS, CFG_NAND_U_BOOT_SIZE,
 		(unsigned char *)CFG_NAND_U_BOOT_DST);
 #endif
+	nand_load(0,0x1000,(unsigned char *)0x80000000);
+
 	nand_load(0x5000, 0x10000,
 		(unsigned char *)0x80004000);
 	serial_puts("Jumping to ram ...\n");

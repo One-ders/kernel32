@@ -4,7 +4,7 @@ CC:=mipsel-linux-gcc
 LD:=mipsel-linux-ld
 OBJCOPY:=mipsel-linux-objcopy
 
-CFLAGS:=-I../. -I../../../incl -I../../../arch/mips -I../../../arch/mips/jz4740 -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls
+CFLAGS:=-I../. -I../../../incl -I../../../arch/mips -I../../../arch/mips/incl/jz4740 -I../../../arch/mips/jz4740 -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls
 LDFLAGS:=-g -T./pavo_ipl.ld 
 
 OBJECTS=ipl_start.o ipl_nand_boot.o jz_serial.o jz4740.o

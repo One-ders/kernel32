@@ -29,14 +29,23 @@ void setup_return_stack(struct task *t, void *stackp_v,
 			void *arg1) {
 //	unsigned long int *stackp=(unsigned long int *)(((char *)t)+4096);
 	unsigned long int *stackp=(unsigned long int *)stackp_v;
+	unsigned long int v_stack;
 
 	sys_printf("t at %x, stackp at %x\n",
 			t, stackp);
+	if (t->asp->ref==1) {
+		v_stack = 0x80000000;
+	} else {
+		unsigned long int brk=(t->asp->brk-1)>>PAGE_SHIFT;
+		brk+=2; 
+		t->asp->brk=brk<<PAGE_SHIFT;
+		v_stack = t->asp->brk;
+	}
 
-	curr_pgd=t->pgd;  /* repoint page table directory while loading */
+	curr_pgd=t->asp->pgd;  /* repoint page table directory while loading */
 //	strcpy(((void *)0x3f000),arg0);
-	strcpy(((void *)0x7ffffff8),arg0);
-	curr_pgd=current->pgd;
+	strcpy(((void *)(v_stack-8)),arg0);
+	curr_pgd=current->asp->pgd;
 	
 	*(--stackp)=0;		// hi
 	*(--stackp)=0;		// lo
@@ -48,7 +57,7 @@ void setup_return_stack(struct task *t, void *stackp_v,
 	*(--stackp)=0;		// ra
 	*(--stackp)=0;		// fp
 //	*(--stackp)=0x80000000;	// user sp
-	*(--stackp)=0x80000000-((unsigned int)arg1); // user sp
+	*(--stackp)=v_stack-((unsigned int)arg1); // user sp
 
 	*(--stackp)=0;		// gp
 	*(--stackp)=0;		// k1
@@ -75,7 +84,7 @@ void setup_return_stack(struct task *t, void *stackp_v,
 	*(--stackp)=0;		// t1
 
 	*(--stackp)=0;		// t0
-	*(--stackp)=0x80000000-((unsigned int)arg1);	// a3
+	*(--stackp)=v_stack-((unsigned int)arg1);	// a3
 	*(--stackp)=0;		// a2
 	*(--stackp)=0;		// a1
 //	*(--stackp)=(unsigned long int)arg1; // a1
@@ -95,3 +104,19 @@ unsigned long int get_usr_pc(struct task *t) {
 	// tbd
 	return 0;
 }
+
+int sys_udelay(unsigned int usec) {
+        unsigned int count=0;
+        unsigned int utime=(120*usec/7);
+        do {
+                if (++count>utime) {
+                        return 0;
+                }
+        } while (1);
+}
+
+int sys_mdelay(unsigned int msec) {
+        sys_udelay(msec*1000);
+        return 0;
+}
+

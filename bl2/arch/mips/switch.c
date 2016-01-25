@@ -40,8 +40,10 @@ unsigned long int *curr_pgd;
 struct task *create_user_context(void) {
 	struct task *t=(struct task *)get_page();
 	unsigned long int *t_pgd=(unsigned long int *)get_page();
+	struct address_space *asp=(struct address_space *)(t+1);
 	memset(t,0,sizeof(struct task));
 	memset(t_pgd,0,P_SIZE);
+	memset(asp,0,sizeof(*asp));
 	t->sp=(void *)(((char *)t)+4096);
 //	sys_printf("got page at %x\n",t);
 	if (allocate_task_id(t)<0) {
@@ -50,8 +52,11 @@ struct task *create_user_context(void) {
 		put_page(t_pgd);
 		return 0;
 	}
-	set_asid(t->id);
-	t->pgd=t_pgd;
+	t->asp=asp;
+	asp->ref=1;
+	asp->id=t->id;
+//	set_asid(asp->id);
+	asp->pgd=t_pgd;
 	return t;
 }
 
@@ -189,6 +194,12 @@ unsigned int read_c0_hi(void) {
         return ret;
 }
 
+#define U_STACK_TOP 0x80000000
+#define U_STACK_BOT 0x70000000
+#define U_HEAP_START 0x10000000
+#define U_INSTR_END  0x01000000
+#define U_INSTR_START 0x00001000
+
 
 void handle_tlb_miss(void *sp) {
 	struct fullframe *ff=(struct fullframe *)sp;
@@ -203,7 +214,16 @@ void handle_tlb_miss(void *sp) {
 	}
 //	sys_printf("curr_pgd at %x\n",curr_pgd);
 
-//	sys_printf("tlb_miss for %x\n", badvaddr);
+	sys_printf("tlb_miss for %x\n", badvaddr);
+	if ((badvaddr<U_STACK_TOP) || (badvaddr>= U_STACK_BOT) ||
+            (badvaddr<current->asp->brk) || (badvaddr>= U_HEAP_START) ||
+            (badvaddr<U_INSTR_END) || (badvaddr>= U_INSTR_START)) {
+	} else {
+		sys_printf("User: Seqmentation violation\n");
+		while(1);
+	}
+
+
 	pt=(unsigned long int *)curr_pgd[pgd_index];
 	if (!pt) {
 //		sys_printf("allocating page table at pgd_index %x\n",pgd_index);
@@ -231,7 +251,7 @@ void handle_tlb_miss(void *sp) {
 		set_c0_lo1(0);
 	}
 
-#if 0
+#if 1
 	sys_printf("handle_tlb_miss: tlb_index %x, tlb_random %x, tlb_lo0 %x\n",
 			read_c0_index(),read_c0_random(),read_c0_lo0());
 
@@ -251,10 +271,66 @@ void handle_TLBL(void *sp) {
 	unsigned int pgd_index=badvaddr>>PT_SHIFT;
 	unsigned int pt_index=(badvaddr&P_MASK)>>P_SHIFT;
 	unsigned long int *pt, p;
-#if 1
+#if 0
 	sys_printf("handle tlb load trap, badvaddr %x\n",badvaddr);
 #endif
-	while(1);
+	if (!curr_pgd) {
+		sys_printf("super error, no curr_pgd\n");
+		while(1);
+	}
+//	sys_printf("TLBL: curr_pgd at %x\n",curr_pgd);
+
+//	sys_printf("TLBL: tlb_miss for %x\n", badvaddr);
+	pt=(unsigned long int *)curr_pgd[pgd_index];
+	if (!pt) {
+		sys_printf("allocating page table at pgd_index %x\n",pgd_index);
+		pt=(unsigned long int *)get_page();
+		memset(pt,0,4096);
+		curr_pgd[pgd_index]=(unsigned long int)pt;
+	}
+//	sys_printf("TLBL: page_table at %x\n", pt);
+//
+//	sys_printf("lookup page table index %x\n", pt_index);
+	p=pt[pt_index];
+	if (!p) {
+		p=(unsigned long int)get_page();
+		memset(p,0,4096);
+		p&=~0x80000000;
+		sys_printf("allocating page(%x) at pt_index %x\n",p,pt_index);
+		pt[pt_index]=p;
+	}
+
+	if (badvaddr&(1<<12)) {
+		unsigned long int pp=pt[pt_index-1];
+		if (pp) {
+			set_c0_lo0((pp>>6)|P_CACHEABLE|P_DIRTY|P_VALID);
+		} else {
+			set_c0_lo0(0);
+		}
+		set_c0_lo1((p>>6)|P_CACHEABLE|P_DIRTY|P_VALID);
+	} else {
+		unsigned long int pa=pt[pt_index+1];
+		set_c0_lo0((p>>6)|P_CACHEABLE|P_DIRTY|P_VALID);
+		if (pa) {
+			set_c0_lo1((pa>>6)|P_CACHEABLE|P_DIRTY|P_VALID);
+		} else {
+			set_c0_lo1(0);
+		}
+	}
+
+#if 1
+	sys_printf("handle_tlbl_miss: tlb_index %x, tlb_random %x, tlb_lo0 %x\n",
+			read_c0_index(),read_c0_random(),read_c0_lo0());
+
+	sys_printf("handle_tlbl_miss: tlb_lo1 %x, tlb_context %x, tlb_pagemask %x\n",
+			read_c0_lo1(), read_c0_context(), read_c0_pagemask());
+
+	sys_printf("handle_tlbl_miss: tlb_wired %x, tlb_hi %x\n",
+			read_c0_wired(), read_c0_hi());
+#endif
+
+//	asm("tlbwi");
+	asm("tlbwr");
 }
 
 void handle_TLBS(void *sp) {
@@ -291,7 +367,7 @@ void handle_TLBS(void *sp) {
 	}
 
 	if (badvaddr&(1<<12)) {
-		unsigned int pp=pt[pt_index-1];
+		unsigned long int pp=pt[pt_index-1];
 		if (pp) {
 			set_c0_lo0((pp>>6)|P_CACHEABLE|P_DIRTY|P_VALID);
 		} else {
@@ -308,18 +384,19 @@ void handle_TLBS(void *sp) {
 		}
 	}
 
-#if 0
-	sys_printf("handle_tlb_miss: tlb_index %x, tlb_random %x, tlb_lo0 %x\n",
+#if 1
+	sys_printf("handle_tlbs_miss: tlb_index %x, tlb_random %x, tlb_lo0 %x\n",
 			read_c0_index(),read_c0_random(),read_c0_lo0());
 
-	sys_printf("handle_tlb_miss: tlb_lo1 %x, tlb_context %x, tlb_pagemask %x\n",
+	sys_printf("handle_tlbs_miss: tlb_lo1 %x, tlb_context %x, tlb_pagemask %x\n",
 			read_c0_lo1(), read_c0_context(), read_c0_pagemask());
 
-	sys_printf("handle_tlb_miss: tlb_wired %x, tlb_hi %x\n",
+	sys_printf("handle_tlbs_miss: tlb_wired %x, tlb_hi %x\n",
 			read_c0_wired(), read_c0_hi());
 #endif
 
-	asm("tlbwi");
+//	asm("tlbwi");
+	asm("tlbwr");
 }
 
 
