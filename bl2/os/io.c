@@ -395,6 +395,7 @@ void init_io(void) {
 	dh=iodrv->ops->open(iodrv->instance, io_cb_handler, 0);
 	if (!dh) {
 		iodrv=0;
-	} else 
-	io_push();    /* to force out prints, done before open */
+	} else {
+		io_push();    /* to force out prints, done before open */
+	}
 }

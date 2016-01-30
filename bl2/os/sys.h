@@ -110,6 +110,7 @@ struct address_space {
 	unsigned long int *pgd;		/* 00-03 */
 	int		id;		/* 04-07 */
 	unsigned long int brk;
+	unsigned long int mmap_vaddr;
 	int		ref;
 #endif
 };
@@ -214,6 +215,18 @@ int task_sleepable(void);
 #define EV_WRITE 2
 #define EV_STATE 4
 
+#define PROT_EXEC       1
+#define PROT_READ       2
+#define PROT_WRITE      4
+#define PROT_NONE       0
+
+#define MAP_SHARED      1
+#define MAP_PRIVATE     2
+#define MAP_ANONYMOUS   4
+#define MAP_FIXED       5
+#define MAP_GROWSDOWN   6
+
+
 struct device_handle {
 	unsigned int user_data1;
 	struct device_handle *next;
@@ -237,6 +250,9 @@ struct dyn_open_args {
 #define READDIR 9
 #define DYNOPEN 10
 #define IO_LSEEK 11
+#define IO_MMAP 12
+#define IO_MUNMAP 13
+
 
 #define O_NONBLOCK 1
 
@@ -261,7 +277,9 @@ struct dent {
 #define SVC_IO_LSEEK    SVC_IO_CONTROL+1
 #define SVC_IO_CLOSE    SVC_IO_LSEEK+1
 #define SVC_IO_SELECT   SVC_IO_CLOSE+1
-#define SVC_KILL_SELF   SVC_IO_SELECT+1
+#define SVC_IO_MMAP     SVC_IO_SELECT+1
+#define SVC_IO_MUNMAP   SVC_IO_MMAP+1
+#define SVC_KILL_SELF   SVC_IO_MUNMAP+1
 #define SVC_BLOCK_TASK  SVC_KILL_SELF+1
 #define SVC_UNBLOCK_TASK SVC_BLOCK_TASK+1
 #define SVC_SETPRIO_TASK SVC_UNBLOCK_TASK+1

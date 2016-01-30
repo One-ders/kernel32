@@ -32,6 +32,8 @@ tlb_refill_user:
 	lw	k1,0(k1)
 	beqz	k1,_do_page_fault
 	ssnop
+	j _do_page_fault
+	ssnop
 1:	j	1b
 	nop
 	.set	pop
@@ -200,6 +202,8 @@ ret_from_irq:
 	lw	v1,10*4(v0)	# read address space
 	lw	v1,1*4(v1)	# read address space id
 	mtc0	v1,CP0_ENTRYHI
+	ssnop
+	ssnop
 #
 	lw	sp,1*4(v0)      # get stack pointer for new thread
 	addiu	k0,sp,(32*4)+(5*4) # return space for regs
@@ -308,6 +312,7 @@ ret_from_irq:
 	.set pop
 
 
+# write on write protected page
 _handle_tlb1:
 5:	j	5b
 	ssnop
@@ -949,8 +954,7 @@ _start:
         /* Set up temporary stack.
          */
         la      sp, 0x84000000
-        la      t9, c_start
-        j       t9
+        j	c_start
         nop
 
 #	mfc0	a0,CP0_STATUS

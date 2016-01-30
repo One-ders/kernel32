@@ -647,6 +647,7 @@ static int fb_map_smem(struct lcd_cfb_info *cfb) {
 
 	cfb->fb.fix.smem_start = virt_to_phys((void *)lcd_frame[0]);
 	cfb->fb.fix.smem_len = (PAGE_SIZE << page_shift);
+	// Move address to uncached space
 	cfb->fb.screen_base =
 	(unsigned char *)(((unsigned int)lcd_frame[0] & 0x1fffffff) | 0xa0000000);
 	if (!cfb->fb.screen_base) {

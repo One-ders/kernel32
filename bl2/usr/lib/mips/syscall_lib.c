@@ -44,7 +44,9 @@
 #define SVC_IO_LSEEK	SVC_IO_CONTROL+1
 #define SVC_IO_CLOSE    SVC_IO_LSEEK+1
 #define SVC_IO_SELECT   SVC_IO_CLOSE+1
-#define SVC_KILL_SELF   SVC_IO_SELECT+1
+#define SVC_IO_MMAP	SVC_IO_SELECT+1
+#define SVC_IO_MUNMAP	SVC_IO_MMAP+1
+#define SVC_KILL_SELF   SVC_IO_MUNMAP+1
 #define SVC_BLOCK_TASK  SVC_KILL_SELF+1
 #define SVC_UNBLOCK_TASK SVC_BLOCK_TASK+1
 #define SVC_SETPRIO_TASK SVC_UNBLOCK_TASK+1
@@ -101,6 +103,8 @@ int svc_io_control(int fd, int cmd, void *b, int s);
 unsigned long int svc_io_lseek(int fd, unsigned long int offs, int whence);
 int svc_io_close(int fd);
 int svc_io_select(struct sel_args *sel_args);
+void *svc_io_mmap(void *addr, unsigned int len, int prot, int flags, int fd, long int offset);
+int svc_io_munmap(void *addr, unsigned int len);
 int svc_block_task(char *name);
 int svc_unblock_task(char *name);
 int svc_setprio_task(char *name, int prio);
@@ -170,6 +174,19 @@ __attribute__ ((noinline)) int svc_io_close(int fd) {
 __attribute__ ((noinline)) int svc_io_select(struct sel_args *sel_args) {
 	register int rc asm("v0");
 	svc(SVC_IO_SELECT);
+	return rc;
+}
+
+__attribute__ ((noinline)) void *svc_io_mmap(void *addr, unsigned int len, int prot, int flags,
+						int fd, long int offset) {
+	register void *rc asm("v0");
+	svc(SVC_IO_MMAP);
+	return rc;
+}
+
+__attribute__ ((noinline)) int svc_io_munmap(void *addr, unsigned int len) {
+	register int rc asm("v0");
+	svc(SVC_IO_MUNMAP);
 	return rc;
 }
 
@@ -306,6 +323,14 @@ int io_select(int nfds, fd_set *rfds, fd_set *wfds, fd_set *stfds, unsigned int 
 //	printf("io_select: nfds=%d, rfds=%x, wfds=%x, stfds=%x, tout=%x\n",
 //			nfds,rfds,wfds,stfds,tout);
 	return svc_io_select(&sel_args);
+}
+
+void *io_mmap(void *addr, unsigned int len, int prot, int flags, int fd, long int offset) {
+	return svc_io_mmap(addr,len,prot,flags,fd,offset);
+}
+
+int io_munmap(void *addr, unsigned int len) {
+	return svc_io_munmap(addr, len);
 }
 
 void *sbrk(long int incr) {

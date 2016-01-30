@@ -118,7 +118,8 @@ int handle_srec_memline(unsigned char *r, int len, struct task *t) {
 	p=(unsigned char *)addr;
 	sys_brk(t,p);
 	for (i=4;i<(len-1);i++) {
-		if ((p>0x10000000)&&(p<0x70000000)) {
+		if ((p>((unsigned char *)0x10000000))&&
+			(p<((unsigned char *)0x70000000))) {
 			sys_sbrk(t,1);
 //			sys_printf("sys_break = 0x%x\n", sbrk(t,0));
 		}
@@ -215,6 +216,7 @@ int load_init(struct task *t) {
 //	sys_printf("nand_pos = %d\n", nand_pos);
 
 	t->asp->brk=0x10000000;
+	t->asp->mmap_vaddr=0x10000000;
 	brk_save=current->asp->brk;
 	current->asp->brk=t->asp->brk;
 

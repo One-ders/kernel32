@@ -31,6 +31,7 @@ int io_control(int fd, int cmd, void *d, int sz);
 int io_close(int fd);
 int io_select(int nfds, fd_set *rfds, fd_set *wfds, fd_set *stfds, unsigned int *tout);
 unsigned long int io_lseek(int fd, unsigned long int offset, int whence);
+void *io_mmap(void *addr, unsigned int length, int prot, int flags, int fd, long int offset);
 
 void *sbrk(long int incr);
 int brk(void *);
@@ -45,11 +46,28 @@ int brk(void *);
 #define F_SETFL 8
 #define READDIR 9
 #define DYNOPEN 10
+#if 0
+#define IO_LSEEK 11
+#define IO_MMAP  12
+#define IO_MUNMAP 13
+#endif
 
 #define O_NONBLOCK 1
 
 #define EV_READ  1
 #define EV_WRITE 2
 #define EV_STATE 4
+
+
+#define PROT_EXEC	1
+#define PROT_READ	2
+#define PROT_WRITE	4
+#define PROT_NONE	0
+
+#define MAP_SHARED	1
+#define MAP_PRIVATE	2
+#define MAP_ANONYMOUS	4
+#define MAP_FIXED	5
+#define MAP_GROWSDOWN	6
 
 

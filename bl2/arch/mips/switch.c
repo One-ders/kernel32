@@ -206,15 +206,15 @@ void handle_tlb_miss(void *sp) {
 	unsigned long int badvaddr=read_c0_badvaddr();
 	unsigned int pgd_index=badvaddr>>PT_SHIFT;
 	unsigned int pt_index=(badvaddr&P_MASK)>>P_SHIFT;
-	unsigned long int *pt, p;
+	unsigned long int *pt, pte;
 
 	if (!curr_pgd) {
-		sys_printf("super error, no curr_pgd\n");
+		sys_printf("handle_tlb_miss: super error, no curr_pgd for addr %x\n",badvaddr);
 		while(1);
 	}
 //	sys_printf("curr_pgd at %x\n",curr_pgd);
 
-	sys_printf("tlb_miss for %x\n", badvaddr);
+//	sys_printf("tlb_miss for %x\n", badvaddr);
 	if ((badvaddr<U_STACK_TOP) || (badvaddr>= U_STACK_BOT) ||
             (badvaddr<current->asp->brk) || (badvaddr>= U_HEAP_START) ||
             (badvaddr<U_INSTR_END) || (badvaddr>= U_INSTR_START)) {
@@ -234,24 +234,28 @@ void handle_tlb_miss(void *sp) {
 //	sys_printf("page_table at %x\n", pt);
 
 //	sys_printf("lookup page table index %x\n", pt_index);
-	p=pt[pt_index];
-	if (!p) {
-		p=(unsigned long int)get_page();
-		memset(p,0,4096);
-		p&=~0x80000000;
-		pt[pt_index]=p;
+	pte=pt[pt_index];
+	if (!pte) {
+		unsigned long int p=(unsigned long int)get_page();
+		memset((void *)p,0,4096);
+		p&=~0x80000000;  // to physical
+//		if ((badvaddr>=U_INSTR_START)&&(badvaddr<U_INSTR_END)) {
+//			pt[pt_index]=pte=(p>>6)|(P_CACHEABLE|P_VALID);
+//		} else {
+			pt[pt_index]=pte=(p>>6)|(P_CACHEABLE|P_DIRTY|P_VALID);
+//		}
 //		sys_printf("allocating page(%x) at pt_index %x\n",p,pt_index);
 	}
 
 	if (badvaddr&(1<<12)) {
 		set_c0_lo0(0);
-		set_c0_lo1((p>>6)|P_CACHEABLE|P_DIRTY|P_VALID);
+		set_c0_lo1(pte);
 	} else {
-		set_c0_lo0((p>>6)|P_CACHEABLE|P_DIRTY|P_VALID);
+		set_c0_lo0(pte);
 		set_c0_lo1(0);
 	}
 
-#if 1
+#if 0
 	sys_printf("handle_tlb_miss: tlb_index %x, tlb_random %x, tlb_lo0 %x\n",
 			read_c0_index(),read_c0_random(),read_c0_lo0());
 
@@ -270,12 +274,12 @@ void handle_TLBL(void *sp) {
 	unsigned long int badvaddr=read_c0_badvaddr();
 	unsigned int pgd_index=badvaddr>>PT_SHIFT;
 	unsigned int pt_index=(badvaddr&P_MASK)>>P_SHIFT;
-	unsigned long int *pt, p;
+	unsigned long int *pt, pte;
 #if 0
 	sys_printf("handle tlb load trap, badvaddr %x\n",badvaddr);
 #endif
 	if (!curr_pgd) {
-		sys_printf("super error, no curr_pgd\n");
+		sys_printf("handle_TLBL: super error, no curr_pgd for addr %x\n",badvaddr);
 		while(1);
 	}
 //	sys_printf("TLBL: curr_pgd at %x\n",curr_pgd);
@@ -291,34 +295,38 @@ void handle_TLBL(void *sp) {
 //	sys_printf("TLBL: page_table at %x\n", pt);
 //
 //	sys_printf("lookup page table index %x\n", pt_index);
-	p=pt[pt_index];
-	if (!p) {
-		p=(unsigned long int)get_page();
+	pte=pt[pt_index];
+	if (!pte) {
+		unsigned long int p=(unsigned long int)get_page();
 		memset(p,0,4096);
 		p&=~0x80000000;
 		sys_printf("allocating page(%x) at pt_index %x\n",p,pt_index);
-		pt[pt_index]=p;
+//		if ((badvaddr>=U_INSTR_START)&&(badvaddr<U_INSTR_END)) {
+//			pt[pt_index]=pte=((p>>6)|(P_CACHEABLE|P_VALID));
+//		} else {
+			pt[pt_index]=pte=((p>>6)|(P_CACHEABLE|P_DIRTY|P_VALID));
+//		}
 	}
 
 	if (badvaddr&(1<<12)) {
-		unsigned long int pp=pt[pt_index-1];
-		if (pp) {
-			set_c0_lo0((pp>>6)|P_CACHEABLE|P_DIRTY|P_VALID);
+		unsigned long int ptep=pt[pt_index-1];
+		if (ptep) {
+			set_c0_lo0(ptep);
 		} else {
 			set_c0_lo0(0);
 		}
-		set_c0_lo1((p>>6)|P_CACHEABLE|P_DIRTY|P_VALID);
+		set_c0_lo1(pte);
 	} else {
-		unsigned long int pa=pt[pt_index+1];
-		set_c0_lo0((p>>6)|P_CACHEABLE|P_DIRTY|P_VALID);
-		if (pa) {
-			set_c0_lo1((pa>>6)|P_CACHEABLE|P_DIRTY|P_VALID);
+		unsigned long int ptea=pt[pt_index+1];
+		set_c0_lo0(pte);
+		if (ptea) {
+			set_c0_lo1(ptea);
 		} else {
 			set_c0_lo1(0);
 		}
 	}
 
-#if 1
+#if 0
 	sys_printf("handle_tlbl_miss: tlb_index %x, tlb_random %x, tlb_lo0 %x\n",
 			read_c0_index(),read_c0_random(),read_c0_lo0());
 
@@ -338,10 +346,10 @@ void handle_TLBS(void *sp) {
 	unsigned long int badvaddr=read_c0_badvaddr();
 	unsigned int pgd_index=badvaddr>>PT_SHIFT;
 	unsigned int pt_index=(badvaddr&P_MASK)>>P_SHIFT;
-	unsigned long int *pt, p;
+	unsigned long int *pt, pte;
 
 	if (!curr_pgd) {
-//		sys_printf("super error, no curr_pgd\n");
+		sys_printf("handle_TLBS: super error, no curr_pgd\n");
 		while(1);
 	}
 //	sys_printf("TLBS: curr_pgd at %x\n",curr_pgd);
@@ -357,34 +365,38 @@ void handle_TLBS(void *sp) {
 //	sys_printf("TLBS: page_table at %x\n", pt);
 
 //	sys_printf("lookup page table index %x\n", pt_index);
-	p=pt[pt_index];
-	if (!p) {
-		p=(unsigned long int)get_page();
+	pte=pt[pt_index];
+	if (!pte) {
+		unsigned long int p=(unsigned long int)get_page();
 		memset(p,0,4096);
 		p&=~0x80000000;
 //		sys_printf("allocating page(%x) at pt_index %x\n",p,pt_index);
-		pt[pt_index]=p;
+//		if ((badvaddr>=U_INSTR_START)&&(badvaddr<U_INSTR_END)) {
+//			pt[pt_index]=pte=((p>>6)|(P_CACHEABLE|P_VALID));
+//		} else {
+			pt[pt_index]=pte=((p>>6)|(P_CACHEABLE|P_DIRTY|P_VALID));
+//		}
 	}
 
 	if (badvaddr&(1<<12)) {
-		unsigned long int pp=pt[pt_index-1];
-		if (pp) {
-			set_c0_lo0((pp>>6)|P_CACHEABLE|P_DIRTY|P_VALID);
+		unsigned long int ptep=pt[pt_index-1];
+		if (ptep) {
+			set_c0_lo0(ptep);
 		} else {
 			set_c0_lo0(0);
 		}
-		set_c0_lo1((p>>6)|P_CACHEABLE|P_DIRTY|P_VALID);
+		set_c0_lo1(pte);
 	} else {
-		unsigned long int pa=pt[pt_index+1];
-		set_c0_lo0((p>>6)|P_CACHEABLE|P_DIRTY|P_VALID);
-		if (pa) {
-			set_c0_lo1((pa>>6)|P_CACHEABLE|P_DIRTY|P_VALID);
+		unsigned long int ptea=pt[pt_index+1];
+		set_c0_lo0(pte);
+		if (ptea) {
+			set_c0_lo1(ptea);
 		} else {
 			set_c0_lo1(0);
 		}
 	}
 
-#if 1
+#if 0
 	sys_printf("handle_tlbs_miss: tlb_index %x, tlb_random %x, tlb_lo0 %x\n",
 			read_c0_index(),read_c0_random(),read_c0_lo0());
 
@@ -399,6 +411,48 @@ void handle_TLBS(void *sp) {
 	asm("tlbwr");
 }
 
+int mapmem(struct task *t, unsigned long int vaddr, unsigned long int paddr, unsigned int attr) {
+	unsigned int pgd_index=vaddr>>PT_SHIFT;
+	unsigned int pt_index=(vaddr&P_MASK)>>P_SHIFT;
+	unsigned long int *pt, pte;
+
+	pt=(unsigned long int *)t->asp->pgd[pgd_index];
+	if (!pt) {
+//		sys_printf("allocating page table at pgd_index %x\n",pgd_index);
+		pt=(unsigned long int *)get_page();
+		memset(pt,0,4096);
+		t->asp->pgd[pgd_index]=(unsigned long int)pt;
+	}
+	pte=pt[pt_index];
+	if (pte) {
+		sys_printf("mapmem: already mapped %x\n", vaddr);
+		return -1;
+	}
+	
+	pte=pt[pt_index]=(paddr>>6)|attr|P_VALID;
+
+#if 0
+	if (vaddr&(1<<12)) {
+		unsigned long int ptep=pt[pt_index-1];
+		if (ptep) {
+			set_c0_lo0(ptep);
+		} else {
+			set_c0_lo0(0);
+		}
+		set_c0_lo1(pte);
+	} else {
+		unsigned long int ptea=pt[pt_index+1];
+		set_c0_lo0(pte);
+		if (ptea) {
+			set_c0_lo1(ptea);
+		} else {
+			set_c0_lo1(0);
+		}
+	}
+	asm("tlbwr");
+#endif
+	return 0;
+}
 
 int task_sleepable(void) {
 	return (irq_lev==1?1:0);

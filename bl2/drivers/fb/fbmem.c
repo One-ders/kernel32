@@ -134,6 +134,8 @@ static int fb_control(struct device_handle *dh,
 			return 0;
 		case FBIOGET_FSCREENINFO:
 			return memcpy(arg, &fi->fix,sizeof(fi->fix));
+		case IO_MMAP:
+			return (((unsigned long int)fi->screen_base)&~0xa0000000)+((unsigned long)arg);
 		default:
 			if (!fi->fbops->fb_ioctl) return -EINVAL;
 			return fi->fbops->fb_ioctl(fi, cmd, arg);
