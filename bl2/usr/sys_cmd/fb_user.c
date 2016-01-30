@@ -9,7 +9,7 @@ int fb_test(void *dum) {
 	struct fb_fix_screeninfo finfo;
 	struct fb_var_screeninfo vinfo;
 	unsigned int screensize;
-	char *fbp;
+	unsigned char *fbp;
 	int x=0,y=0;
 	int location=0;
 
@@ -51,6 +51,16 @@ int fb_test(void *dum) {
 
 	screensize = vinfo.xres_virtual * vinfo.yres_virtual * (vinfo.bits_per_pixel / 8);
 
+	fbp=(char *)io_mmap(0,screensize, PROT_READ|PROT_WRITE, MAP_SHARED, fb_fd, 0);
+
+	printf("io_mmap returned %x\n", fbp);
+	if (!fbp) {
+		while(1) {
+			sleep(100);
+		}
+	}
+
+#if 0
 	x = 0; y = 0;
 	for (y = 0; y < 272; y++) {
 		for (x = 0; x < 480; x++) {
@@ -67,6 +77,20 @@ int fb_test(void *dum) {
 			io_write(fb_fd,out, 1);
 			out[0]=0;
 			io_write(fb_fd,out, 1);
+		}
+	}
+#endif
+	x = 0; y = 0;
+	for (y = 0; y < 272; y++) {
+		for (x = 0; x < 480; x++) {
+			location = (x+vinfo.xoffset) * (vinfo.bits_per_pixel/8) +
+				(y+vinfo.yoffset) * finfo.line_length;
+
+//			printf("output location: %d\n", location);
+			fbp[location]=100;
+			fbp[location+1]=15+(x-0)/2;
+			fbp[location+2]=200-(y-0)/5;
+			fbp[location+3]=0;
 		}
 	}
 

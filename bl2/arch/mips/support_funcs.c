@@ -12,7 +12,14 @@ unsigned int get_svc_number(void *sp)  {
 }
 
 unsigned long int get_svc_arg(void *sp,int arg) {
-	unsigned long int a=((unsigned long int *)sp)[4+arg];
+	unsigned long int a;
+	if (arg<4) {
+		a=((unsigned long int *)sp)[4+arg];
+	} else {
+		struct fullframe *ff=(struct fullframe *)sp;
+		unsigned long int *a_stack=(unsigned long int *)ff->sp;
+		a=a_stack[arg];
+	}
 //	sys_printf("get_svc_arg: arg %x is %x\n", arg, a);
 	return a;
 }
@@ -119,3 +126,9 @@ int sys_mdelay(unsigned int msec) {
         sys_udelay(msec*1000);
         return 0;
 }
+
+unsigned long int get_mmap_vaddr(struct task *current, unsigned int size) {
+	int psize=(((size-1)/PAGE_SIZE)+1)*PAGE_SIZE;
+	current->asp->mmap_vaddr-=psize;
+	return current->asp->mmap_vaddr;
+};

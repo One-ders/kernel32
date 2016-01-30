@@ -60,6 +60,7 @@ void c_start(void) {
 		ULINT(&__bss_end__)-ULINT(&__bss_start__));
 
 	sys_printf("in c_start, udata0=%x\n",udata[0].drv_data);
+
 	/* shutoff BEV and ERL*/
 	asm(	"mfc0	$t0,$12\n\t"
 		"lui	$t1,0x44\n\t"
@@ -80,6 +81,7 @@ void c_start(void) {
 
 	enable_interrupts();
 	start_up();
+
 	while(1) {
 		int i,j;
 		unsigned int count, compare;

@@ -630,6 +630,46 @@ again:
 			set_svc_ret(svc_sp,current->sel_data.nfds);
 			return 0;
 		}
+		case SVC_IO_MMAP: {
+			void *addr=(void *)get_svc_arg(svc_sp,0);
+			unsigned int len=(unsigned int)get_svc_arg(svc_sp,1);
+			int prot=(int)get_svc_arg(svc_sp,2);
+			int flags=(int)get_svc_arg(svc_sp,3);
+			int fd=(int)get_svc_arg(svc_sp,4);
+			long int offset=(long int)get_svc_arg(svc_sp,5);
+			struct driver *driver=fd_tab[fd].driver;
+			struct device_handle *dh=fd_tab[fd].dev_handle;
+			unsigned long int paddr;
+			unsigned long int vaddr;
+			unsigned long int start_vaddr;
+			unsigned int npages;
+			int i;
+			int rc;
+
+			sys_printf("IO_MMAP: addr=%x, len=%d, prot=%d, flags=%d, fd=%d, offset=%d\n",
+				addr,len,prot,flags,fd,offset);
+			if (!driver) {
+				set_svc_ret(svc_sp,0);
+				return 0;
+			}
+			npages=((len-1)/PAGE_SIZE)+1;
+			paddr=driver->ops->control(dh,IO_MMAP,offset,len);
+			vaddr=get_mmap_vaddr(current,len);
+
+			sys_printf("IO_MMAP: need %d pages, vaddr %x, paddr %x\n", npages, vaddr, paddr);
+			start_vaddr=vaddr;
+			for(i=0;i<npages;i++) {
+				rc=mapmem(current,vaddr,paddr, MAP_NO_CACHE | MAP_WRITE);
+				if (rc<0) {
+					set_svc_ret(svc_sp,0);
+					return 0;
+				}
+				vaddr+=PAGE_SIZE;
+				paddr+=PAGE_SIZE;
+			}
+			set_svc_ret(svc_sp,start_vaddr);
+			return 0;
+		}
 		case SVC_BLOCK_TASK: {
 			char *name=(char *)get_svc_arg(svc_sp,0);
 			struct task *t=lookup_task_for_name(name);
