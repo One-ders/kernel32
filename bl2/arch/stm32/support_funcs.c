@@ -88,3 +88,13 @@ int sys_mdelay(unsigned int msec) {
 	sys_udelay(msec*1000);
 	return 0;
 }
+
+int mapmem(struct task *t, unsigned long int vaddr, unsigned long int paddr, unsigned int attr) {
+	if (vaddr!=paddr)
+		return -1;
+	return 0;
+}
+
+unsigned long int get_mmap_vaddr(struct task *current, unsigned int size) {
+	return 0;
+}

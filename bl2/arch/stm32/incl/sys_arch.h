@@ -1,4 +1,5 @@
 
+#include <mmu.h>
 
 static inline __attribute__ ((always_inline))
 unsigned long int save_cpu_flags(void) {
