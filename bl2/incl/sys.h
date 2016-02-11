@@ -111,8 +111,8 @@ struct address_space {
 	int		id;		/* 04-07 */
 	unsigned long int brk;
 	unsigned long int mmap_vaddr;
-	int		ref;
 #endif
+	int		ref;
 };
 
 

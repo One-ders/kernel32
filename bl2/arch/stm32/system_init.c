@@ -69,7 +69,7 @@ void *get_page(void) {
 					i,j);
 			j--;
 			free_page_map[i]&=~(1<<j);
-			return (void *)(SD_RAM_START + (i*32*4096) + (j*4096));
+			return (void *)(SDRAM_START + (i*32*4096) + (j*4096));
 		}
 	}
 	return 0;

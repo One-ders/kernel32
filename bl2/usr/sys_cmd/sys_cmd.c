@@ -322,7 +322,7 @@ static int reboot_fnc(int argc, char **argv, struct Env *env) {
 extern int fb_test(void *);
 
 static int testprog(int argc, char **argv, struct Env *env) {
-	thread_create(fb_test,"groda",6,1,"fb_test");
+//	thread_create(fb_test,"groda",6,1,"fb_test");
 	return 0;
 }
 
