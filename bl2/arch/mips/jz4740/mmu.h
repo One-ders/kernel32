@@ -1,4 +1,6 @@
 
+#define MMU
+
 #define P_GLOBAL 1
 #define P_VALID 2
 #define P_DIRTY 4

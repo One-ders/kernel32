@@ -67,6 +67,7 @@ extern int cec_debug;
 #define CMD_GET_PA		31
 #define CMD_SET_PA		32
 #define CMD_GET_DEVICE_TYPE	33
+#define CMD_SET_DEVICE_TYPE	34
 #define CMD_GET_HDMI_VERSION	35
 #define CMD_GET_OSD_NAME	37
 #define CMD_SET_OSD_NAME	38

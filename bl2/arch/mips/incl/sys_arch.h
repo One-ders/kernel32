@@ -1,5 +1,7 @@
 #include <../jz4740/mmu.h>
 
+#define MIPS
+
 static inline __attribute__ ((always_inline))
 unsigned long int save_cpu_flags() {
 	unsigned long int flags;
