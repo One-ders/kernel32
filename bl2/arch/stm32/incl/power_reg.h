@@ -1,0 +1,39 @@
+
+/* PWR power control register */
+#define PWR_CR_LPDS		0x00000001
+#define PWR_CR_PDDS		0x00000002
+#define PWR_CR_CWUF		0x00000004
+#define PWR_CR_CSBF		0x00000008
+#define PWR_CR_PVDE		0x00000010
+#define PWR_CR_PLS_MASK		0x000000e0
+#define PWR_CR_PLS_SHIFT	5
+#define PWR_CR_DBP		0x00000100
+#define PWR_CR_FPDS		0x00000200
+#define PWR_CR_LPUDS		0x00000400
+#define PWR_CR_MRUDS		0x00000800
+#define PWR_CR_ADCDC1		0x00002000
+#define PWR_CR_VOS_MASK		0x0000c000
+#define PWR_CR_VOS_SHIFT	14
+#define PWR_CR_ODEN		0x00010000
+#define PWR_CR_ODSW  		0x00020000
+#define PWR_CR_UDEN_MASK	0x000c0000
+#define PWR_CR_UDEN_SHIFT	18
+
+/* PWR power control/status register */
+#define PWR_CSR_WUF		0x00000001
+#define PWR_CSR_SBF		0x00000002
+#define PWR_CSR_PVDO		0x00000004
+#define PWR_CSR_BRR		0x00000008
+#define PWR_CSR_EWUP		0x00000100
+#define PWR_CSR_BRE		0x00000200
+#define PWR_CSR_VOSRDY		0x00004000
+#define PWR_CSR_ODRDY		0x00010000
+#define PWR_CSR_ODSWRDY		0x00020000
+#define PWR_CSR_UDRDY_MASK	0x000c0000
+#define PWR_CSR_UDRDY_SHIFT	18
+
+
+struct POWER {
+	volatile unsigned int CR;
+	volatile unsigned int CSR;
+};

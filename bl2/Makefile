@@ -1,34 +1,33 @@
 
+#DRIVERS_DIR := os stddrv stmusb drivers arch
+#APP_DIR := cec_a1_ctrl blinky timer_test
 
-AS=arm-none-eabi-as
-CC=arm-none-eabi-gcc
-CFLAGS=-g -O2 -DDEBUG -DDRIVERSUPPORT -DUNECESS -Wall -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi=hard -mfpu=fpv4-sp-d16 -fno-builtin
-LDFLAGS=-g -Tstm32_flash.ld -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi=hard -mfpu=fpv4-sp-d16 -fno-builtin
+#SUBDIRS:=$(DRIVERS_DIR) $(APP_DIR)
 
-all: blinky
+#.PHONY: all
 
-blinky: init_sect.o main.o sys.o io.o startup_stm32f4xx.o system_stm32f4xx.o usart_drv.o stterm_drv.o end_sect.o
-	$(CC)  $(LDFLAGS) -o $@ $^
+#all: $(SUBDIRS)
 
-sys.o: sys.h io.h
+.PHONY: clean
 
-io.o: io.h sys.h
+pavo:
+	$(MAKE) -C arch/boards/pavo all
 
-main.o: sys.h io.h
+discovery:
+	$(MAKE) -C arch/boards/discovery all
 
-usart_drv.o: usart_drv.c usart_drv.h
+pavo-clean:
+	$(MAKE) -C arch/boards/pavo clean
 
-stterm_drv.o: stterm_drv.c
-
-init_sect.o: sys_init.c
-	$(CC) $(CFLAGS) -c -o $@ -DSECTION_BEGIN $^
-
-end_sect.o: sys_init.c
-	$(CC) $(CFLAGS) -c -o $@ -DSECTION_END $^
+discovery-clean:
+	$(MAKE) -C arch/boards/discovery clean
 
 
 
-clean:
-	rm -rf *.o blinky
+clean:	$(SUBDIRS)
 
 
+.PHONY: $(SUBDIRS)
+
+$(SUBDIRS):
+	@$(MAKE) -C $@ $(MAKECMDGOALS)
