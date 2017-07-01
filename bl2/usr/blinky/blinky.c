@@ -2,12 +2,13 @@
 #include "sys.h"
 #include "sys_env.h"
 #include "io.h"
+#include "config.h"
 
 #include "led_drv.h"
 
 #include <string.h>
 
-static int blinky(int argc, char **argv, struct Env *env);
+int blinky(int argc, char **argv, struct Env *env);
 
 static struct cmd cmds[] = {
 	{"help", generic_help_fnc},
@@ -80,7 +81,7 @@ void blink_loop(struct blink_data *bd) {
 #endif
 
 
-static int blinky(int argc, char **argv, struct Env *env) {
+int blinky(int argc, char **argv, struct Env *env) {
 	struct blink_data green={LED_GREEN,1000};
 	struct blink_data amber={LED_AMBER,500};
 	struct blink_data red={LED_RED,750};

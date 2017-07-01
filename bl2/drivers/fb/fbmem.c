@@ -217,5 +217,3 @@ int register_framebuffer(struct fb_info *fb_info) {
 
 	return 0;
 }
-
-

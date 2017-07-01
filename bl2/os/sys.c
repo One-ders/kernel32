@@ -376,7 +376,7 @@ void *handle_syscall(unsigned long int *svc_sp) {
 			drv=driver_lookup(drvname);
 			if (!drv) {
 				set_svc_ret(svc_sp,-1);
-				sys_printf("SVC_IO_OPEN: return -1 no drv\n");
+				sys_printf("SVC_IO_OPEN: return -1 no drv:\n");
 				return 0;
 			}
 			ufd=get_user_fd(((struct driver *)0xffffffff),0);
@@ -1289,7 +1289,7 @@ void init_sys(void) {
 		sys_printf("calling %x:%x\n",i,*i);
 		((ifunc)*i)();
 	}
-	
+
 	driver_init();
 	driver_start();
 }
@@ -1302,7 +1302,7 @@ void start_up(void) {
 //        init_io();
 
         /* start the executive */
-        sys_printf("Nosix git ver %s, starting tasks\n",ver);
+        sys_printf("Leanaux git ver %s, starting tasks\n",ver);
         start_sys();
 }
 

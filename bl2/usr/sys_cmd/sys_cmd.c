@@ -322,7 +322,7 @@ static int reboot_fnc(int argc, char **argv, struct Env *env) {
 extern int fb_test(void *);
 
 static int testprog(int argc, char **argv, struct Env *env) {
-//	thread_create(fb_test,"groda",6,1,"fb_test");
+	thread_create(fb_test,"groda",6,1,"fb_test");
 	return 0;
 }
 
@@ -345,9 +345,11 @@ static struct cmd_node my_cmd_node = {
 	cmd_root,
 };
 
-//void init_blinky(void);
+void init_blinky(void);
 
 void init_cec_a1();
+
+char *barg[] = {"blinky", "on"};
 
 void main(void *dum) {
 	char buf[256];
@@ -370,6 +372,7 @@ void main(void *dum) {
 #endif
 	}
 
+//	blinky(2, barg, &env);
 
 	while(1) {
 		int rc;

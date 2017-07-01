@@ -1,4 +1,10 @@
 
+DRIVERS:=hr_timer
+DRIVERS+=stddrv
+DRIVERS+=usb_drv
+DRIVERS+=usb_serial_drv
+DRIVERS+=usr_drv
+
 BOARD=MB997C
 TOP:=$(shell pwd)/../..
 OBJ:=$(TOP)/boards/$(BOARD)/obj
@@ -13,7 +19,7 @@ export OBJCOPY:=arm-none-eabi-objcopy
  
 CFLAGS=-I. -I$(TOP)/incl -I$(TOP)/boards/$(BOARD) -I$(TOP)/arch/stm32 -I$(TOP)/arch/stm32/incl -g -O2 -DDEBUG -Wall -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi=soft -fno-builtin
 
-CFLAGS_USR:=-I$(TOP)/usr/incl -I$(GCC_BASE)/lib/gcc/arm-none-eabi/4.8.3/include -g -Os -DDEBUG -fno-builtin -ffreestanding -nostdinc -Wall -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi=soft -fno-builtin
+CFLAGS_USR:=-I$(TOP)/usr/incl -I$(TOP)/boards/$(BOARD) -I$(GCC_BASE)/lib/gcc/arm-none-eabi/4.8.3/include -g -Os -DDEBUG -fno-builtin -ffreestanding -nostdinc -Wall -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi=soft -fno-builtin
 
 #LDFLAGS=-g -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi=hard -mfpu=fpv4-sp-d16 -fno-builtin
 LDFLAGS=-g -T./stm32_flash.ld -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -fno-builtin -nostartfiles
@@ -22,7 +28,21 @@ LDFLAGS_USR=-g -r $(OBJ)/usr/lib/usrlib.o
 
 all: myCore
 
-myCore: os version stm32f407 stm32 stddrv hr_timer usb_core usb_serial usr.drv.o usr.bin.o
+#myCore: os version stm32f407 stm32 stddrv hr_timer usb_core usb_serial usr.drv.o usr.bin.o
+#	$(CC) $(LDFLAGS) -o $@ $(OBJ)/os/init_sect.o \
+#				$(OBJ)/version.c \
+#				$(OBJ)/os/os.o \
+#				$(OBJ)/arch/stm32/stm32f407/stm32f407.o \
+#				$(OBJ)/arch/stm32/stm32.o \
+#				$(OBJ)/stddrv/stddrv.o \
+#				$(OBJ)/arch/stm32/stm32f407/hr_timer/hr_timer.o \
+#				$(OBJ)/arch/stm32/usb/usb_drv.o \
+#				$(OBJ)/drivers/usb_serial/usb_serial_drv.o \
+#				$(OBJ)/usr/usr.drv.o \
+#				$(OBJ)/os/end_sect.o \
+#				$(OBJ)/usr/usr.bin.o
+
+myCore: os version stm32f407 stm32 stddrv hr_timer usr.bin.o
 	$(CC) $(LDFLAGS) -o $@ $(OBJ)/os/init_sect.o \
 				$(OBJ)/version.c \
 				$(OBJ)/os/os.o \
@@ -30,23 +50,25 @@ myCore: os version stm32f407 stm32 stddrv hr_timer usb_core usb_serial usr.drv.o
 				$(OBJ)/arch/stm32/stm32.o \
 				$(OBJ)/stddrv/stddrv.o \
 				$(OBJ)/arch/stm32/stm32f407/hr_timer/hr_timer.o \
-				$(OBJ)/arch/stm32/usb/usb_drv.o \
-				$(OBJ)/drivers/usb_serial/usb_serial_drv.o \
-				$(OBJ)/usr/usr.drv.o \
 				$(OBJ)/os/end_sect.o \
 				$(OBJ)/usr/usr.bin.o
+
 
 version:
 	echo "const char *ver=\"$(BOARD)-$(GIT_VERSION)\";" > $(OBJ)/version.c
 
 
-usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/cec_a1_ctrl/cec_a1_ctrl.o
-	$(LD) -o $(OBJ)/usr/usr.bin.o $(LDFLAGS_USR) $^
-	$(OBJCOPY) --prefix-symbols=__usr_ $(OBJ)/usr/usr.bin.o
+#usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/cec_a1_ctrl/cec_a1_ctrl.o
+#	$(LD) -o $(OBJ)/usr/usr.bin.o $(LDFLAGS_USR) $^
+#	$(OBJCOPY) --prefix-symbols=__usr_ $(OBJ)/usr/usr.bin.o
 
 #usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/usr/blinky/blinky.o $(OBJ)/cec_a1_mon/cec_a1_mon.o
 #	$(LD) -o $(OBJ)/usr/usr.bin.o $(LDFLAGS_USR) $^
 #	$(OBJCOPY) --prefix-symbols=__usr_ $(OBJ)/usr/usr.bin.o
+ 
+usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/usr/blinky/blinky.o
+	$(LD) -o $(OBJ)/usr/usr.bin.o $(LDFLAGS_USR) $^
+	$(OBJCOPY) --prefix-symbols=__usr_ $(OBJ)/usr/usr.bin.o
 
 $(OBJ)/usr/lib/usrlib.o: $(OBJ)/usr/lib $(OBJ)/usr/lib/arm/syscall_lib.o
 	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $(OBJ)/usr/lib

@@ -40,10 +40,23 @@ static struct driver *iodrv;
 static struct device_handle *dh=0;
 
 typedef int (*P_STR)(char *);
-P_STR p_str=0x800009a4;
-
 typedef int (*P_CHAR)(char );
+
+
+#ifdef MIPS
+P_STR p_str=0x800009a4;
 P_CHAR p_char=0x80000948;
+#else
+int dum_p_str(char *dum) {
+	if (dum) return 1;
+	return 0;
+}
+int dum_p_char(char a) {
+	return 0;
+}
+P_STR p_str=dum_p_str;
+P_CHAR p_char=dum_p_char;
+#endif
 
 
 
