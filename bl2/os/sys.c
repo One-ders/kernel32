@@ -1299,7 +1299,7 @@ void start_up(void) {
         /* initialize the executive */
         init_io();
         init_sys();
-//        init_io();
+        init_io();
 
         /* start the executive */
         sys_printf("Leanaux git ver %s, starting tasks\n",ver);

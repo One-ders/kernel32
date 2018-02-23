@@ -79,6 +79,7 @@ static int ps_fnc(int argc, char **argv, struct Env *env) {
 	int fd=io_open("procps");
 	struct dents dents[10];
 	int rc,i=0;
+	int tic;
 
 	if (fd<0) {
 		fprintf(env->io_fd,"could not open ps driver\n");
@@ -92,7 +93,8 @@ static int ps_fnc(int argc, char **argv, struct Env *env) {
 		return 0;
 	}
 
-	fprintf(env->io_fd, "uptime: %t, current tic: %d\n", get_current_tic());
+	tic=get_current_tic();
+	fprintf(env->io_fd, "uptime: %t, current tic: %d\n", tic);
 	while(i<rc) {
 		get_procdata(fd,dents[i].name,env);
 		i++;
@@ -319,12 +321,14 @@ static int reboot_fnc(int argc, char **argv, struct Env *env) {
 	return 0;
 }
 
+#if 0
 extern int fb_test(void *);
 
 static int testprog(int argc, char **argv, struct Env *env) {
 	thread_create(fb_test,"groda",6,1,"fb_test");
 	return 0;
 }
+#endif
 
 static struct cmd cmd_root[] = {
 		{"help", generic_help_fnc},
@@ -336,7 +340,7 @@ static struct cmd cmd_root[] = {
 		{"setprio",setprio_fnc},
 		{"reboot",reboot_fnc},
 		{"kmem",kmem_fnc},
-		{"testprog",testprog},
+//		{"testprog",testprog},
 		{0,0}
 };
 
@@ -368,7 +372,7 @@ void main(void *dum) {
 #ifdef TEST_USB_SERIAL
 		thread_create(main,"usb_serial0",12,1,"sys_mon:usb");
 #else
-//		init_cec_a1();
+		init_cec_a1();
 #endif
 	}
 
@@ -393,7 +397,8 @@ void main(void *dum) {
 			cmd=lookup_cmd(argv[0],fd);
 			if (cmd) {
 				int rc;
-				fprintf(fd,":iofd is %d\n",env.io_fd);
+//				fprintf(fd,":iofd is %d\n",env.io_fd);
+				fprintf(fd,"\n");
 				rc=cmd->fnc(argc,argv,&env); 
 				if (rc<0) {
 					fprintf(fd,"%s returned %d\n",argv[0],rc);

@@ -28,21 +28,7 @@ LDFLAGS_USR=-g -r $(OBJ)/usr/lib/usrlib.o
 
 all: myCore
 
-#myCore: os version stm32f407 stm32 stddrv hr_timer usb_core usb_serial usr.drv.o usr.bin.o
-#	$(CC) $(LDFLAGS) -o $@ $(OBJ)/os/init_sect.o \
-#				$(OBJ)/version.c \
-#				$(OBJ)/os/os.o \
-#				$(OBJ)/arch/stm32/stm32f407/stm32f407.o \
-#				$(OBJ)/arch/stm32/stm32.o \
-#				$(OBJ)/stddrv/stddrv.o \
-#				$(OBJ)/arch/stm32/stm32f407/hr_timer/hr_timer.o \
-#				$(OBJ)/arch/stm32/usb/usb_drv.o \
-#				$(OBJ)/drivers/usb_serial/usb_serial_drv.o \
-#				$(OBJ)/usr/usr.drv.o \
-#				$(OBJ)/os/end_sect.o \
-#				$(OBJ)/usr/usr.bin.o
-
-myCore: os version stm32f407 stm32 stddrv hr_timer usr.bin.o
+myCore: os version stm32f407 stm32 stddrv hr_timer usb_core usb_serial usr.drv.o usr.bin.o
 	$(CC) $(LDFLAGS) -o $@ $(OBJ)/os/init_sect.o \
 				$(OBJ)/version.c \
 				$(OBJ)/os/os.o \
@@ -50,25 +36,39 @@ myCore: os version stm32f407 stm32 stddrv hr_timer usr.bin.o
 				$(OBJ)/arch/stm32/stm32.o \
 				$(OBJ)/stddrv/stddrv.o \
 				$(OBJ)/arch/stm32/stm32f407/hr_timer/hr_timer.o \
+				$(OBJ)/arch/stm32/usb/usb_drv.o \
+				$(OBJ)/drivers/usb_serial/usb_serial_drv.o \
+				$(OBJ)/usr/usr.drv.o \
 				$(OBJ)/os/end_sect.o \
 				$(OBJ)/usr/usr.bin.o
 
+#myCore: os version stm32f407 stm32 stddrv hr_timer usr.bin.o
+#	$(CC) $(LDFLAGS) -o $@ $(OBJ)/os/init_sect.o \
+#				$(OBJ)/version.c \
+#				$(OBJ)/os/os.o \
+#				$(OBJ)/arch/stm32/stm32f407/stm32f407.o \
+#				$(OBJ)/arch/stm32/stm32.o \
+#				$(OBJ)/stddrv/stddrv.o \
+#				$(OBJ)/arch/stm32/stm32f407/hr_timer/hr_timer.o \
+#				$(OBJ)/os/end_sect.o \
+#				$(OBJ)/usr/usr.bin.o
+#
 
 version:
 	echo "const char *ver=\"$(BOARD)-$(GIT_VERSION)\";" > $(OBJ)/version.c
 
 
-#usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/cec_a1_ctrl/cec_a1_ctrl.o
-#	$(LD) -o $(OBJ)/usr/usr.bin.o $(LDFLAGS_USR) $^
-#	$(OBJCOPY) --prefix-symbols=__usr_ $(OBJ)/usr/usr.bin.o
+usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/cec_a1_ctrl/cec_a1_ctrl.o
+	$(LD) -o $(OBJ)/usr/usr.bin.o $(LDFLAGS_USR) $^
+	$(OBJCOPY) --prefix-symbols=__usr_ $(OBJ)/usr/usr.bin.o
 
 #usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/usr/blinky/blinky.o $(OBJ)/cec_a1_mon/cec_a1_mon.o
 #	$(LD) -o $(OBJ)/usr/usr.bin.o $(LDFLAGS_USR) $^
 #	$(OBJCOPY) --prefix-symbols=__usr_ $(OBJ)/usr/usr.bin.o
  
-usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/usr/blinky/blinky.o
-	$(LD) -o $(OBJ)/usr/usr.bin.o $(LDFLAGS_USR) $^
-	$(OBJCOPY) --prefix-symbols=__usr_ $(OBJ)/usr/usr.bin.o
+#usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/usr/blinky/blinky.o
+#	$(LD) -o $(OBJ)/usr/usr.bin.o $(LDFLAGS_USR) $^
+#	$(OBJCOPY) --prefix-symbols=__usr_ $(OBJ)/usr/usr.bin.o
 
 $(OBJ)/usr/lib/usrlib.o: $(OBJ)/usr/lib $(OBJ)/usr/lib/arm/syscall_lib.o
 	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $(OBJ)/usr/lib
