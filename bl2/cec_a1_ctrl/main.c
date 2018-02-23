@@ -32,6 +32,7 @@
  */
 
 #include "sys.h"
+#include "sys_env.h"
 #include "io.h"
 #include "cec_drv.h"
 #include "cec.h"
@@ -42,7 +43,7 @@
 
 #include <string.h>
 
-#if DEBUG
+#ifdef DEBUG
 
 int cec_debug;
 
@@ -71,12 +72,23 @@ static struct cmd_node cmn = {
 
 static int debug_fnc(int argc, char **argv, struct Env *env) {
 	fprintf(env->io_fd,"debug called with %d args\n",argc);
-	if (argc==1) {
+	if (argc!=2) {
+		goto out_err;
+	}
+
+	if (strcmp(argv[1],"on")==0) {
 		cec_debug=1;
-	} else {
+	} else if (strcmp(argv[1],"off")==0) {
 		cec_debug=0;
+	} else {
+		goto out_err;
 	}
 	return 0;
+
+out_err:
+	fprintf(env->io_fd,"debug needs argument (on or off)\n");
+	return -1;
+
 }
 
 static int set_fnc(int argc, char **argv, struct Env *env) {
@@ -190,7 +202,9 @@ void cec_gw(void *dum) {
 	cec_init_cec();
 	init_pulse_eight();
 
+#ifdef DEBUG
 	install_cmd_node(&cmn,root_cmd_node);
+#endif
 
 	while(1) do_event();
 }
@@ -208,18 +222,11 @@ void watchdog(void *dum) {
 	}
 }
 
-int main(void) {
 
-	/* initialize the executive */
-	init_sys();
-	init_io();
-
-	/* start the executive */
-	start_sys();
-	printf("In main, starting tasks\n");
-
+//int main(void) {
+int init_cec_a1(void) {
 	/* create some jobs */
 	thread_create(watchdog,0,0,3,"watchdog");
 	thread_create(cec_gw,0,0,1,"cec_gw");
-	while (1);
+	return 0;
 }

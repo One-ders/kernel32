@@ -67,6 +67,7 @@ extern int cec_debug;
 #define CMD_GET_PA		31
 #define CMD_SET_PA		32
 #define CMD_GET_DEVICE_TYPE	33
+#define CMD_SET_DEVICE_TYPE	34
 #define CMD_GET_HDMI_VERSION	35
 #define CMD_GET_OSD_NAME	37
 #define CMD_SET_OSD_NAME	38
@@ -388,6 +389,7 @@ static int handle_pe_cmd(int fd,unsigned char *buf, int len) {
 static int  handle_read_event(int fd, int ev, void *dum) {
 	unsigned char ch;
 	int rc;
+
 	while(((rc=io_read(fd,(char *)&ch,1))==1)) {
 		if (!bix) {
 			if (ch==0xff) {

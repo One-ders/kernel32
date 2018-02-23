@@ -57,8 +57,12 @@ static struct driver *leddrv;
 static struct driver *pindrv;
 static struct driver *timerdrv;
 
+#ifdef LED_AMBER
 unsigned int amber=LED_AMBER;
+#endif
+#ifdef LED_RED
 unsigned int red=LED_RED;
+#endif
 
 #define A1_STATE_IDLE		0
 #define A1_STATE_RX_INIT0	1
@@ -183,13 +187,17 @@ static int a1_timeout(struct device_handle *dh, int ev, void *dum) {
 		}
 		case A1_STATE_RX_INIT1: { /* means we have a startbit but timedout on data */
 			a1->state=A1_STATE_IDLE;
+#ifdef LED_RED
 			leddrv->ops->control(a1->led_dh,LED_CTRL_DEACTIVATE,&red,sizeof(red));
+#endif
 			sys_printf("sender never started to send data\n");
 			break;
 		}
 		case A1_STATE_RX_DATA1: {
 			a1->state=A1_STATE_IDLE;
+#ifdef LED_RED
 			leddrv->ops->control(a1->led_dh,LED_CTRL_DEACTIVATE,&red,sizeof(red));
+#endif
 			if (a1->rbi==8) {
 //				sys_printf("frame received: rxIn %d len %d\n",a1->rxIn,a1->rxlen);
 				a1->rxbuf[a1->rxIn&RXB_MASK]=a1->rxlen;
@@ -218,7 +226,9 @@ static int a1_timeout(struct device_handle *dh, int ev, void *dum) {
 				int flags=GPIO_IRQ_ENABLE(0);
 				a1->prev_pin_stat=1;
 				pindrv->ops->control(a1->pin_dh,GPIO_SET_FLAGS,&flags,sizeof(flags));
+#ifdef LED_AMBER
 				leddrv->ops->control(a1->led_dh,LED_CTRL_DEACTIVATE,&amber,sizeof(amber));
+#endif
 				sys_printf("a1: bus collision at start of send bit\n");
 				a1->state=A1_STATE_IDLE;
 				if (a1->txIn-a1->txOut)  {
@@ -263,7 +273,9 @@ static int handle_rx_start(struct a1_data *a1, int pin_lev) {
 	a1->state=A1_STATE_RX_INIT0;
 	a1->rxlen=0;
 	timerdrv->ops->control(a1->timer_dh,HR_TIMER_SET,&uSec,sizeof(uSec));
+#ifdef LED_RED
 	leddrv->ops->control(a1->led_dh,LED_CTRL_ACTIVATE,&red,sizeof(red));
+#endif
 	return 0;
 }
 
@@ -274,14 +286,18 @@ static int handle_rx_init0(struct a1_data *a1,int pin_lev) {
 	timerdrv->ops->control(a1->timer_dh,HR_TIMER_CANCEL,0,0);
 	if (!pin_lev) {
 		a1->state=A1_STATE_IDLE;
+#ifdef LED_RED
 		leddrv->ops->control(a1->led_dh,LED_CTRL_DEACTIVATE,&red,sizeof(red));
+#endif
 		sys_printf("a1, got a 'pin to low' transition in init0\n");
 		return 0;
 	}
 
 	if (a1->rx_tout_cnt!=4) {
 		a1->state=A1_STATE_IDLE;
+#ifdef LED_RED
 		leddrv->ops->control(a1->led_dh,LED_CTRL_DEACTIVATE,&red,sizeof(red));
+#endif
 		sys_printf("a1, in INIT0,  got a 'pin low' wrong timer for startbit %d\n",a1->rx_tout_cnt);
 		return 0;
 	}
@@ -301,7 +317,9 @@ static int handle_rx_init1(struct a1_data *a1, int pin_lev) {
 	timerdrv->ops->control(a1->timer_dh,HR_TIMER_CANCEL,0,0);
 	if (pin_lev) {
 		a1->state=A1_STATE_IDLE;
+#ifdef LED_RED
 		leddrv->ops->control(a1->led_dh,LED_CTRL_DEACTIVATE,&red,sizeof(red));
+#endif
 		sys_printf("a1, got a 'pin to high' transition in init0\n");
 		return 0;
 	}
@@ -320,7 +338,9 @@ static int handle_rx_data0(struct a1_data *a1,int pin_lev) {
 	timerdrv->ops->control(a1->timer_dh,HR_TIMER_CANCEL,0,0);
 	if (!pin_lev) {
 		a1->state=A1_STATE_IDLE;
+#ifdef LED_RED
 		leddrv->ops->control(a1->led_dh,LED_CTRL_DEACTIVATE,&red,sizeof(red));
+#endif
 		sys_printf("a1, got a 'pin to low' transition in data0\n");
 		return 0;
 	}
@@ -329,7 +349,9 @@ static int handle_rx_data0(struct a1_data *a1,int pin_lev) {
 		a1->rxbyte|=1;
 	} else if (a1->rx_tout_cnt!=1) {
 		a1->state=A1_STATE_IDLE;
+#ifdef LED_RED
 		leddrv->ops->control(a1->led_dh,LED_CTRL_DEACTIVATE,&red,sizeof(red));
+#endif
 		sys_printf("a1, bit indicator bad %d\n",a1->rx_tout_cnt);
 		return 0;
 	}
@@ -362,7 +384,9 @@ static int handle_rx_data1(struct a1_data *a1, int pin_lev) {
 	timerdrv->ops->control(a1->timer_dh,HR_TIMER_CANCEL,0,0);
 	if (pin_lev) {
 		a1->state=A1_STATE_IDLE;
+#ifdef LED_RED
 		leddrv->ops->control(a1->led_dh,LED_CTRL_DEACTIVATE,&red,sizeof(red));
+#endif
 		sys_printf("a1, got a 'pin to high' transition in data1\n");
 		return 0;
 	}
@@ -381,7 +405,9 @@ int a1_send_bit(struct a1_data *a1) {
 
 	if (!a1->txbi) {
 		int flags=GPIO_IRQ_ENABLE(0);
+#ifdef LED_AMBER
 		leddrv->ops->control(a1->led_dh,LED_CTRL_DEACTIVATE,&amber,sizeof(amber));
+#endif
 		a1->state=A1_STATE_IDLE;
 		a1->prev_pin_stat=1;
 		pindrv->ops->control(a1->pin_dh,GPIO_SET_FLAGS,&flags,sizeof(flags));
@@ -430,7 +456,9 @@ static int a1_start_tx(struct a1_data *a1) {
 	timerdrv->ops->control(a1->timer_dh,HR_TIMER_SET,&uSec,sizeof(uSec));
 	pindrv->ops->control(a1->pin_dh,GPIO_SINK_PIN,0,0);
 
+#ifdef LED_AMBER
 	leddrv->ops->control(a1->led_dh,LED_CTRL_ACTIVATE,&amber,sizeof(amber));
+#endif
 	return 0;
 }
 
@@ -563,7 +591,7 @@ static int a1_drv_start(void *inst) {
 	if (!a1->timer_dh) goto out2;
 
 	if (a1==&a1_data_0) {
-		pin=GPIO_PIN(PB,0);
+		pin=A1_PIN;
 	} else {
 		sys_printf("A1 protocol driver: error no pin assigned for driver\n");
 		goto out3;

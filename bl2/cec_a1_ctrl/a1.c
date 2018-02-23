@@ -30,6 +30,7 @@
  *
  * @(#)a1.c
  */
+#include <string.h>
 #include "sys.h"
 #include "io.h"
 #include "a1_drv.h"
@@ -123,7 +124,6 @@ static int handle_cec_data(unsigned char *buf, int size) {
 					cec_send_system_audio_mode_set(A1_LINK,(5<<4)|fromAddr,1);
 				}
 			} else {
-				a1_power_off();
 				cec_send_system_audio_mode_set(A1_LINK,(5<<4)|fromAddr,0);
 			}
 			break;

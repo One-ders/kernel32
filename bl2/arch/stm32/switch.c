@@ -1,4 +1,4 @@
-#include "stm32/stm32f407.h"
+#include "stm32f407.h"
 #include "io.h"
 #include "sys.h"
 
@@ -43,36 +43,45 @@ void __attribute__ (( naked )) PendSV_Handler(void) {
 		"1:\n\t"
 		"cpsid i\n\t"
 		"stmfd r2!,{r4-r11}\n\t"
-		"ldr r1,.L1\n\t"
+		"ldr r1,.Label1\n\t"
 		"ldr r1,[r1]\n\t"
 		"str r2,[r1,#4]\n\t"		/* save sp on prev task */
-		"ldr r1,.L2\n\t"
+		"ldr r1,.Label2\n\t"
 		"ldr r2,[r1,#0]\n\t"
-		"bic r2,r2,0x03000000\n\t"
+		"bic r2,r2,0x07000000\n\t"
 		"str r2,[r1,#0]\n\t"		/* map out prev task mem */
-		"ldr r1,.L1\n\t"
+		"ldr r1,.Label1\n\t"
 		"str r0,[r1,#0]\n\t"		/* store new task as current */
 		"movs r2,#1\n\t"
-		"str r2,[r0,#16]\n\t"		/* set current state running */
+		"str r2,[r0,#20]\n\t"		/* set current state running */
 		"ldr r0,[r0,#4]\n\t"
 		"mov sp,r0\n\t"			/* switch stack		*/
 		"ldmfd sp!,{r4-r11}\n\t"
 		"cpsie i\n\t"
 		"bx lr\n\t"
-		".L1: .word current\n\t"
-		".L2: .word 0xe000eda0\n\t"
+		".Label1: .word current\n\t"
+		".Label2: .word 0xe000eda0\n\t"
 		:
 		:
 		:
 	);
 }
 
+#define POLLPRINT(a) {io_setpolled(1);sys_printf(a);io_setpolled(0);}
+
+// For now, dont use any call that can block the thread,
+// theres is a bug when running this code from the kernel,
+// wrong irq level is set.
+
 void *PendSV_Handler_c(unsigned long int *save_sp) {
 	int i=0;
 	struct task *t;
+	unsigned long int cpu_flags;
 	sys_irqs++;
 
-	disable_interrupt();
+	/* clr pendsv trap  cpu bug????*/
+//	 *((unsigned int volatile *)0xE000ED04) = 0x08000000;
+	cpu_flags=disable_interrupts();
 	while(i<MAX_PRIO) {
 		t=ready[i];
 		if (t) {
@@ -82,25 +91,39 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 		}
 		i++;
 	}
+
 	if (t==current) {
 		ASSERT(0);
 	}
-	enable_interrupt();
+	restore_cpu_flags(cpu_flags);
+	// Now interrupts are on again, current task on the way out
+	// may be awaken by pending irq. handle below.
 
 	if (!t) {
 		ASSERT(0);
 	}
+
 	if (t==current) {
 		ASSERT(0);
 	}
 
+	// from here as fix we run with irq off until ctx switch
+	cpu_flags=disable_interrupts();
 	if (current->blocker.wake) {
 		/* IO blocked task, is ready, so    */
 		/* fall through and set state ready */
 		current->blocker.wake=0;
 		current->state=TASK_STATE_RUNNING;
-//		sys_printf("in pendsv: readying blocked task\n");
+		if (t->prio_flags>current->prio_flags) {
+			CLR_TMARK(current);
+			t->next=ready[t->prio_flags&3];
+			ready[t->prio_flags&3]=t;
+			restore_cpu_flags(cpu_flags);
+			return 0;
+		}
 	}
+
+//	restore_cpu_flags(cpu_flags);
 	/* Have next, move away current if still here, 
 	   timer and blocker move themselves */
 	if (current->state==TASK_STATE_RUNNING) {
@@ -108,7 +131,7 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 		ASSERT(!current->next);
 		CLR_TMARK(current);
 		if (prio>4) prio=4;
-		disable_interrupt();
+//		cpu_flags=disable_interrupts();
 		current->state=TASK_STATE_READY;
 		if (ready[prio]) {
 			ready_last[prio]->next=current;
@@ -116,7 +139,10 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 			ready[prio]=current;
 		}
 		ready_last[prio]=current;
-		enable_interrupt();
+//		restore_cpu_flags(cpu_flags);
+		if (t->prio_flags>current->prio_flags) {
+			POLLPRINT("pendsv: yielding out high prio proc\n");
+		}
 	}
 
 	map_next_stack_page((unsigned long int)t->estack,
@@ -126,6 +152,7 @@ void *PendSV_Handler_c(unsigned long int *save_sp) {
 	} else {
 		*(save_sp-2)=0xfffffff9;
 	}
+	t->blocker.ev&=~0x80; // Clear list sleep
 	return t;
 }
 
@@ -160,6 +187,9 @@ __attribute__ ((naked)) int fake_pendSV(void) {
 }
 
 void switch_now(void) {
+//	if (!(ready[0]||ready[1]||ready[2]||ready[3])) {
+//		ASSERT(0);
+//	}
 	fake_pendSV();
 	if ((xpsr()&0x1ff)!=0x0b) {
 		ASSERT(0);
@@ -176,4 +206,75 @@ void init_switcher(void) {
 	/* allow software to return to threadmode always */
         *((unsigned int *)0xe000ed14)|=1;
 #endif
+}
+
+void __attribute__ (( naked )) UsageFault_Handler(void) {
+        io_setpolled(1);
+        sys_printf("in usagefault handler\n");
+        ASSERT(0);
+}
+
+
+void Error_Handler_c(void *sp);
+
+void __attribute__ (( naked )) HardFault_Handler(void) {
+        asm volatile ( "tst lr,#4\n\t"
+                        "ite eq\n\t"
+                        "mrseq r0,msp\n\t"
+                        "mrsne r0,psp\n\t"
+                        "mov r1,lr\n\t"
+                        "mov r2,r0\n\t"
+                        "push {r1-r2}\n\t"
+                        "bl %[Error_Handler_c]\n\t"
+                        "pop {r1-r2}\n\t"
+                        "mov lr,r1\n\t"
+                        "bx lr\n\t"
+                        :
+                        : [Error_Handler_c] "i" (Error_Handler_c)
+                        :
+        );
+}
+
+void Error_Handler_c(void *sp_v) {
+        unsigned int *sp=(unsigned int *)sp_v;
+        io_setpolled(1);
+        sys_printf("\nerrorhandler trap, current=%s@0x%08x sp=0x%08x\n",current->name,current,sp);
+        sys_printf("Value of CFSR register 0x%08x\n", SCB->CFSR);
+        sys_printf("Value of HFSR register 0x%08x\n", SCB->HFSR);
+        sys_printf("Value of DFSR register 0x%08x\n", SCB->DFSR);
+        sys_printf("Value of MMFAR register 0x%08x\n", SCB->MMFAR);
+        sys_printf("Value of BFAR register 0x%08x\n", SCB->BFAR);
+        sys_printf("r0 =0x%08x, r1=0x%08x, r2=0x%08x, r3  =0x%08x\n", sp[0], sp[1], sp[2], sp[3]);
+        sys_printf("r12=0x%08x, LR=0x%08x, PC=0x%08x, xPSR=0x%08x\n", sp[4], sp[5], sp[6], sp[7]);
+
+        ASSERT(0);
+}
+
+void *handle_syscall(unsigned long int *sp);
+
+void __attribute__ (( naked )) SVC_Handler(void) {
+ /*
+ *   * Get the pointer to the stack frame which was saved before the SVC
+ *     * call and use it as first parameter for the C-function (r0)
+ *       * All relevant registers (r0 to r3, r12 (scratch register), r14 or lr
+ *         * (link register), r15 or pc (programm counter) and xPSR (program
+ *           * status register) are saved by hardware.
+ *             */
+
+        asm volatile ( "tst lr,#4\n\t"
+                        "ite eq\n\t"
+                        "mrseq r0,msp\n\t"
+                        "mrsne r0,psp\n\t"
+                        "mov r1,lr\n\t"
+                        "mov r2,r0\n\t"
+                        "push {r1-r2}\n\t"
+			"cpsie i\n\t"
+                        "bl %[handle_syscall]\n\t"
+                        "pop {r1-r2}\n\t"
+                        "mov lr,r1\n\t"
+                        "bx lr\n\t"
+                        :
+                        : [handle_syscall] "i" (handle_syscall)
+                        :
+        );
 }

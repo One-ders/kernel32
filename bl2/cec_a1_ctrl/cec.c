@@ -67,7 +67,6 @@ int cec_dump_data(int itf, char *pretext, unsigned char *buf, int len) {
 }
 #endif
 
-
 int cec_init_cec(void) {
 	fd_cec=io_open(CEC_DRV);
 	io_control(fd_cec,F_SETFL,(void *)O_NONBLOCK,0);
