@@ -110,7 +110,7 @@ static int handle_cec_data(unsigned char *buf, int size) {
 	}
 	switch(cmd) {
 		case CEC_OPCODE_GIVE_PHYSICAL_ADDRESS:
-			cec_send_physical_address(A1_LINK,(5<<4)|0xf, 0x1000, 5);
+			cec_send_physical_address(A1_LINK,(5<<4)|0xf, 0x1100, 5);
 			a1_attach_amp();
 			break;
 		case CEC_OPCODE_GIVE_SYSTEM_AUDIO_MODE_STATUS:
