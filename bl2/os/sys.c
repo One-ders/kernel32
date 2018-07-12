@@ -850,7 +850,7 @@ check_resched:
 			return 0;
 		}
 		default:
-			sys_printf("bad syscall %x\n",svc_number);
+			sys_printf("%s: bad syscall %x\n",current->name,svc_number);
 			set_svc_ret(svc_sp,-1);
 			while(1);
 			break;

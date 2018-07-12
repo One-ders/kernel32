@@ -490,6 +490,20 @@ static int gpio_control(struct device_handle *dh, int cmd, void *arg1, int arg2)
 			break;
 		}
 		case GPIO_BUS_READ_BITS: {
+			unsigned int *bits=(unsigned int *)arg1;
+			unsigned int nrofpins;
+			int i;
+
+			if (!(pdp->pin_flags&PIN_FLAGS_BUS)) return -1;
+			*bits=0;
+			nrofpins=(pdp->pin_flags>>16)&0xff;
+			for(i=0;i<nrofpins;i++) {
+				int bus=pdp->pin_array[i]>>4;
+				int pin=pdp->pin_array[i]&0xf;
+				if (GPIO[bus]->odr&(1<<pin)) {
+					(*bits)|=(1<<i);
+				}
+			}
 			break;
 		}
 		case GPIO_BUS_SET_BITS: {

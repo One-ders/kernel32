@@ -266,6 +266,8 @@ struct dent {
 	char	name[32];
 };
 
+#include <sys_svc.h>
+#if 0
 #define SVC_CREATE_TASK 1
 #define SVC_SLEEP       SVC_CREATE_TASK+1
 #define SVC_SLEEP_ON    SVC_SLEEP+1
@@ -288,6 +290,7 @@ struct dent {
 #define SVC_GETTIC	SVC_REBOOT+1
 #define SVC_SBRK	SVC_GETTIC+1
 #define SVC_BRK		SVC_SBRK+1
+#endif
 
 struct task_create_args {
 	void *fnc;

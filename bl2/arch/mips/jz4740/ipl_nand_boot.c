@@ -2,6 +2,14 @@
 #include <dev/nand/nand.h>
 #include <config.h>
 
+extern void serial_putc (const char c);
+extern void serial_puts(const char *s);
+
+struct Bsp_functions {
+	void *p_char;
+	void *p_str;
+} bsp_funcs = { serial_putc, serial_puts };
+
 
 /*
  * NAND flash definitions
@@ -56,7 +64,6 @@ static unsigned char oob_buf[128] = {0};
  */
 extern void flush_cache_all(void);
 extern int serial_init(void);
-extern void serial_puts(const char *s);
 extern void sdram_init(void);
 extern void pll_init(void);
 
@@ -326,7 +333,7 @@ void move_blaf(void) {
 
 void nand_boot(void) {
 	int boot_sel;
-	void (*b_start)(void);
+	void (*b_start)(void *);
 
 	/*
 	 * Init hardware
@@ -386,8 +393,8 @@ void nand_boot(void) {
 	 * Jump to U-Boot image
 	 */
 
-	b_start=(void (*)(void))0x80004000;
-	(*b_start)();
+	b_start=(void (*)(void *))0x80004000;
+	(*b_start)(&bsp_funcs);
 	serial_puts("Running from ram ...\n");
 	while(1);
 }

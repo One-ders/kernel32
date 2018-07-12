@@ -75,7 +75,7 @@ int parse_fmt(const char *fmt, int *field_width, int *zero_fill) {
 int fprintf(int fd, const char *fmt, ...) {
 	int i=0;
 	va_list ap;
-	char numericbuf[16];
+	char numericbuf[17];
 	
 	va_start(ap,fmt);
 	while(1) {

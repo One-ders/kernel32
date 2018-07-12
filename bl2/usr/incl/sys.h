@@ -19,6 +19,7 @@ int thread_create(void *fnc, void *val, unsigned int val_size,
 int sleep(unsigned int ms);
 int block_task(char *name);
 int unblock_task(char *name);
+int kill_task(char *name);
 int setprio_task(char *name,int prio);
 int set_debug_level(unsigned int dbglev);
 int _reboot_(unsigned int cookie);

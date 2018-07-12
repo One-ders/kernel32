@@ -300,6 +300,16 @@ static int unblock_fnc(int argc, char **argv, struct Env *env) {
 	return 0;
 }
 
+static int kill_fnc(int argc, char **argv, struct Env *env) {
+	int rc;
+	fprintf(env->io_fd, "killing %s, ", argv[1]);
+	rc=kill_task(argv[1]);
+	fprintf(env->io_fd, "returned %d\n", rc);
+
+	return 0;
+}
+
+
 static int setprio_fnc(int argc, char **argv, struct Env *env) {
 	int rc;
 	int prio=strtoul(argv[2],0,0);
@@ -338,6 +348,7 @@ static struct cmd cmd_root[] = {
 		{"block",block_fnc},
 		{"unblock",unblock_fnc},
 		{"setprio",setprio_fnc},
+		{"kill", kill_fnc},
 		{"reboot",reboot_fnc},
 		{"kmem",kmem_fnc},
 //		{"testprog",testprog},
@@ -349,7 +360,7 @@ static struct cmd_node my_cmd_node = {
 	cmd_root,
 };
 
-void init_blinky(void);
+//void init_blinky(void);
 
 void init_cec_a1();
 
