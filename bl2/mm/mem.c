@@ -1,6 +1,7 @@
 
 #include <types.h>
 #include <sys.h>
+#include <string.h>
 
 size_t copy_to_user(void *dst, const void *src, size_t n) {
 	memcpy(dst,src,n);

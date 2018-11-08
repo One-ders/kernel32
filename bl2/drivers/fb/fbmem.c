@@ -2,6 +2,7 @@
 #include <sys.h>
 #include <io.h>
 #include <fb.h>
+#include <string.h>
 #include <malloc.h>
 
 #define FBPIXMAPSIZE    (1024 * 8)
@@ -17,7 +18,7 @@ static struct fb_data fb_data[FB_MAX];
 struct my_userdata {
 	DEVICE_HANDLE();
 	struct fb_data *fb_data;
-	unsigned int ppos;
+	loff_t ppos;
 };
 
 struct my_userdata my_userdata[4];
@@ -133,12 +134,13 @@ static int fb_control(struct device_handle *dh,
 			memcpy(arg, &fi->var,sizeof(fi->var));
 			return 0;
 		case FBIOGET_FSCREENINFO:
-			return memcpy(arg, &fi->fix,sizeof(fi->fix));
+			memcpy(arg, &fi->fix,sizeof(fi->fix));
+			return 0;
 		case IO_MMAP:
 			return (((unsigned long int)fi->screen_base)&~0xa0000000)+((unsigned long)arg);
 		default:
 			if (!fi->fbops->fb_ioctl) return -EINVAL;
-			return fi->fbops->fb_ioctl(fi, cmd, arg);
+			return fi->fbops->fb_ioctl(fi, cmd,(long unsigned int) arg);
 	}
 	return 0;
 }

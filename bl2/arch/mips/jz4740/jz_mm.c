@@ -1,4 +1,5 @@
 #include <sys.h>
+#include <string.h>
 
 static unsigned long free_page_map[SDRAM_SIZE/(PAGE_SIZE*sizeof(unsigned long))]
 ;

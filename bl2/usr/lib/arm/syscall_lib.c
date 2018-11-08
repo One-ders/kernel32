@@ -33,6 +33,9 @@
 #include "io.h"
 #include "sys.h"
 
+#include <sys_svc.h>
+
+#if 0
 #define SVC_CREATE_TASK 1
 #define SVC_SLEEP       SVC_CREATE_TASK+1
 #define SVC_SLEEP_ON    SVC_SLEEP+1
@@ -44,30 +47,33 @@
 #define SVC_IO_LSEEK    SVC_IO_CONTROL+1
 #define SVC_IO_CLOSE    SVC_IO_LSEEK+1
 #define SVC_IO_SELECT   SVC_IO_CLOSE+1
-#define SVC_KILL_SELF   SVC_IO_SELECT+1
+#define SVC_IO_MMAP     SVC_IO_SELECT+1
+#define SVC_IO_MUNMAP   SVC_IO_MMAP+1
+#define SVC_KILL_SELF   SVC_IO_MUNMAP+1
 #define SVC_BLOCK_TASK  SVC_KILL_SELF+1
 #define SVC_UNBLOCK_TASK SVC_BLOCK_TASK+1
 #define SVC_SETPRIO_TASK SVC_UNBLOCK_TASK+1
 #define SVC_SETDEBUG_LEVEL SVC_SETPRIO_TASK+1
 #define SVC_REBOOT	SVC_SETDEBUG_LEVEL+1
 #define SVC_GETTIC	SVC_REBOOT+1
+#endif
 
 #include <string.h>
 
 struct sel_args {
-	int nfds;
-	fd_set *rfds;
-	fd_set *wfds;
-	fd_set *stfds;
-	unsigned int *tout;
+	int		nfds;
+	fd_set		*rfds;
+	fd_set		*wfds;
+	fd_set		*stfds;
+	unsigned int	*tout;
 };
 
 struct task_create_args {
-	void *fnc;
-	void *val;
-	unsigned int val_size;
-	int prio;
-	char *name;
+	void 		*fnc;
+	void 		*val;
+	unsigned int	val_size;
+	int		prio;
+	char		*name;
 };
 
 
@@ -97,6 +103,7 @@ int svc_io_close(int fd);
 int svc_io_select(struct sel_args *sel_args);
 int svc_block_task(char *name);
 int svc_unblock_task(char *name);
+int svc_kill_task(char *name);
 int svc_setprio_task(char *name, int prio);
 int svc_set_debug_level(unsigned int dbglev);
 int svc_reboot(unsigned int cookie);
@@ -177,6 +184,13 @@ __attribute__ ((noinline)) int svc_unblock_task(char *name) {
 	return rc;
 }
 
+__attribute__ ((noinline)) int svc_kill_task(char *name) {
+	register int rc asm("r0");
+	svc(SVC_KILL_TASK);
+	return rc;
+}
+
+
 __attribute__ ((noinline)) int svc_setprio_task(char *name, int prio) {
 	register int rc asm("r0");
 	svc(SVC_SETPRIO_TASK);
@@ -227,6 +241,10 @@ int block_task(char *name) {
 
 int unblock_task(char *name) {
 	return svc_unblock_task(name);
+}
+
+int kill_task(char *name) {
+	return svc_kill_task(name);
 }
 
 int setprio_task(char *name,int prio) {

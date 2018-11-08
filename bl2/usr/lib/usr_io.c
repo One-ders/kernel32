@@ -75,7 +75,7 @@ int parse_fmt(const char *fmt, int *field_width, int *zero_fill) {
 int fprintf(int fd, const char *fmt, ...) {
 	int i=0;
 	va_list ap;
-	char numericbuf[16];
+	char numericbuf[17];
 	
 	va_start(ap,fmt);
 	while(1) {
@@ -282,6 +282,7 @@ int readline_r(int fd, char *prompt, char *buf, int buf_size) {
 		if (state==STATE_C_MULTI) goto handle_special;
 		if (state==STATE_C_ARROW) goto handle_arrow;
 		switch(ch) {
+			case 0x7f:
 			case 0x08: {
 				char ochar=' ';
 				int i;

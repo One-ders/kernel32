@@ -12,11 +12,11 @@ export OBJCOPY:=mipsel-linux-objcopy
  
 #include $(TOP)/os/Makefile
 
-#CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4740 -I/opt/cross/lib/gcc/mipsel-linux/4.9.1/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls
-CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/boards/$(BOARD) -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl/jz4740 -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4740 -I/opt/cross/lib/gcc/mipsel-linux/4.9.1/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -D__KERNEL__ -DDEBUG
-CFLAGS_USR:=-I$(TOP)/usr/incl -I/opt/cross/lib/gcc/mipsel-linux/4.9.1/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -DMMU -DMIPS
+#CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4740 -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls
+CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/boards/$(BOARD) -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl/jz4740 -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4740 -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -D__KERNEL__ -DDEBUG
+CFLAGS_USR:=-I$(TOP)/usr/incl -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -DMMU -DMIPS
 LDFLAGS:=-g -T./pavo.ld 
-LDFLAGS_USR:=-g $(OBJ)/usr/lib/start.o $(OBJ)/usr/lib/usrlib.o -T$(OBJ)/../pavo_usr.ld
+LDFLAGS_USR:=-g $(OBJ)/usr/lib/start.o $(OBJ)/usr/lib/usrlib.o -T$(OBJ)/../pavo_usr.ld 
 
 
 all: uCore.img
@@ -26,6 +26,10 @@ nblock=$(shell expr $(fsize) / 4096)
 
 uCore.img: tmp/fot5 usr.bin
 	cat tmp/fot5 obj/usr/sys_cmd/sys_cmd.srec tmp/fot1 > uCore.img
+	rm -rf uroot
+	mkdir uroot
+	cp obj/usr/sys_cmd/sys_cmd uroot/init
+	mkyaffs2image uroot rootf.img
 
 tmp/fot5: tmp/fot4
 	dd if=tmp/fot4 of=tmp/fot5 ibs=4096 count=$(nblock)
@@ -52,8 +56,8 @@ uCore.bin: uCore
 ipl/boot.bin:
 	$(MAKE) -C ipl
 
-uCore: os version mips jz c_start.o mm stddrv stdlib fb
-	$(LD) $(LDFLAGS) -o $@ $(OBJ)/lib/init_sect.o $(OBJ)/lib/jz.o c_start.o $(OBJ)/version.o $(OBJ)/lib/mips.o $(OBJ)/lib/os.o $(OBJ)/lib/mm.o $(OBJ)/stddrv/stddrv.o $(OBJ)/stdlib/stdlib.o $(OBJ)/lib/fb.o  $(OBJ)/lib/end_sect.o
+uCore: os version mips jz c_start.o mm stddrv stdlib fb fs
+	$(LD) $(LDFLAGS) -o $@ $(OBJ)/lib/init_sect.o $(OBJ)/lib/jz.o c_start.o $(OBJ)/version.o $(OBJ)/lib/mips.o $(OBJ)/lib/os.o $(OBJ)/lib/mm.o $(OBJ)/stddrv/stddrv.o $(OBJ)/stdlib/stdlib.o $(OBJ)/lib/fb.o $(OBJ)/lib/fs.o $(OBJ)/lib/end_sect.o -L/opt/cross/lib/gcc/mipsel-linux/8.1.0 -lgcc
 
 #traps.o: ../../mips/jz4740/traps.S
 #	$(CC) $(CFLAGS) -c -o $@ $<
@@ -109,6 +113,12 @@ $(OBJ)/drivers/fb: $(TOP)/drivers/fb
 	mkdir -p $@
 	lndir $< $@
 
+fs: $(OBJ)/fs/yaffs2
+	CFLAGS="$(CFLAGS)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
+
+$(OBJ)/fs/yaffs2: $(TOP)/fs/yaffs2
+	mkdir -p $@
+	lndir $< $@
 
 mm: $(OBJ)/mm
 	CFLAGS="$(CFLAGS)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
@@ -144,6 +154,6 @@ $(OBJ)/usr/sys_cmd: $(TOP)/usr/sys_cmd
 
 
 clean:
-	rm -rf $(OBJECTS) uCore uCore.bin uCore.img
+	rm -rf $(OBJECTS) uCore uCore.bin uCore.img uroot
 	rm -rf tmp obj *.o
 	$(MAKE) -C ipl clean

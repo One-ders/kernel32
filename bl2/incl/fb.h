@@ -152,7 +152,7 @@
 #define FB_ACCEL_PROSAVAGE_DDR  0x8d    /* S3 ProSavage DDR             */
 #define FB_ACCEL_PROSAVAGE_DDRK 0x8e    /* S3 ProSavage DDR-K           */
 
-typedef long int loff_t;
+//typedef long int loff_t;
 
 struct fb_fix_screeninfo {
         char id[16];                    /* identification string eg "TT Builtin" */
@@ -883,6 +883,8 @@ extern int fb_new_modelist(struct fb_info *info);
 #define FB_MODE_IS_FIRST        16
 #define FB_MODE_IS_FROM_VAR     32
 
+
+int fb_find_mode_cvt(struct fb_videomode *mode, int margins, int rb);
 
 /* drivers/video/modedb.c */
 #define VESA_MODEDB_SIZE 34

@@ -159,6 +159,7 @@ void init_sys(void);
 void start_sys(void);
 void *getSlab_256(void);
 void *get_page(void);
+void *get_pages(unsigned int order);
 void put_page(void *);
 
 /* interface towards arch functions */
@@ -197,6 +198,8 @@ void *sys_sbrk(struct task *t, long int incr);
 int sys_brk(struct task *t, void *nbrk);
 #endif
 
+void SysTick_Handler(void);
+int sys_udelay(unsigned int usec);
 
 /*****************************************************/
 
@@ -266,6 +269,8 @@ struct dent {
 	char	name[32];
 };
 
+#include <sys_svc.h>
+#if 0
 #define SVC_CREATE_TASK 1
 #define SVC_SLEEP       SVC_CREATE_TASK+1
 #define SVC_SLEEP_ON    SVC_SLEEP+1
@@ -288,6 +293,7 @@ struct dent {
 #define SVC_GETTIC	SVC_REBOOT+1
 #define SVC_SBRK	SVC_GETTIC+1
 #define SVC_BRK		SVC_SBRK+1
+#endif
 
 struct task_create_args {
 	void *fnc;
@@ -297,6 +303,7 @@ struct task_create_args {
 	char *name;
 };
 
+int allocate_task_id(struct task *t);
 
 /*  driver */
 

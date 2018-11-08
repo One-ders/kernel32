@@ -1,9 +1,11 @@
 
 #include <types.h>
+#include <io.h>
 #include <malloc.h>
 #include <mm.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <string.h>
 #include <fb.h>
 
 #define name_matches(v, s, l) \

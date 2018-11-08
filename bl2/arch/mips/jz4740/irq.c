@@ -1,8 +1,9 @@
 #include <regdef.h>
 #include <frame.h>
-#include <jz4740.h>
 #include <irq.h>
-#include <sys_arch.h>
+#include <sys.h>
+
+unsigned int read_c0_count(void);
 
 struct IH_DATA {
 	IRQ_HANDLER handler;
@@ -105,6 +106,7 @@ void irq_dispatch(void *sp) {
 			int i;
 			for(i=0;i<32;i++) {
 				if (cirq&(1<<i)) {
+					INTC->icmcr=cirq&(1<<i);
 					handlers[i].handler(i,handlers[i].h_data);
 				}
 			}

@@ -1,7 +1,10 @@
 
 #include <types.h>
 #include <errno.h>
+#include <io.h>
+#include <malloc.h>
 #include <mm.h>
+#include <string.h>
 #include <fb.h>
 
 
@@ -81,11 +84,11 @@ int fb_alloc_cmap(struct fb_cmap *cmap, int len, int transp) {
 	if (cmap->len != len) {
 		fb_dealloc_cmap(cmap);
 		if (!len) return 0;
-		if (!(cmap->red = malloc(size))) goto fail;
-		if (!(cmap->green = malloc(size))) goto fail;
-		if (!(cmap->blue = malloc(size))) goto fail;
+		if (!(cmap->red = (short unsigned int *)malloc(size))) goto fail;
+		if (!(cmap->green = (short unsigned int *)malloc(size))) goto fail;
+		if (!(cmap->blue = (short unsigned int *)malloc(size))) goto fail;
 		if (transp) {
-			if (!(cmap->transp = malloc(size))) {
+			if (!(cmap->transp = (short unsigned int *)malloc(size))) {
 				goto fail;
 			}
 		} else cmap->transp = NULL;

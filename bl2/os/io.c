@@ -39,23 +39,49 @@
 static struct driver *iodrv;
 static struct device_handle *dh=0;
 
-typedef int (*P_STR)(char *);
+typedef int (*P_STR)(const char *);
 typedef int (*P_CHAR)(char );
 
 
 #ifdef MIPS
-P_STR p_str=0x800009a4;
-P_CHAR p_char=0x80000948;
+
+extern P_STR p_str;
+extern P_CHAR p_char;
+
+//P_STR p_str=0x800008d8;
+//P_CHAR p_char=0x80000880;
+
+void io_push() {
+}
+
 #else
-int dum_p_str(char *dum) {
-	if (dum) return 1;
+static char buf[1024];
+static int bp=0;
+int dum_p_str(const char *dum) {
+	if (dum) {
+		int sz=strlen(dum);
+		if (bp+sz>1023) return 1;
+		memcpy(&buf[bp],dum, sz);
+		bp+=sz;
+		return 1;
+	}
 	return 0;
 }
+
 int dum_p_char(char a) {
+	if (bp<1023) {
+		buf[bp++]=a;
+	}
 	return 0;
 }
+
 P_STR p_str=dum_p_str;
 P_CHAR p_char=dum_p_char;
+
+void io_push() {
+	iodrv->ops->control(dh, WR_CHAR, (char *)buf, bp);
+}
+
 #endif
 
 
@@ -63,10 +89,6 @@ P_CHAR p_char=dum_p_char;
 int io_cb_handler(struct device_handle *dh, int ev, void *dum) {
 	return 0;
 }
-
-void io_push() {
-}
-
 int io_add_c(const char c) {
 	if (!dh) return p_char(c);
 	return iodrv->ops->control(dh, WR_CHAR, (char *)&c,1);

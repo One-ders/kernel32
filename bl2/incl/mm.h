@@ -22,3 +22,10 @@ struct vm_area_struct {
 
 size_t copy_to_user(void *uptr, const void *src, size_t n);
 size_t copy_from_user(void *dst, const void *uptr, size_t n);
+
+struct task;
+
+unsigned long int get_mmap_vaddr(struct task *current, unsigned int size);
+int mapmem(struct task *t, unsigned long int vaddr, unsigned long int paddr, unsigned int attr);
+
+unsigned int virt_to_phys(void *v);

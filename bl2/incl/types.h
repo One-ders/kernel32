@@ -4,6 +4,11 @@
 typedef unsigned long int size_t;
 typedef long int ssize_t;
 
+typedef unsigned long int off_t;
+typedef unsigned long long int loff_t;
+
+typedef unsigned int dev_t;
+
 #define NULL (0)
 #define BITS_PER_LONG (32)
 
