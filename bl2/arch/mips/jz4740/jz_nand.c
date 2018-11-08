@@ -2,9 +2,9 @@
 #include "sys.h"
 #include <string.h>
 
-#include <dev/nand/nand.h>
+#include "jz_nand.h"
 
-#include "nand.h"
+#include <nand.h>
 
 
 struct userdata {
@@ -44,8 +44,8 @@ struct partition {
 };
 
 static struct partition partitions[] = {
-	{0, 131072},        /* 0-0x1ffff       */
-	{131072, 524288},   /* 0x20000-0xa0000 */
+	{0, 262144},        /* 0-0x3ffff       */
+	{262144, 393216},   /* 0x40000-0x9ffff */
 };
 
 #define NAND_DATAPORT   0xb8000000
@@ -322,6 +322,20 @@ static int nand_control(struct device_handle *dh, int cmd, void *arg1, int arg2)
                         }
                         return udh->fpos;
                 }
+		case NAND_GET_CONFIG: {
+			struct nand_config *nand_config=
+				(struct nand_config *)arg1;
+			nand_config->page_size=page_size;
+			nand_config->pages_per_block=page_per_block;
+			nand_config->n_blocks=
+				partitions[udh->partition].size/
+				 (page_per_block*page_size);
+				;
+			nand_config->bad_block_mark=bad_block_pos;
+			nand_config->oob_size=oob_size;
+			nand_config->ecc_count=ecc_count;
+			return 0;
+		}
 	}
 	return -1;
 }

@@ -1,5 +1,9 @@
 #include <sys.h>
 #include "yaffs_trace.h"
+#include "yaffs_guts.h"
+#include "yaffs_osglue.h"
+
+#include <nand.h>
 
 
 static int yaffs_errno;
@@ -42,6 +46,7 @@ void yaffs_bug_fn(const char *file_name, int line_no) {
 }
 
 int yaffsfs_CheckMemRegion(const void *addr, size_t size, int write_request) {
+	sys_printf("yaffsfs check mem region  %x:%d\n", addr, size);
 	return 0;
 }
 
@@ -186,3 +191,155 @@ loop:	SWAPINIT(a, es);
 	}
 }
 
+//================================================================
+//
+//  Nand blk dev interface
+//
+//================================================================
+//
+//
+
+static int yaffs_nand_write(struct yaffs_dev *dev, int nand_chunk,
+                                   const unsigned char *data, 
+					int data_len,
+                                   const unsigned char *oob, 
+					int oob_len) {
+
+	sys_printf("yaffs_nand_write\n");
+	return 0;
+}
+
+static int yaffs_nand_read(struct yaffs_dev *dev, int nand_chunk,
+                                   unsigned char *data, 
+					int data_len,
+                                   unsigned char *oob, 
+					int oob_len,
+                                   enum yaffs_ecc_result *ecc_result_out) {
+
+	sys_printf("yaffs_nand_read\n");
+	return 0;
+}
+
+static int yaffs_nand_erase(struct yaffs_dev *dev, int block_no) {
+	sys_printf("yaffs_nand_erase\n");
+	return 0;
+}
+
+static int yaffs_nand_mark_bad(struct yaffs_dev *dev, int block_no) {
+	sys_printf("yaffs_nand_mark_bad\n");
+	return 0;
+}
+
+static int yaffs_nand_check_bad(struct yaffs_dev *dev, int block_no) {
+	sys_printf("yaffs_nand_check_bad\n");
+	return 0;
+}
+
+static int yaffs_nand_init(struct yaffs_dev *dev) {
+	sys_printf("yaffs_nand_init\n");
+	return 0;
+}
+
+static int yaffs_nand_deinit(struct yaffs_dev *dev) {
+	sys_printf("yaffs_nand_deinit\n");
+	return 0;
+}
+
+
+struct nand_context {
+	void *bub;
+	unsigned char *buffer;
+};
+
+static struct yaffs_dev ydev;
+static struct nand_context ctxt;
+static unsigned char buffer[64];
+
+int mount_nand(char *nand_dev_name) {
+	struct driver *nand_dev=driver_lookup(nand_dev_name);
+	struct device_handle *dh=0;
+	struct nand_config nand_cfg;
+	struct yaffs_param *param;
+	struct yaffs_driver *ydrv=&ydev.drv;
+
+	memset(&ydev,0,sizeof(ydev));
+
+	if (!nand_dev) return -1;
+	dh=nand_dev->ops->open(0, NULL, 0);
+	if (!dh) return -1;
+
+	if (nand_dev->ops->control(dh,NAND_GET_CONFIG,&nand_cfg,sizeof(nand_cfg))<0) {
+		nand_dev->ops->close(dh);
+		return -1;
+	}
+
+	param=&ydev.param;
+
+	param->name="bajs";
+	param->total_bytes_per_chunk=nand_cfg.page_size*nand_cfg.pages_per_block;
+	param->chunks_per_block=nand_cfg.pages_per_block;
+	param->n_reserved_blocks=0;
+	param->start_block=0;
+	param->end_block=nand_cfg.n_blocks-1;
+	param->is_yaffs2=1;
+	param->use_nand_ecc=1;
+	param->n_caches=10;
+	param->stored_endian=2;
+
+
+	ydrv->drv_write_chunk_fn=yaffs_nand_write;
+	ydrv->drv_read_chunk_fn =yaffs_nand_read;
+	ydrv->drv_erase_fn      =yaffs_nand_erase;
+	ydrv->drv_mark_bad_fn	=yaffs_nand_mark_bad;
+	ydrv->drv_check_bad_fn	=yaffs_nand_check_bad;
+	ydrv->drv_initialise_fn	=yaffs_nand_init;
+	ydrv->drv_deinitialise_fn=yaffs_nand_deinit;
+
+	ctxt.bub = 0;
+	ctxt.buffer=buffer;
+	ydev.driver_context=(void *)&ctxt;
+	
+	yaffs_add_device(&ydev);
+
+	return 0;
+}
+
+static struct device_handle *yaffsfs_open(void *inst, DRV_CBH cb, void *dum) {
+	return 0;
+}
+
+static int yaffsfs_close(struct device_handle *hd) {
+	return 0;
+}
+
+static int yaffsfs_control(struct device_handle *dh, int cmd, void *arg, int arg_len) {
+	return -1;
+}
+
+static int yaffsfs_init(void *inst) {
+	return 0;
+}
+
+static int yaffsfs_start(void *inst) {
+	return 0;
+}
+
+static struct driver_ops yaffsfs_ops = {
+	yaffsfs_open,
+	yaffsfs_close,
+	yaffsfs_control,
+	yaffsfs_init,
+	yaffsfs_start,
+};
+
+static struct driver yaffsfs_drv = {
+	"yaffsfs",
+	0,
+	&yaffsfs_ops,
+};
+
+void init_yaffsfs(void) {
+	driver_publish(&yaffsfs_drv);
+}
+
+INIT_FUNC(init_yaffsfs);

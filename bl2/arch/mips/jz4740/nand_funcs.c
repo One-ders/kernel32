@@ -1,6 +1,6 @@
 
-#include <dev/nand/nand.h>
 #include <config.h>
+#include "jz_nand.h"
 
 
 /*
