@@ -1,0 +1,1 @@
+#define NAND_READ_BLOCK 10
