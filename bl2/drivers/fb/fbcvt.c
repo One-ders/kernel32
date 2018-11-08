@@ -1,5 +1,7 @@
 #include <types.h>
 #include <mm.h>
+#include <string.h>
+#include <io.h>
 #include <fb.h>
 
 #define FB_CVT_CELLSIZE               8

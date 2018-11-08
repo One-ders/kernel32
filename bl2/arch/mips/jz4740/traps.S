@@ -136,6 +136,7 @@ _handle_irq:
 	lui	k1,%hi(irq_lev)
 	addiu	k1,k1,%lo(irq_lev)
 	lw	k0,0(k1)
+	sw	k0,0*4(sp)		# save current irq_lev to reg zero in frame
 	ori	k0,k0,0xa
 	sw	k0,0(k1)
 #
@@ -241,20 +242,20 @@ ret_from_irq:
 #	addiu	v0,%lo(current)
 #	lw	v0,0(v0)
 #	sw	k0,1*4(v0)	# update stored stack ptr	
-3:  	lw	k1,33*4(k0)	# check cause on prev. frame
-	andi	k1,k1,0x20
-	bnez	k1,6f
-	nop
+3:  	lw	k1,0*4(sp)	# read irq_lev on prev. frame
+#	andi	k1,k1,0x20
+#	bnez	k1,6f
+#	nop
 	lui	t1,%hi(irq_lev)
 	addiu	t1,t1,%lo(irq_lev)
-	li	k1,0xa
+#	li	k1,0xa
 	sw	k1,0(t1)
 	j	5f
 	nop
-6:	lui     t1,%hi(irq_lev)
-	addiu	t1,t1,%lo(irq_lev)
-	li      k1,0x1
-	sw      k1,0(t1)
+#6:	lui     t1,%hi(irq_lev)
+#	addiu	t1,t1,%lo(irq_lev)
+#	li      k1,0x1
+#	sw      k1,0(t1)
 # RESTORE_TEMP
 5:	lw	t8,35*4(sp)
 	mtlo	t8
@@ -647,6 +648,7 @@ _handle_Sys:
 	lui	k1,%hi(irq_lev)
 	addiu	k1,k1,%lo(irq_lev)
 	lw	k0,0(k1)
+	sw	k0,0*4(sp)	# save irq_lev as register zero
 	li	k0,1
 	sw	k0,0(k1)
 #
@@ -833,7 +835,7 @@ do_switch:
 _handle_switch:
 	.set push
 	.set noat
-# disable interrupt and set excption level
+# disable interrupt and set exception level
 	mfc0	a0,CP0_STATUS
 	nop
 	ori	a0,a0,0x03
@@ -864,6 +866,12 @@ _handle_switch:
 	sw	t9,25*4(sp)
 	sw	gp,28*4(sp)
 	sw	ra,31*4(sp)
+	lui	k1,%hi(irq_lev)
+	addiu	k1,k1,%lo(irq_lev)
+	lw	k0,0(k1)
+	sw	k0,0*4(sp)	# save irq_lev as register zero
+	li	k0,0xa
+	sw	k0,0(k1)
 #
 	sw	$1,1*4(sp)
 #

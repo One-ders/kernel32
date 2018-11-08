@@ -327,6 +327,7 @@ static int usart_control(struct device_handle *dh,
 	switch(cmd) {
 		case RD_CHAR: {
 			int rc=usart_read(u,arg1,arg2);
+//sys_printf("read got %x\n",((unsigned char *)arg1)[0]);
 			return rc;
 		}
 		case WR_CHAR: {

@@ -11,7 +11,7 @@ void c_start(void) {
 #ifdef MMU
 	sbrk(size);
 	memset(&__bss_start__,0,size);
-	main(0x7ffffff8,8);
+	main(0x7ffffff8,(void *)8);
 #else
 	main(1,((void *)0x3f000));
 #endif

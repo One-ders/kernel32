@@ -159,6 +159,7 @@ void init_sys(void);
 void start_sys(void);
 void *getSlab_256(void);
 void *get_page(void);
+void *get_pages(unsigned int order);
 void put_page(void *);
 
 /* interface towards arch functions */
@@ -197,6 +198,8 @@ void *sys_sbrk(struct task *t, long int incr);
 int sys_brk(struct task *t, void *nbrk);
 #endif
 
+void SysTick_Handler(void);
+int sys_udelay(unsigned int usec);
 
 /*****************************************************/
 
@@ -300,6 +303,7 @@ struct task_create_args {
 	char *name;
 };
 
+int allocate_task_id(struct task *t);
 
 /*  driver */
 

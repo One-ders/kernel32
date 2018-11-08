@@ -187,7 +187,7 @@ unsigned long int strtoul(char *str, char **endp, int base) {
 		if ((p[0]=='0')&&(__builtin_tolower(p[1])=='x')) {
 			mode=16;
 			p=&p[2];
-		} else if (p[0]=='0') {
+		} else if (p[0]=='0'&&strlen(&p[1])) {
 			mode=8;
 			p=&p[1];
 		} else {
@@ -248,7 +248,7 @@ int getopt_r(int argc, char *argv[], const char *optstring, struct getopt_data* 
 	gd->optarg=0;
 	gd->optopt=0;
 	if (gd->nextchar) {
-		oarg=gd->nextchar;
+		oarg=(char *)gd->nextchar;
 	} else {
 		if (gd->optind<argc) {
 			oarg=argv[gd->optind];
@@ -276,7 +276,7 @@ int getopt_r(int argc, char *argv[], const char *optstring, struct getopt_data* 
 			} else {
 				if (pos[1]==':') { /* opt with arg */
 					if (gd->nextchar) {
-						gd->optarg=gd->nextchar;
+						gd->optarg=(char *)gd->nextchar;
 						gd->nextchar=0;
 						return *pos;
 					} else if ((gd->optind<argc)&&argv[gd->optind]){

@@ -1,6 +1,8 @@
 
 #include <types.h>
 #include <mm.h>
+#include <io.h>
+#include <string.h>
 #include <fb.h>
 #include "fb_draw.h"
 

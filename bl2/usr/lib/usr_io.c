@@ -282,6 +282,7 @@ int readline_r(int fd, char *prompt, char *buf, int buf_size) {
 		if (state==STATE_C_MULTI) goto handle_special;
 		if (state==STATE_C_ARROW) goto handle_arrow;
 		switch(ch) {
+			case 0x7f:
 			case 0x08: {
 				char ochar=' ';
 				int i;

@@ -34,8 +34,13 @@
 #include "irq.h"
 #include "jz_lcd.h"
 
+#include "jz4740/clocks.h"
+
 #include <devices.h>
 #include <fb.h>
+
+#include <string.h>
+#include <malloc.h>
 
 #ifndef __lcd_special_pin_init
 #define __lcd_special_pin_init()

@@ -39,7 +39,7 @@
 static struct driver *iodrv;
 static struct device_handle *dh=0;
 
-typedef int (*P_STR)(char *);
+typedef int (*P_STR)(const char *);
 typedef int (*P_CHAR)(char );
 
 
@@ -57,7 +57,7 @@ void io_push() {
 #else
 static char buf[1024];
 static int bp=0;
-int dum_p_str(char *dum) {
+int dum_p_str(const char *dum) {
 	if (dum) {
 		int sz=strlen(dum);
 		if (bp+sz>1023) return 1;

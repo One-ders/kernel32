@@ -1,6 +1,7 @@
 
 #include <sys.h>
 #include <frame.h>
+#include <string.h>
 
 
 extern unsigned long int *curr_pgd;

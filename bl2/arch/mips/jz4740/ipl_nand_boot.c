@@ -380,7 +380,7 @@ void nand_boot(void) {
 	nand_load(0x5000, 0x10000,
 		(unsigned char *)0x80004000);
 #endif
-	nand_load(0x5000, 0x15000,
+	nand_load(0x5000, 0x34000,
 		(unsigned char *)0x80004000);
 	serial_puts("Jumping to ram ...\n");
 

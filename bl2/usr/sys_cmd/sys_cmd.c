@@ -37,6 +37,7 @@
 #include <sys_env.h>
 #include <procps.h>
 #include <devls.h>
+#include "nand.h"
 
 struct dents {
 	char name[32];
@@ -264,6 +265,151 @@ out:
 	return rc;
 }
 
+static int nand_fnc(int argc, char **argv, struct Env *env) {
+	int fd;
+	int rc=0;
+	char cmd;
+	char *nptr;
+	int dev_no;
+	char dev_name[8];
+	unsigned long int value=0;
+	unsigned long int size=0;
+	unsigned long int block_no;
+	unsigned long int address=0;
+
+/*      nand read <nr> <offset> <size>
+        nand write <nr> <offset> <data> 
+        nand erase <nr> <block>
+*/
+
+	if (argc<2) {
+		fprintf(env->io_fd,"nand <nr> read  <offset> <size>\n");
+		fprintf(env->io_fd,"nand <nr> write <offset> <data>\n");
+		fprintf(env->io_fd,"nand <nr> erase <block>\n");
+		return 0;
+	}
+
+	dev_no=strtoul(argv[1],&nptr,0);
+	if (nptr==argv[1]) {
+		fprintf(env->io_fd,"strtoul failed for nand %s\n",argv[1]);
+		return 0;
+	}
+	
+	sprintf(dev_name,"nand%d",dev_no);
+
+	if (strcmp(argv[2],"read")==0) {
+		cmd='r';
+	} else if (strcmp(argv[2],"write")==0) {
+		cmd='w';
+	} else if (strcmp(argv[2],"erase")==0) {
+		cmd='e';
+	} else {
+		fprintf(env->io_fd,"nand: unknown cmd %s\n",argv[2]);
+		return 0;
+	}
+
+	if (cmd=='r' || cmd=='w') {
+		address=strtoul(argv[3],&nptr,0);
+		if (nptr==argv[3]) {
+			fprintf(env->io_fd,"not a offset %s\n", argv[3]);
+			return 0;
+		}
+	}
+
+	if (cmd=='e') {
+		block_no=strtoul(argv[3],&nptr,0);
+		if (nptr==argv[3]) {
+			fprintf(env->io_fd,"not a block number %s\n", argv[3]);
+			return 0;
+		}
+	}
+
+	if (cmd=='r') {
+		size=strtoul(argv[4],&nptr,0);
+		if (nptr==argv[4]) {
+			fprintf(env->io_fd,"not a size %s\n", argv[4]);
+			return 0;
+		}
+	}
+
+	if (cmd=='w') {
+		value=strtoul(argv[4],&nptr,0);
+		if (nptr==argv[4]) {
+			fprintf(env->io_fd,"not a size %s\n", argv[4]);
+			return 0;
+		}
+	}
+
+	fprintf(env->io_fd,"nand %d %c\n", dev_no, cmd);
+
+
+	fd=io_open(dev_name);
+	if (fd<0) {
+		fprintf(env->io_fd,"could not open dev nand\n");
+		return -1;
+	}
+
+
+	if (cmd=='r') {  // read command
+		unsigned char vbuf[4096];
+		unsigned int nbytes=16;
+		int i=0,j;
+		unsigned int nwords;
+		int rc;
+
+		rc=io_lseek(fd,address,SEEK_SET);
+		if (rc==-1) {
+			goto out;
+		}
+
+		rc=io_control(fd,NAND_READ_PAGE,vbuf,2048);
+		nwords=((rc+3)>>2);
+		while(i<nwords) {
+			fprintf(env->io_fd,"%08x:\t",address+(i<<2));
+			for(j=0;(j<4)&&i<nwords;i++,j++) {
+				if (rc<0) {
+					rc=-11;
+					goto out;
+				}
+				fprintf(env->io_fd,"%08x ", ((unsigned int *)vbuf)[i]);
+			}
+			fprintf(env->io_fd,"\n");
+		}
+#if 0
+	} else if (w) {
+		unsigned long int value;
+
+		if (gd.optind<argc) {
+			nptr=argv[gd.optind];
+			value=strtoul(argv[gd.optind],&nptr,0);
+			if (nptr==argv[gd.optind]) {
+				fprintf(env->io_fd, "value %s, not a number\n",argv[gd.optind]);
+				rc = -1;
+				goto out;
+			}
+		}
+
+		rc=io_lseek(fd,address,SEEK_SET);
+		if (rc==-1) {
+			goto out;
+		}
+
+		fprintf(env->io_fd,"%08x:\t=%08x",address,value);
+		rc=io_write(fd,&value,4);
+		if (rc<0) {
+			rc=-1;
+			goto out;
+		}
+#endif
+	} else {
+		fprintf(env->io_fd, "nand: unknown operation\n");
+	}
+out:
+	io_close(fd);
+	return rc;
+}
+
+
 static int debug_fnc(int argc, char **argv, struct Env *env) {
 	int dbglev;
 	if (argc>1) {
@@ -331,7 +477,7 @@ static int reboot_fnc(int argc, char **argv, struct Env *env) {
 	return 0;
 }
 
-#if 0
+#if 1
 extern int fb_test(void *);
 
 static int testprog(int argc, char **argv, struct Env *env) {
@@ -351,7 +497,8 @@ static struct cmd cmd_root[] = {
 		{"kill", kill_fnc},
 		{"reboot",reboot_fnc},
 		{"kmem",kmem_fnc},
-//		{"testprog",testprog},
+		{"nand",nand_fnc},
+		{"testprog",testprog},
 		{0,0}
 };
 
@@ -383,7 +530,7 @@ void main(void *dum) {
 #ifdef TEST_USB_SERIAL
 		thread_create(main,"usb_serial0",12,1,"sys_mon:usb");
 #else
-		init_cec_a1();
+//		init_cec_a1();
 #endif
 	}
 

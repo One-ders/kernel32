@@ -1,9 +1,12 @@
 #include "io.h"
 #include "sys.h"
+#include "string.h"
 #include <mmu.h>
 
-unsigned int irq_lev=0;
-unsigned int switch_flag=0;
+void do_switch(void);
+
+volatile unsigned int irq_lev=0;
+volatile unsigned int switch_flag=0;
 
 void set_asid(unsigned int asid) {
 	asm volatile ("mtc0\t%z0, $10\n\t"
@@ -219,7 +222,7 @@ void handle_tlb_miss(void *sp) {
             (badvaddr<current->asp->brk) || (badvaddr>= U_HEAP_START) ||
             (badvaddr<U_INSTR_END) || (badvaddr>= U_INSTR_START)) {
 	} else {
-		sys_printf("User: Seqmentation violation\n");
+		sys_printf("User: Segmentation violation\n");
 		while(1);
 	}
 
@@ -298,7 +301,7 @@ void handle_TLBL(void *sp) {
 	pte=pt[pt_index];
 	if (!pte) {
 		unsigned long int p=(unsigned long int)get_page();
-		memset(p,0,4096);
+		memset((void *)p,0,4096);
 		p&=~0x80000000;
 		sys_printf("allocating page(%x) at pt_index %x\n",p,pt_index);
 //		if ((badvaddr>=U_INSTR_START)&&(badvaddr<U_INSTR_END)) {
@@ -368,7 +371,7 @@ void handle_TLBS(void *sp) {
 	pte=pt[pt_index];
 	if (!pte) {
 		unsigned long int p=(unsigned long int)get_page();
-		memset(p,0,4096);
+		memset((void *)p,0,4096);
 		p&=~0x80000000;
 //		sys_printf("allocating page(%x) at pt_index %x\n",p,pt_index);
 //		if ((badvaddr>=U_INSTR_START)&&(badvaddr<U_INSTR_END)) {

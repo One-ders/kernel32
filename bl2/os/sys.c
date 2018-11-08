@@ -321,7 +321,7 @@ void *handle_syscall(unsigned long int *svc_sp) {
 			}
 			t->asp=current->asp;
 			t->asp->ref++;
-			setup_return_stack(t,(void *)stackp,(unsigned long int)tca->fnc,0,uval,8);
+			setup_return_stack(t,(void *)stackp,(unsigned long int)tca->fnc,0,uval,(void *)8);
 
 			t->state=TASK_STATE_READY;
 			t->name=tca->name;
@@ -653,7 +653,7 @@ again:
 				return 0;
 			}
 			npages=((len-1)/PAGE_SIZE)+1;
-			paddr=driver->ops->control(dh,IO_MMAP,offset,len);
+			paddr=driver->ops->control(dh,IO_MMAP,(void *)offset,len);
 			vaddr=get_mmap_vaddr(current,len);
 
 			sys_printf("IO_MMAP: need %d pages, vaddr %x, paddr %x\n", npages, vaddr, paddr);
@@ -833,7 +833,7 @@ check_resched:
 #ifdef MMU
 			long int incr=get_svc_arg(svc_sp,0);
 			void *ret=sys_sbrk(current,incr);
-			set_svc_ret(svc_sp,ret);
+			set_svc_ret(svc_sp,(unsigned long)ret);
 #else
 			set_svc_ret(svc_sp,0);
 #endif
@@ -841,7 +841,7 @@ check_resched:
 		}
 		case SVC_BRK: {
 #ifdef MMU
-			void *nbrk=get_svc_arg(svc_sp,0);
+			void *nbrk=(void *)get_svc_arg(svc_sp,0);
 			int ret=sys_brk(current,nbrk);
 			set_svc_ret(svc_sp,ret);
 #else
@@ -907,18 +907,25 @@ int device_ready(struct blocker *b) {
 	return b->driver->ops->control(b->dh, IO_POLL, (void *)b->ev, 0);
 }
 
+extern unsigned int irq_lev;
+
 /* not to be called from irq, cant sleep */
 void *sys_sleepon(struct blocker *so, unsigned int *tout) {
 	unsigned long int cpu_flags;
-	if (!task_sleepable()) return 0;
+	if (!task_sleepable()) {
+		DEBUGP(DLEV_SCHED,"sleep called from irq: %s, irq_lev %d\n", current->name,irq_lev);
+		return 0;
+	}
 	cpu_flags=disable_interrupts();
 
 	if (so->wake) {
 		so->wake=0;
+		DEBUGP(DLEV_SCHED,"sleep called with wake up marked: %s\n", current->name);
 		restore_cpu_flags(cpu_flags);
 		return 0;
 	}
 	if (so->driver && device_ready(so)) {
+		DEBUGP(DLEV_SCHED,"sleep called with device ready: %s\n", current->name);
 		restore_cpu_flags(cpu_flags);
 		return 0;
 	}
@@ -953,7 +960,7 @@ void *sys_sleepon(struct blocker *so, unsigned int *tout) {
 		}
 		so->wakeup_tic=0;
 	}
-	DEBUGP(DLEV_SCHED,"sys sleepon woke up %x task: %s\n", so, current->name);
+//	DEBUGP(DLEV_SCHED,"sys sleepon woke up %x task: %s\n", so, current->name);
 	return so;
 }
 
@@ -985,6 +992,7 @@ void *sys_sleepon_update_list(struct blocker *b, struct blocker_list *bl_ptr) {
 	if (!rc) { 
 		/* return 0, means no sleep */
 		/* link out the blocker */
+		cpu_flags=disable_interrupts();
 		pprev=&bl_ptr->first;
 		tmp=bl_ptr->first;
 		while(tmp) {
@@ -996,6 +1004,7 @@ void *sys_sleepon_update_list(struct blocker *b, struct blocker_list *bl_ptr) {
 			pprev=&tmp->next2;
 			tmp=tmp->next2;
 		}
+		restore_cpu_flags(cpu_flags);
 		if (tmp==b) {
 			sys_printf("sleep_list: failed, linked out blocker\n");
 		} else {
@@ -1333,7 +1342,7 @@ void start_sys(void) {
 	t->state=TASK_STATE_READY;
 	t->prio_flags=3;
 	stackp=((unsigned long int)t)+4096;
-	t->estack=((unsigned long int)t)+2048;
+	t->estack=(void *)(((unsigned long int)t)+2048);
 	stackp=stackp-8;
 	strcpy((void *)stackp,"usart0");
 	setup_return_stack(t,(void *)stackp,(unsigned long int)usr_init,0, (void *)stackp, (void *)8);

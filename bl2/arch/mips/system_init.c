@@ -1,8 +1,12 @@
 
 #include <sys.h>
+#include <string.h>
 
 extern unsigned long __bss_start__;
 extern unsigned long __bss_end__;
+
+void set_asid(unsigned int asid);
+void nand_load(int offs, int size, unsigned char *dst);
 
 struct address_space kernel_asp = {
 .pgd	= 0,
@@ -49,12 +53,12 @@ void *sys_sbrk(struct task *t, long int incr) {
 }
 
 int sys_brk(struct task *t, void *nbrk) {
-	if (nbrk<0x10000000) return -1;
+	if (((unsigned long int)nbrk)<0x10000000) return -1;
 
-	if (t->asp->brk>nbrk) {
+	if (t->asp->brk>((unsigned long int)nbrk)) {
 		sys_printf("brk reduce: check for page free\n");
 	}
-	t->asp->brk=nbrk;
+	t->asp->brk=((unsigned long int)nbrk);
 	return 0;
 }
 
