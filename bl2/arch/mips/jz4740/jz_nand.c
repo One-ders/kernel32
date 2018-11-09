@@ -44,8 +44,8 @@ struct partition {
 };
 
 static struct partition partitions[] = {
-	{0, 262144},        /* 0-0x3ffff       */
-	{262144, 393216},   /* 0x40000-0x9ffff */
+	{0, 0x60000},
+	{0x80000, 0xa0000},
 };
 
 #define NAND_DATAPORT   0xb8000000

@@ -154,6 +154,6 @@ $(OBJ)/usr/sys_cmd: $(TOP)/usr/sys_cmd
 
 
 clean:
-	rm -rf $(OBJECTS) uCore uCore.bin uCore.img uroot
+	rm -rf $(OBJECTS) uCore uCore.bin uCore.img uroot rootf.img
 	rm -rf tmp obj *.o
 	$(MAKE) -C ipl clean
