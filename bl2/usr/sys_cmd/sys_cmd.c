@@ -353,7 +353,7 @@ static int nand_fnc(int argc, char **argv, struct Env *env) {
 	if (cmd=='r') {  // read command
 		unsigned char vbuf[4096];
 		unsigned int nbytes=16;
-		int i=0,j;
+		int i=0,j,k;
 		unsigned int nwords;
 		int rc;
 
@@ -362,16 +362,24 @@ static int nand_fnc(int argc, char **argv, struct Env *env) {
 			goto out;
 		}
 
-		rc=io_control(fd,NAND_READ_PAGE,vbuf,2048);
-		nwords=((rc+3)>>2);
+		rc=io_control(fd,NAND_READ_RAW,vbuf,2048+64);
+//		nwords=((rc+3)>>2);
+		nwords=2048>>2;
 		while(i<nwords) {
 			fprintf(env->io_fd,"%08x:\t",address+(i<<2));
 			for(j=0;(j<4)&&i<nwords;i++,j++) {
-				if (rc<0) {
-					rc=-11;
-					goto out;
-				}
 				fprintf(env->io_fd,"%08x ", ((unsigned int *)vbuf)[i]);
+			}
+			fprintf(env->io_fd,"\n");
+		}
+		fprintf(env->io_fd, "=========== OOB Data ===========\n");
+		nwords=64>>2;
+		k=i;
+		i=0;
+		while(i<nwords) {
+			fprintf(env->io_fd,"%08x:\t",(i<<2));
+			for(j=0;(j<4)&&i<nwords;i++,j++) {
+				fprintf(env->io_fd,"%08x ", ((unsigned int *)vbuf)[i+k]);
 			}
 			fprintf(env->io_fd,"\n");
 		}

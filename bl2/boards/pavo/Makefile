@@ -29,7 +29,7 @@ uCore.img: tmp/fot5 usr.bin
 	rm -rf uroot
 	mkdir uroot
 	cp obj/usr/sys_cmd/sys_cmd uroot/init
-	mkyaffs2image uroot rootf.img
+	mkyaffs2image 1 uroot rootf.img
 
 tmp/fot5: tmp/fot4
 	dd if=tmp/fot4 of=tmp/fot5 ibs=4096 count=$(nblock)

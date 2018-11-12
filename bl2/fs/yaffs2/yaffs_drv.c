@@ -24,20 +24,25 @@ unsigned yaffs_trace_mask =
 
 
 void yaffsfs_SetError(int err) {
+	sys_printf("yaffs set error: %d\n", err);
 	yaffs_errno=err;
 }
 
 int yaffsfs_GetLastError(void) {
+	sys_printf("yaffs get error -> %d\n",yaffs_errno);
 	return yaffs_errno;
 }
 
 void yaffsfs_Lock(void) {
+	sys_printf("yaffs lock\n");
 }
 
 void yaffsfs_Unlock(void) {
+	sys_printf("yaffs unlock\n");
 }
 
 unsigned int yaffsfs_CurrentTime(void) {
+	sys_printf("yaffs currentTime\n");
 	return 0;
 }
 
@@ -199,6 +204,13 @@ loop:	SWAPINIT(a, es);
 //
 //
 
+struct context {
+	struct driver *drv;
+	struct device_handle *dh;
+};
+
+static struct context ctx;
+	
 static int yaffs_nand_write(struct yaffs_dev *dev, int nand_chunk,
                                    const unsigned char *data, 
 					int data_len,
@@ -209,15 +221,51 @@ static int yaffs_nand_write(struct yaffs_dev *dev, int nand_chunk,
 	return 0;
 }
 
-static int yaffs_nand_read(struct yaffs_dev *dev, int nand_chunk,
+
+static int yaffs_nand_read(struct yaffs_dev *dev, 
+					int nand_chunk,
                                    unsigned char *data, 
 					int data_len,
                                    unsigned char *oob, 
 					int oob_len,
                                    enum yaffs_ecc_result *ecc_result_out) {
 
-	sys_printf("yaffs_nand_read\n");
-	return 0;
+	struct context *ctx=(struct context *)dev->driver_context;
+	struct driver *nand_drv=ctx->drv;
+	struct device_handle *dh=ctx->dh;
+	struct nand_read_data nrd;
+	unsigned int ecc_info;
+	unsigned char tmp_oobbuf[64];
+//	sys_printf("yaffs_nand_read: chunk %d, databuf %x, blen %d, oob_buf %x, blen %d\n", nand_chunk, data, data_len, oob, oob_len);
+
+	nrd.page=nand_chunk;
+	nrd.dbuf=data;
+	nrd.dbuf_size=data_len;
+	nrd.oob_buf=tmp_oobbuf;
+	nrd.oob_buf_size=64;
+	nrd.ecc_info=&ecc_info;
+
+	nand_drv->ops->control(dh,NAND_READ,&nrd,sizeof(nrd));
+
+//	if (data) {
+//		unsigned int *bdata=(unsigned int *)data;
+//		sys_printf("nand_read: first data ints %x:%x\n",
+//			bdata[0], bdata[1]);
+//	}
+	
+	if (oob) {
+//		unsigned int *boob=(unsigned int *)oob;
+		memcpy(oob,&tmp_oobbuf[2],oob_len);   // bytes 2-38 free
+//		sys_printf("nand_read: oob data ints %x:%x:%x:%x:%x:%x\n",
+//			boob[0], boob[1], boob[2], boob[3],
+//			boob[4], boob[5]);
+	}
+
+	if (ecc_result_out) {
+		*ecc_result_out=YAFFS_ECC_RESULT_NO_ERROR;
+	}
+	
+	return YAFFS_OK;
 }
 
 static int yaffs_nand_erase(struct yaffs_dev *dev, int block_no) {
@@ -231,29 +279,32 @@ static int yaffs_nand_mark_bad(struct yaffs_dev *dev, int block_no) {
 }
 
 static int yaffs_nand_check_bad(struct yaffs_dev *dev, int block_no) {
-	sys_printf("yaffs_nand_check_bad\n");
-	return 0;
+	struct context *ctx=(struct context *)dev->driver_context;
+	struct driver *nand_drv=ctx->drv;
+	struct device_handle *dh=ctx->dh;
+	int rc;
+//	sys_printf("yaffs_nand_check_bad: block %d\n", block_no);
+
+	rc=nand_drv->ops->control(dh, NAND_CHECK_BLOCK, 
+				&block_no,sizeof(block_no));
+	if (rc) {
+		return YAFFS_FAIL;
+	}
+	return YAFFS_OK;
 }
 
 static int yaffs_nand_init(struct yaffs_dev *dev) {
 	sys_printf("yaffs_nand_init\n");
-	return 0;
+	return YAFFS_OK;
 }
 
 static int yaffs_nand_deinit(struct yaffs_dev *dev) {
 	sys_printf("yaffs_nand_deinit\n");
-	return 0;
+	return YAFFS_OK;
 }
 
 
-struct nand_context {
-	void *bub;
-	unsigned char *buffer;
-};
-
 static struct yaffs_dev ydev;
-static struct nand_context ctxt;
-static unsigned char buffer[64];
 
 int mount_nand(char *nand_dev_name) {
 	struct driver *nand_dev=driver_lookup(nand_dev_name);
@@ -261,30 +312,57 @@ int mount_nand(char *nand_dev_name) {
 	struct nand_config nand_cfg;
 	struct yaffs_param *param;
 	struct yaffs_driver *ydrv=&ydev.drv;
+	int rc;
+	struct yaffs_stat stbuf;
+	yaffs_DIR *dirp;
 
 	memset(&ydev,0,sizeof(ydev));
+	memset(&stbuf,0,sizeof(stbuf));
 
-	if (!nand_dev) return -1;
-	dh=nand_dev->ops->open(0, NULL, 0);
-	if (!dh) return -1;
+	sys_printf("mount_nand: enter\n");
+
+	if (!nand_dev) {
+		sys_printf("nand dev %s, not found\n", nand_dev_name);
+		return -1;
+	}
+	dh=nand_dev->ops->open(nand_dev->instance, NULL, 0);
+	if (!dh) {
+		sys_printf("nand_dev open failed\n");
+		return -1;
+	}
 
 	if (nand_dev->ops->control(dh,NAND_GET_CONFIG,&nand_cfg,sizeof(nand_cfg))<0) {
+		sys_printf("NAND_GET_CONFIG: failed\n");
 		nand_dev->ops->close(dh);
 		return -1;
 	}
 
 	param=&ydev.param;
 
-	param->name="bajs";
-	param->total_bytes_per_chunk=nand_cfg.page_size*nand_cfg.pages_per_block;
+//	param->name="bajs";
+	param->name="/";
+	param->total_bytes_per_chunk=nand_cfg.page_size;
+	param->spare_bytes_per_chunk=nand_cfg.oob_size;
 	param->chunks_per_block=nand_cfg.pages_per_block;
-	param->n_reserved_blocks=0;
+	param->n_reserved_blocks=2;
 	param->start_block=0;
 	param->end_block=nand_cfg.n_blocks-1;
 	param->is_yaffs2=1;
-	param->use_nand_ecc=1;
+//	param->use_nand_ecc=0;
+	param->no_tags_ecc=1;
 	param->n_caches=10;
-	param->stored_endian=2;
+	param->stored_endian=1;
+	param->inband_tags=0;
+
+#if 0
+	sys_printf("bpc=%d,sbpc=%d,cpb=%d,resb=%d,sb=%d,eb=%d\n",
+		param->total_bytes_per_chunk,
+		param->spare_bytes_per_chunk,
+		param->chunks_per_block,
+		param->n_reserved_blocks,
+		param->start_block,
+		param->end_block);
+#endif
 
 
 	ydrv->drv_write_chunk_fn=yaffs_nand_write;
@@ -295,11 +373,35 @@ int mount_nand(char *nand_dev_name) {
 	ydrv->drv_initialise_fn	=yaffs_nand_init;
 	ydrv->drv_deinitialise_fn=yaffs_nand_deinit;
 
-	ctxt.bub = 0;
-	ctxt.buffer=buffer;
-	ydev.driver_context=(void *)&ctxt;
+	ctx.drv=nand_dev;
+	ctx.dh=dh;
+
+	ydev.driver_context=(void *)&ctx;
 	
 	yaffs_add_device(&ydev);
+
+	sys_printf("mount device\n");
+//	yaffs_mount("bajs");
+	yaffs_mount_reldev(&ydev);
+
+	dirp=yaffs_opendir("/");
+	if (dirp) {
+		struct yaffs_dirent *d=yaffs_readdir(dirp);
+		while(d) {
+			sys_printf("found entry %s\n", d->d_name);
+			d=yaffs_readdir(dirp);
+		}
+	} else {
+		sys_printf("opendir failed\n");
+	}
+
+	rc=yaffs_stat("/init", &stbuf);
+
+	if (!rc) {
+		sys_printf("sizeof of init is %d bytes\n", stbuf.st_size);
+	}
+
+	
 
 	return 0;
 }

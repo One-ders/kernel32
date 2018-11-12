@@ -44,8 +44,8 @@ struct partition {
 };
 
 static struct partition partitions[] = {
-	{0, 0x60000},
-	{0x80000, 0xa0000},
+	{0, 	0x80000},	// 2 blocks
+	{0x80000, 0x280000},	// 10 blocks
 };
 
 #define NAND_DATAPORT   0xb8000000
@@ -217,6 +217,7 @@ static int nand_read_page(int block, int page, unsigned char *dst, unsigned char
 		stat=REG_NFINTS;
 		if (stat&NFINTS_ERR) {
 			if (stat&NFINTS_UNCOR) {
+				return -1;
 			} else {
 				unsigned int errcnt, index, mask;
 
@@ -258,7 +259,7 @@ static void nand_read(int offs, int size, unsigned char *dst) {
 
 	block=offs/block_size;
 	pagecopy_count=0;
-	pages=((size-1)/page_size)+1;
+	pages=((2048-1)/page_size)+1;
         page_inblock=(offs/page_size)%page_per_block;
 
 
@@ -275,8 +276,10 @@ static void nand_read(int offs, int size, unsigned char *dst) {
 			nand_read_page(block,page_inblock,dst,oob_buf);
 			dst+=page_size;
 			pagecopy_count++;
-			if (pagecopy_count>pages) break;
+			if (pagecopy_count>=pages) break;
 		}
+
+		memcpy(dst,oob_buf,64);
 
 		page_inblock=0;
 		block++;
@@ -284,13 +287,91 @@ static void nand_read(int offs, int size, unsigned char *dst) {
 	__nand_disable();
 }
 
+static unsigned char dumbuf[4096];
+
+static void nand_read_spec(unsigned int p_page, 
+				unsigned char *p_data_buf,
+				int p_data_buf_size,
+				unsigned char *p_oob,
+				int p_oob_size,
+				unsigned int *ecc_info) {
+	int block;
+	int pagecopy_count;
+	int page_inblock;
+	int pages;
+
+	__nand_enable();
+
+	block=p_page/page_per_block;
+	pagecopy_count=0;
+	pages=((p_data_buf_size-1)/page_size)+1;
+        page_inblock=p_page%page_per_block;
+
+
+	while (pagecopy_count < pages) {
+		nand_read_oob(block*page_per_block+CFG_NAND_BADBLOCK_PAGE,
+				oob_buf, oob_size);
+
+//		if (oob_buf[bad_block_pos]!=0xff) {
+//			block++;
+//			continue;
+//		}
+		if (!p_data_buf) {
+			p_data_buf=dumbuf;
+		}
+
+		for (;page_inblock<page_per_block;page_inblock++) {
+			if (nand_read_page(block,page_inblock,p_data_buf,oob_buf)<0) {
+				sys_printf("jz_nand:ecc_error on nand page\n");
+				__nand_disable();
+				return;
+			}
+
+			if (p_oob) {
+				memcpy(p_oob,oob_buf,p_oob_size);
+			}
+
+			p_data_buf+=page_size;
+			pagecopy_count++;
+			if (pagecopy_count>=pages) break;
+		}
+
+		page_inblock=0;
+		block++;
+	}
+	__nand_disable();
+
+	if (ecc_info) *ecc_info=0;
+}
+
+static int nand_check_block(unsigned int block) {
+
+	__nand_enable();
+
+
+	nand_read_oob(block*page_per_block+CFG_NAND_BADBLOCK_PAGE,
+				oob_buf, oob_size);
+
+	if (oob_buf[bad_block_pos]!=0xff) {
+		__nand_disable();
+		sys_printf("nand_check_block: block %d is bad\n", block);
+		return 1;
+	}
+
+	__nand_disable();
+//	sys_printf("nand_check_block: block %d is ok\n", block);
+	return 0;
+}
+
+
+
 static struct device_handle *nand_open(void *instance, DRV_CBH callback, void *userdata) {
 	struct userdata *ud=get_userdata();
 	if (!ud) return 0;
 	ud->fpos=0;
 	ud->partition=(unsigned int)instance;
 
-	return (struct device_handle *)ud;
+	return &ud->dh;
 }
 
 static int nand_close(struct device_handle *udh) {
@@ -302,11 +383,28 @@ static int nand_control(struct device_handle *dh, int cmd, void *arg1, int arg2)
 	struct userdata *udh=(struct userdata *)dh;
 
 	switch(cmd) {
-		case NAND_READ_PAGE: {
+		case NAND_READ_RAW: {
 			nand_read(ud->fpos+partitions[udh->partition].start,
 				  arg2,
 				  arg1);
-			ud->fpos=arg2;
+			ud->fpos+=2048;
+			return arg2;
+		}
+		case NAND_READ: {
+			struct nand_read_data *nrd=(struct nand_read_data *)arg1;
+			if (nrd->dbuf) {
+				if (nrd->dbuf_size!=2048) {
+					sys_printf("nand_read: size is %d expect 2048\n",
+								nrd->dbuf_size);
+				}
+			}
+
+//			sys_printf("nand_read_spec: page %d, buf %x, size %d\n",
+//					nrd->page, nrd->dbuf, nrd->dbuf_size);
+			nand_read_spec(nrd->page+(partitions[udh->partition].start/page_size),
+						nrd->dbuf,nrd->dbuf_size,
+						nrd->oob_buf, nrd->oob_buf_size,
+						nrd->ecc_info);
 			return arg2;
 		}
 		case IO_LSEEK: {
@@ -334,7 +432,12 @@ static int nand_control(struct device_handle *dh, int cmd, void *arg1, int arg2)
 			nand_config->bad_block_mark=bad_block_pos;
 			nand_config->oob_size=oob_size;
 			nand_config->ecc_count=ecc_count;
+			sys_printf("nand_get_cfg: ps=%d, ppb=%d, nb=%d, bbp=%d, sbpb=%d, eccc=%d, p_start=%d, p_size=%d, internal_partition=%d\n",
+				page_size,page_per_block, nand_config->n_blocks, bad_block_pos, oob_size, ecc_count, partitions[udh->partition].start, partitions[udh->partition].size, udh->partition);
 			return 0;
+		}
+		case NAND_CHECK_BLOCK: {
+			return nand_check_block(*((unsigned int *)arg1));
 		}
 	}
 	return -1;

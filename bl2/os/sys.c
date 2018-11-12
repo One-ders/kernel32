@@ -1321,6 +1321,8 @@ extern int switch_flag;
 //extern int __usr_main(int argc, char **argv);
 extern void *usr_init;
 
+int mount_nand(char *nand_dev_name);
+
 void start_sys(void) {
 	
 	unsigned long int stackp;
@@ -1337,6 +1339,7 @@ void start_sys(void) {
 		while(1);
 	}
 #endif
+	mount_nand("nand1");
 
 	t->name="sys_mon";
 	t->state=TASK_STATE_READY;

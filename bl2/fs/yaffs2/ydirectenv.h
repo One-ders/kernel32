@@ -40,6 +40,7 @@ void yaffs_bug_fn(const char *file_name, int line_no);
 #define YUCHAR unsigned char
 #define _Y(x) x
 
+#define LOFF_T_32_BIT
 #ifndef Y_LOFF_T
 #define Y_LOFF_T loff_t
 #endif
