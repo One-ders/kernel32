@@ -56,8 +56,8 @@ uCore.bin: uCore
 ipl/boot.bin:
 	$(MAKE) -C ipl
 
-uCore: os version mips jz c_start.o mm stddrv stdlib fb fs
-	$(LD) $(LDFLAGS) -o $@ $(OBJ)/lib/init_sect.o $(OBJ)/lib/jz.o c_start.o $(OBJ)/version.o $(OBJ)/lib/mips.o $(OBJ)/lib/os.o $(OBJ)/lib/mm.o $(OBJ)/stddrv/stddrv.o $(OBJ)/stdlib/stdlib.o $(OBJ)/lib/fb.o $(OBJ)/lib/fs.o $(OBJ)/lib/end_sect.o -L/opt/cross/lib/gcc/mipsel-linux/8.1.0 -lgcc
+uCore: os version mips jz c_start.o mm stddrv stdlib fb fs bin_fmt
+	$(LD) $(LDFLAGS) -o $@ $(OBJ)/lib/init_sect.o $(OBJ)/lib/jz.o c_start.o $(OBJ)/version.o $(OBJ)/lib/mips.o $(OBJ)/lib/os.o $(OBJ)/lib/mm.o $(OBJ)/stddrv/stddrv.o $(OBJ)/stdlib/stdlib.o $(OBJ)/lib/fb.o $(OBJ)/lib/fs.o $(OBJ)/lib/bin_fmt.o $(OBJ)/lib/end_sect.o -L/opt/cross/lib/gcc/mipsel-linux/8.1.0 -lgcc
 
 #traps.o: ../../mips/jz4740/traps.S
 #	$(CC) $(CFLAGS) -c -o $@ $<
@@ -117,6 +117,13 @@ fs: $(OBJ)/fs/yaffs2
 	CFLAGS="$(CFLAGS)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
 
 $(OBJ)/fs/yaffs2: $(TOP)/fs/yaffs2
+	mkdir -p $@
+	lndir $< $@
+
+bin_fmt: $(OBJ)/bin_fmt/elf
+	CFLAGS="$(CFLAGS)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
+
+$(OBJ)/bin_fmt/elf: $(TOP)/bin_fmt/elf
 	mkdir -p $@
 	lndir $< $@
 

@@ -186,6 +186,7 @@ void switch_now(void);
 void init_irq(void);
 void config_sys_tic(unsigned int ms);
 void board_reboot(void);
+void wait_irq(void);
 
 unsigned int get_svc_number(void *sp);
 unsigned long int get_svc_arg(void *sp, int arg_ix);

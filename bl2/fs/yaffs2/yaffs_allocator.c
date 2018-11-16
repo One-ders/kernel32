@@ -14,7 +14,7 @@
 #include "yaffs_guts.h"
 #include "yaffs_trace.h"
 #include "yportenv.h"
-
+#include "io.h"
 /*
  * Each entry in yaffs_tnode_list and yaffs_obj_list hold blocks
  * of approx 100 objects that are themn allocated singly.

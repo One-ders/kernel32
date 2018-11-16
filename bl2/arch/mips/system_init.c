@@ -1,12 +1,16 @@
 
 #include <sys.h>
+#include "yaffs_guts.h"
+#include "yaffs_osglue.h"
+
 #include <string.h>
+#include <elf.h>
 
 extern unsigned long __bss_start__;
 extern unsigned long __bss_end__;
 
 void set_asid(unsigned int asid);
-void nand_load(int offs, int size, unsigned char *dst);
+//void nand_load(int offs, int size, unsigned char *dst);
 
 struct address_space kernel_asp = {
 .pgd	= 0,
@@ -47,6 +51,7 @@ void *sys_sbrk(struct task *t, long int incr) {
 	unsigned long int cur=t->asp->brk;
 	if (incr<0) {
 		sys_printf("sbrk reduce: check for page free\n");
+		return 0;
 	}
 	t->asp->brk+=incr;
 	return (void *)cur;
@@ -57,12 +62,13 @@ int sys_brk(struct task *t, void *nbrk) {
 
 	if (t->asp->brk>((unsigned long int)nbrk)) {
 		sys_printf("brk reduce: check for page free\n");
+		return 0;
 	}
 	t->asp->brk=((unsigned long int)nbrk);
 	return 0;
 }
 
-
+#if 0
 unsigned char to_val(char n) {
 	switch (n) {
 		case '0':
@@ -106,7 +112,9 @@ int handle_srec_header(unsigned char *r, int len) {
 //	sys_printf("srec header: %s\n", &bbuf[2]);
 	return 0;
 }
+#endif
 
+#if 0
 int handle_srec_memline(unsigned char *r, int len, struct task *t) {
 	char bbuf[len];
 	unsigned long addr;
@@ -131,7 +139,9 @@ int handle_srec_memline(unsigned char *r, int len, struct task *t) {
 		p++;
 	}
 }
+#endif
 
+#if 0
 int handle_srec_start_addr(unsigned char *r, int len) {
 	unsigned long addr;
 	int i;
@@ -142,8 +152,9 @@ int handle_srec_start_addr(unsigned char *r, int len) {
 
 //	sys_printf("start_addr: %x\n", addr);
 }
+#endif
 
-
+#if 0
 static unsigned char sbuf[256];
 
 int parse_srec(unsigned char *srec_buf, int *ofs, struct task *t) {
@@ -204,9 +215,11 @@ again:
 	goto again;
 	return 0;
 }
+#endif
 
 extern unsigned long int *curr_pgd;
 
+#if 0
 int load_init(struct task *t) {
 	unsigned char buf[5096];
 	unsigned int nand_pos=(unsigned int)&__bss_start__;
@@ -235,6 +248,54 @@ int load_init(struct task *t) {
 		}
 		nand_pos+=4096;
 	}
+	current->asp->brk=brk_save;
+	curr_pgd=current->asp->pgd;  /* restore page table direcotry */
+	set_asid(current->asp->id);
+	return 0;
+}
+#endif
+
+int load_init(struct task *t) {
+//	unsigned char buf[5096];
+//	unsigned int nand_pos=(unsigned int)&__bss_start__;
+	unsigned long brk_save;
+//	int ofs=0;
+	
+	struct elf_phdr phdr;
+
+	int rc=elf_get_first_phdr("/init",&phdr);
+	if (rc<0) {
+		sys_printf("could not open init\n");
+		return -1;
+	}
+
+	t->asp->brk=0x10000000;
+	t->asp->mmap_vaddr=0x10000000;
+	brk_save=current->asp->brk;
+	current->asp->brk=t->asp->brk;
+
+	curr_pgd=t->asp->pgd;  /* repoint page table directory while loading */
+	set_asid(t->asp->id);
+
+	while(1) {
+		sys_printf("sys_brk: at %x\n", phdr.p.p_vaddr+phdr.p.p_memsz);
+	        sys_brk(t,(void *)(phdr.p.p_vaddr+phdr.p.p_memsz));
+		sys_lseek(phdr.fd,phdr.p.p_offset,SEEK_SET);
+		sys_printf("load: at %x size %x\n", phdr.p.p_vaddr, phdr.p.p_memsz);
+	        sys_read(phdr.fd,(void *)phdr.p.p_vaddr,phdr.p.p_memsz);
+
+		rc=elf_get_next_phdr(&phdr);
+		if (rc!=1) break;
+		if (phdr.p.p_memsz-phdr.p.p_filesz) {
+			sys_printf("zero out %d bytes at %x\n",
+				phdr.p.p_memsz-phdr.p.p_filesz,
+				phdr.p.p_vaddr+phdr.p.p_memsz);
+			memset((void *)phdr.p.p_vaddr+phdr.p.p_memsz,0,phdr.p.p_memsz-phdr.p.p_filesz);
+		}
+	}
+
+	elf_close(&phdr);
+
 	current->asp->brk=brk_save;
 	curr_pgd=current->asp->pgd;  /* restore page table direcotry */
 	set_asid(current->asp->id);

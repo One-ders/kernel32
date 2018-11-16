@@ -84,7 +84,6 @@ struct iattr {
 #elif defined CONFIG_YAFFS_DIRECT
 
 /* Direct interface */
-#include <io.h>
 #include "ydirectenv.h"
 
 #elif defined CONFIG_YAFFS_UTIL
@@ -302,6 +301,7 @@ struct iattr {
 #ifndef S_IEXEC
 #define	S_IEXEC	0000100
 #endif
+
 
 #else
 #include <errno.h>

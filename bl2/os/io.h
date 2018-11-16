@@ -44,6 +44,126 @@ typedef unsigned int fd_set;
 #define SEEK_CUR	1
 #define SEEK_END	2
 
+#ifndef O_RDONLY
+#define O_RDONLY        00
+#endif
+
+#ifndef O_WRONLY
+#define O_WRONLY        01
+#endif
+
+#ifndef O_RDWR
+#define O_RDWR          02
+#endif
+
+#ifndef O_CREAT
+#define O_CREAT         0100
+#endif
+
+#ifndef O_EXCL
+#define O_EXCL          0200
+#endif
+
+#ifndef O_TRUNC
+#define O_TRUNC         01000
+#endif
+#ifndef O_APPEND
+#define O_APPEND        02000
+#endif
+
+#ifndef SEEK_SET
+#define SEEK_SET        0
+#endif
+
+#ifndef SEEK_CUR
+#define SEEK_CUR        1
+#endif
+
+#ifndef SEEK_END
+#define SEEK_END        2
+#endif
+
+#ifndef EBUSY
+#define EBUSY   16
+#endif
+
+#ifndef ENODEV
+#define ENODEV  19
+#endif
+
+#ifndef EINVAL
+#define EINVAL  22
+#endif
+
+#ifndef ENFILE
+#define ENFILE  23
+#endif
+
+#ifndef EBADF
+#define EBADF   9
+#endif
+
+#ifndef EACCES
+#define EACCES  13
+#endif
+
+#ifndef EXDEV
+#define EXDEV   18
+#endif
+#ifndef ENOENT
+#define ENOENT  2
+#endif
+
+#ifndef ENOSPC
+#define ENOSPC  28
+#endif
+
+#ifndef EROFS
+#define EROFS   30
+#endif
+
+#ifndef ERANGE
+#define ERANGE 34
+#endif
+
+#ifndef ENODATA
+#define ENODATA 61
+#endif
+
+#ifndef ENOTEMPTY
+#define ENOTEMPTY 39
+#endif
+
+#ifndef ENAMETOOLONG
+#define ENAMETOOLONG 36
+#endif
+
+#ifndef ENOMEM
+#define ENOMEM 12
+#endif
+
+#ifndef EFAULT
+#define EFAULT 14
+#endif
+
+#ifndef EEXIST
+#define EEXIST 17
+#endif
+
+#ifndef ENOTDIR
+#define ENOTDIR 20
+#endif
+
+#ifndef EISDIR
+#define EISDIR 21
+#endif
+
+#ifndef ELOOP
+#define ELOOP   40
+#endif
+
+
+
 void init_io(void);
 int io_add_c(const char c);
 int io_setpolled(int enabled);
@@ -51,4 +171,9 @@ int io_setpolled(int enabled);
 int sys_printf(const char *format, ...);
 
 unsigned long int strtoul(char *str, char **endp, int base);
+
+#define sys_read(a,b,c) yaffs_read(a,b,c)
+#define sys_lseek(a,b,c) yaffs_lseek(a,b,c)
+#define sys_open yaffs_open
+#define sys_close(a) yaffs_close(a)
 

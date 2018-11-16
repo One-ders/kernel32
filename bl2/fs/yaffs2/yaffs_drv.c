@@ -382,8 +382,9 @@ int mount_nand(char *nand_dev_name) {
 
 	sys_printf("mount device\n");
 //	yaffs_mount("bajs");
-	yaffs_mount_reldev(&ydev);
+	rc=yaffs_mount_reldev(&ydev);
 
+#if 0
 	dirp=yaffs_opendir("/");
 	if (dirp) {
 		struct yaffs_dirent *d=yaffs_readdir(dirp);
@@ -400,10 +401,9 @@ int mount_nand(char *nand_dev_name) {
 	if (!rc) {
 		sys_printf("sizeof of init is %d bytes\n", stbuf.st_size);
 	}
+#endif
 
-	
-
-	return 0;
+	return rc;
 }
 
 static struct device_handle *yaffsfs_open(void *inst, DRV_CBH cb, void *dum) {

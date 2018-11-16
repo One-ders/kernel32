@@ -1326,12 +1326,17 @@ int mount_nand(char *nand_dev_name);
 void start_sys(void) {
 	
 	unsigned long int stackp;
+	struct task *t;
+
 #ifdef MMU
-	struct task *t=create_user_context();
+	if(mount_nand("nand1")<0) {
+		sys_printf("could not mount nand\n");
+	}
+	t=create_user_context();
 	sys_printf("enter start_sys: got task ptr %x\n", t);
 	load_init(t);
 #else
-	struct task *t=(struct task *)get_page();	
+	t=(struct task *)get_page();
 	memset(t,0,sizeof(struct task));
 	if (allocate_task_id(t)<0) {
 		sys_printf("proc table full\n");
@@ -1339,7 +1344,6 @@ void start_sys(void) {
 		while(1);
 	}
 #endif
-	mount_nand("nand1");
 
 	t->name="sys_mon";
 	t->state=TASK_STATE_READY;
@@ -1362,7 +1366,9 @@ void start_sys(void) {
 	sys_printf("leaving start_sys: got task ptr %x\n", t);
 	clear_all_interrupts();
 	switch_on_return();  /* will switch in the task on return from next irq */
-	while(1);
+	while(1) {
+		wait_irq();
+	}
 
 //	thread_create(sys_mon,"usart0",0,3,"sys_mon");
 ////	thread_create(sys_mon,"stterm0",3,"sys_mon");

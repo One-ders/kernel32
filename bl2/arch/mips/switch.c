@@ -457,6 +457,12 @@ int mapmem(struct task *t, unsigned long int vaddr, unsigned long int paddr, uns
 	return 0;
 }
 
+
+void wait_irq(void) {
+	asm volatile ("wait\t\n\t"
+			: : );
+}
+
 int task_sleepable(void) {
 	return (irq_lev==1?1:0);
 }
