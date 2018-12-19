@@ -72,9 +72,9 @@ void c_start(void *bsp_funcs) {
 		p_str=*(((P_STR *)bsp_funcs)+1);
 	}
 
-	sys_printf("in c_start, udata0=%x\n",udata[0].drv_data);
-	sys_printf("bsp_funcs at: %x, p_char at %x, p_str at %x\n",
-			bsp_funcs, p_char, p_str);
+//	sys_printf("in c_start, udata0=%x\n",udata[0].drv_data);
+//	sys_printf("bsp_funcs at: %x, p_char at %x, p_str at %x\n",
+//			bsp_funcs, p_char, p_str);
 
 	/* shutoff BEV and ERL*/
 	asm(	"mfc0	$t0,$12\n\t"

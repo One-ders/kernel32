@@ -30,6 +30,12 @@ void set_svc_ret(void *sp, long int val)  {
 	ff->v0=val;
 }
 
+void set_svc_lret(void *sp, long int val)  {
+	struct fullframe *ff=(struct fullframe *)sp;
+	ff->a3=val;
+}
+
+
 void setup_return_stack(struct task *t, void *stackp_v,
 			unsigned long int fnc,
 			unsigned long int ret_fnc,
@@ -39,7 +45,7 @@ void setup_return_stack(struct task *t, void *stackp_v,
 	unsigned long int *stackp=(unsigned long int *)stackp_v;
 	unsigned long int v_stack;
 
-	sys_printf("t at %x, stackp at %x\n",
+	DEBUGP(DSYS_SCHED,DLEV_INFO, "t at %x, stackp at %x\n",
 			t, stackp);
 	if (t->asp->ref==1) {
 		v_stack = 0x80000000;

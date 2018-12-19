@@ -36,6 +36,18 @@
 
 #include <string.h>
 
+struct iovec {
+	void *iov_base;
+	size_t iov_len;
+};
+
+typedef long int time_t;
+
+struct timespec {
+	time_t tv_sec;
+	long int tv_nsec;
+};
+
 unsigned int sys_irqs;
 
 struct task * volatile ready[5];
@@ -45,6 +57,7 @@ struct task *troot =&main_task;
 struct task * volatile current = &main_task;
 
 
+#if 0
 struct task *t_array[256];
 
 void init_task_list() {
@@ -53,17 +66,26 @@ void init_task_list() {
                 t_array[i]=0;
         }
 }
+#endif
+
+CREATE_BITMAP(t_bp,512);
+CREATE_BITMAP(as_bp,256);
 
 int allocate_task_id(struct task *t) {
-        int i;
-        for(i=0;i<255;i++) {
-                if (!t_array[i]) {
-                        t_array[i]=t;
-                        t->id=i;
-                        return i;
-                }
-        }
-        return -1;
+        t->id=bitmap_alloc_first_free(t_bp);
+	return t->id;
+}
+
+void dealloc_task_id(int id) {
+	bitmap_dealloc(t_bp,id);
+}
+
+int allocate_as_id() {
+	return bitmap_alloc_first_free(as_bp);
+}
+
+void dealloc_as_id(int id)  {
+	bitmap_dealloc(as_bp,id);
 }
 
 struct task *lookup_task_for_name(char *task_name) {
@@ -111,22 +133,34 @@ void SysTick_Handler(void) {
 			if (prio>MAX_PRIO) prio=MAX_PRIO;
 			ASSERT(t->state!=TASK_STATE_RUNNING);
 			cpu_flags=disable_interrupts();
-			t->state=TASK_STATE_READY;
-			t->next=0;
-			b->next=0;
-			if (b->next2) {
-				sys_printf("systick: blocker have next2 link %x\n", b->next2);
-			}
-			if(prio<p) p=prio;
-			if (!ready[prio]) {
-				ready[prio]=t;
+			if (t->state==TASK_STATE_DEAD) {
+				t->next=0;
+				b->next=0;
+				sys_printf("\ntimer delete of dead process task = %s, page=%x\n",t->name,t);
+			        b=bnext;
+				restore_cpu_flags(cpu_flags);
+				free_asp_pages(t->asp);
+				dealloc_as_id(t->asp->id);
+				dealloc_task_id(t->id);
+				put_page(t);
 			} else {
-				ready_last[prio]->next=t;
+				t->state=TASK_STATE_READY;
+				t->next=0;
+				b->next=0;
+				if (b->next2) {
+					sys_printf("systick: blocker have next2 link %x\n", b->next2);
+				}
+				if(prio<p) p=prio;
+				if (!ready[prio]) {
+					ready[prio]=t;
+				} else {
+					ready_last[prio]->next=t;
+				}
+				ready_last[prio]=t;
+				restore_cpu_flags(cpu_flags);
+				DEBUGP(DSYS_SCHED,DLEV_INFO,"timer_wakeup: readying %s\n", t->name);
+				b=bnext;
 			}
-			ready_last[prio]=t;
-			restore_cpu_flags(cpu_flags);
-			DEBUGP(DLEV_SCHED,"timer_wakeup: readying %s\n", t->name);
-			b=bnext;
 		}
 		tqp->tq_out_first=tqp->tq_out_last=0;
 	}
@@ -137,7 +171,7 @@ void SysTick_Handler(void) {
 	}
 
 	if (GET_TMARK(current) && ready[GET_PRIO(current)]) {
-		DEBUGP(DLEV_SCHED,"time slice: switch out %s, switch in %s\n", current->name, ready[GET_PRIO(current)]->name);
+		DEBUGP(DSYS_SCHED,DLEV_INFO, "time slice: switch out %s, switch in %s\n", current->name, ready[GET_PRIO(current)]->name);
 		switch_on_return();
 		return;
 	}
@@ -196,10 +230,10 @@ int get_user_fd(struct driver *d, struct device_handle *dh) {
 }
 
 
-int close_drivers(void) {
-	struct user_fd *fdl=current->fd_list;
+int close_drivers(struct task *t) {
+	struct user_fd *fdl=t->fd_list;
 
-	current->fd_list=0;
+	t->fd_list=0;
 	while(fdl) {
 		struct user_fd *fdlnext=fdl->next;
 		fdl->driver->ops->close(fdl->dev_handle);
@@ -235,7 +269,7 @@ static int sys_drv_wakeup(struct device_handle *dh, int ev, void *user_ref) {
 	int fd=dh->user_data1;
 
 	if (task->sel_data_valid) {
-		DEBUGP(DLEV_SCHED,"wakeup descriptor %d in task %s for ev %d\n", fd, task->name,ev);
+		DEBUGP(DSYS_SCHED,DLEV_INFO,"wakeup descriptor %d in task %s for ev %d\n", fd, task->name,ev);
 		if (ev&EV_READ) {
 			(task->sel_data.rfds)|=(1<<fd);
 		}
@@ -271,6 +305,15 @@ out:
 	return 0;
 }
 
+void *alloc_kheap(struct task *t, unsigned int size) {
+	unsigned long int a=t->kheap;
+	if (a+size>(((unsigned long int)t)+2048)) {
+		return 0;
+	}
+	t->kheap=a+size;
+	return (void *)a;
+}
+
 void *handle_syscall(unsigned long int *svc_sp) {
 	unsigned int svc_number;
 
@@ -297,6 +340,9 @@ void *handle_syscall(unsigned long int *svc_sp) {
 			}
 
 			memset(t,0,sizeof(struct task));
+
+			t->kheap=(unsigned long int)(t+1);
+
 			if (allocate_task_id(t)<0) {
 				sys_printf("proc table full\n");
 				put_page(t);
@@ -324,7 +370,8 @@ void *handle_syscall(unsigned long int *svc_sp) {
 			setup_return_stack(t,(void *)stackp,(unsigned long int)tca->fnc,0,uval,(void *)8);
 
 			t->state=TASK_STATE_READY;
-			t->name=tca->name;
+			t->name=alloc_kheap(t,strlen(tca->name)+5);
+			sys_sprintf(t->name,"%s:%03d",tca->name,t->asp->id);
 			SET_PRIO(t,tca->prio);
 			t->next2=troot;
 			troot=t;
@@ -338,10 +385,10 @@ void *handle_syscall(unsigned long int *svc_sp) {
 			unmap_tmp_stack_page();
 
 			if (tca->prio<GET_PRIO(current)) {
-				DEBUGP(DLEV_SCHED,"Create task: %s, switch out %s\n", t->name, current->name);
+				DEBUGP(DSYS_SCHED,DLEV_INFO,"Create task: %s, switch out %s\n", t->name, current->name);
 				switch_on_return();
 			} else {
-				DEBUGP(DLEV_SCHED,"Create task: %s\n", t->name);
+				DEBUGP(DSYS_SCHED,DLEV_INFO,"Create task: %s\n", t->name);
 			}
 
 			set_svc_ret(svc_sp,0);
@@ -351,17 +398,79 @@ void *handle_syscall(unsigned long int *svc_sp) {
 		case SVC_KILL_SELF: {
 			if (current->state!=TASK_STATE_RUNNING) return 0;
 
-			close_drivers();
+			close_drivers(current);
 			current->state=TASK_STATE_DEAD;
 
-			DEBUGP(DLEV_SCHED,"kill self task: %s\n", current->name);
+			DEBUGP(DSYS_SCHED,DLEV_INFO,"kill self task: %s\n", current->name);
 			switch_on_return();
 			return 0;
 		}
-		case SVC_SLEEP: {
+		case SVC_KILL_PROC: {
+			char *name=(char *)get_svc_arg(svc_sp,0);
+			struct task *t=lookup_task_for_name(name);
+			struct task *t1=troot;
+			struct task **tprev=&troot;
+			struct address_space as;
+			struct address_space *asp;
+			int    killself=0;
+
+			DEBUGP(DSYS_SCHED,DLEV_INFO,"kill proc task: %s\n", t->name);
+
+			if (!t) {
+				set_svc_ret(svc_sp,-1);
+				return 0;
+			}
+
+			asp=t->asp;
+			as=*asp;
+
+			while(t1) {
+				struct task *tnext=t1->next2;
+				if (t1->asp==asp) {
+					if (t1->state==TASK_STATE_TIMER) {
+						close_drivers(t1);
+						*tprev=t1->next2;
+						t1->state=TASK_STATE_DEAD;
+					} else {
+						tprev=&t1->next2;
+					}
+				} else {
+					tprev=&t1->next2;
+				}
+				t1=tnext;
+			}
+			t1=troot;
+			while(t1) {
+				struct task *tnext=t1->next2;
+				if (t1->asp==asp) {
+					if (t1->state==TASK_STATE_DEAD) {
+						;
+					} else if (t1==current) {
+						killself=1;
+						sys_printf("kill self\n");
+					} else {
+						t1->state=TASK_STATE_DEAD;
+						close_drivers(t1);
+						sys_printf("found %s\n",t1->name);
+						dealloc_task_id(t1->id);
+						put_page(t1);
+					}
+				}
+				t1=tnext;
+			}
+//			free_asp_pages(&as);
+			if (killself) {
+				unsigned int tout=100;
+				sys_sleepon(&current->blocker,&tout);
+			}
+
+			switch_on_return();
+			return 0;
+		}
+		case SVC_MSLEEP: {
 			unsigned int tout=get_svc_arg(svc_sp,0);
 			if (current->state!=TASK_STATE_RUNNING) return 0;
-			DEBUGP(DLEV_SCHED,"sleep current task: %s\n", current->name);
+			DEBUGP(DSYS_SCHED,DLEV_INFO,"sleep current task: %s\n", current->name);
 			current->blocker.driver=0;
 			sys_sleepon(&current->blocker,(unsigned int *)&tout);
 			set_svc_ret(svc_sp,tout);
@@ -511,6 +620,7 @@ again:
 				fdd->flags=get_svc_arg(svc_sp,2);
 				return 0;
 			}
+
 			rc=driver->ops->control(dh,get_svc_arg(svc_sp,1),(void *)get_svc_arg(svc_sp,2),get_svc_arg(svc_sp,3));
 			set_svc_ret(svc_sp,rc);
 			return 0;
@@ -679,7 +789,7 @@ again:
 			}
 			if (t==current) {
 				SET_PRIO(t,t->prio_flags|0x8);
-				DEBUGP(DLEV_SCHED,"blocking current task: %s\n",current->name);
+				DEBUGP(DSYS_SCHED,DLEV_INFO,"blocking current task: %s\n",current->name);
 				switch_on_return();
 			} else {
 				struct task *p=ready[GET_PRIO(t)];
@@ -700,7 +810,7 @@ again:
 					p_prev=&p->next;
 					p=p->next;
 				}
-				DEBUGP(DLEV_SCHED,"blocking task: %s, current %s\n",t->name,current->name);
+				DEBUGP(DSYS_SCHED,DLEV_INFO,"blocking task: %s, current %s\n",t->name,current->name);
 			}
 			set_svc_ret(svc_sp,0);
 			return 0;
@@ -733,7 +843,7 @@ again:
 			set_svc_ret(svc_sp,-1);
 			return 0;
 set_ready:
-			DEBUGP(DLEV_SCHED,"unblocking task: %s, current %s\n",t->name,current->name);
+			DEBUGP(DSYS_SCHED,DLEV_INFO,"unblocking task: %s, current %s\n",t->name,current->name);
 			t->next=0;
 			SET_PRIO(t,t->prio_flags&3);
 			if(ready[GET_PRIO(t)]) {
@@ -768,7 +878,7 @@ set_ready:
 						if (i>=prio) break;
 					}
 					if (i<prio) {
-						DEBUGP(DLEV_SCHED,"degrading current prio task: name %s\n",current->name);
+						DEBUGP(DSYS_SCHED,DLEV_INFO,"degrading current prio task: name %s\n",current->name);
 						switch_on_return();
 					}
 				}
@@ -792,13 +902,13 @@ set_ready:
 					p_prev=&p->next;
 					p=p->next;
 				}
-				DEBUGP(DLEV_SCHED,"setprio task: name %s prio=%d, current %s\n",t->name,t->prio_flags,current->name);
+				DEBUGP(DSYS_SCHED,DLEV_INFO,"setprio task: name %s prio=%d, current %s\n",t->name,t->prio_flags,current->name);
 			}
 			set_svc_ret(svc_sp,0);
 			return 0;
 check_resched:
 			if (prio<curr_prio) {
-				DEBUGP(DLEV_SCHED,"setprio task: name %s prio=%d, current %s, reschedule\n",t->name,t->prio_flags,current->name);
+				DEBUGP(DSYS_SCHED,DLEV_INFO,"setprio task: name %s prio=%d, current %s, reschedule\n",t->name,t->prio_flags,current->name);
 				switch_on_return();
 			}
 			set_svc_ret(svc_sp,0);
@@ -810,7 +920,8 @@ check_resched:
 				set_svc_ret(svc_sp,-1);
 			}
 #ifdef DEBUG
-			dbglev=dl;
+			trace_sys=dl>>16;
+			trace_lev=dl&0xffff;
 			set_svc_ret(svc_sp,0);
 #else
 			set_svc_ret(svc_sp,-1);
@@ -847,6 +958,134 @@ check_resched:
 #else
 			set_svc_ret(svc_sp,-1);
 #endif
+			return 0;
+		}
+		case SVC_FORK: {
+			struct task *t;
+			unsigned char *estack;
+			unsigned long int *stackp;
+			int prio=GET_PRIO(current);
+			unsigned long int cpu_flags;
+
+			t=create_user_context();
+			if (!t) {
+				set_svc_ret(svc_sp,-1);
+				return 0;
+			}
+			t->asp->brk=current->asp->brk;
+			share_process_pages(t,current);
+
+			stackp=(void *)(((unsigned long int)t)+4096);
+			t->estack=(void *)(((unsigned long int)t)+2048);
+			t->prio_flags=current->prio_flags;
+
+			cpu_flags=disable_interrupts();
+			estack=t->estack;
+			__builtin_memcpy(estack,current->estack,2048);
+			t->sp=(((unsigned long int)svc_sp)-((unsigned long int)current->estack))+t->estack;
+
+			t->state=TASK_STATE_READY;
+			t->name=alloc_kheap(t,strlen(current->name)+1);
+			if (!t->name) {
+				sys_printf("could not get space for task name\n");
+			}
+			strcpy(t->name,current->name);
+			*__builtin_strchr(t->name,':')=0;
+			sys_sprintf(t->name,"%s:%03d",t->name,t->asp->id);
+			t->next2=troot;
+			troot=t;
+
+			if(!ready[prio]) {
+				ready[prio]=t;
+			} else {
+				ready_last[prio]->next=t;
+			}
+			ready_last[prio]=t;
+
+			restore_cpu_flags(cpu_flags);
+			set_svc_ret(t->sp,0);
+			set_svc_ret(svc_sp,t->id);
+			return 0;
+			break;
+		}
+		case 0x0fd6: {  // Linux ioctl
+			int fd=(int)get_svc_arg(svc_sp,0);
+			int cmd=(int)get_svc_arg(svc_sp,1);
+			sys_printf("ioctl: got cmd %x\n", cmd);
+			set_svc_lret(svc_sp,-1);
+			return 0;
+		}
+		case 0x1032: {	// Linux writev
+			int fd=(int)get_svc_arg(svc_sp,0);
+			struct iovec	*msg_iov=(void *)get_svc_arg(svc_sp,1);
+			size_t		msg_iovlen=get_svc_arg(svc_sp,2);
+			struct user_fd *fdd=&fd_tab[fd];
+			struct driver *driver=fdd->driver;
+			struct device_handle *dh=fdd->dev_handle;
+			int rc=0;
+			int i;
+			int total_done=0;
+
+			if (!driver) {
+				set_svc_ret(svc_sp,-1);
+				set_svc_lret(svc_sp,0);
+				return 0;
+			}
+
+			current->blocker.dh=dh;
+			current->blocker.ev=EV_WRITE;
+
+			for(i=0;i<msg_iovlen&&msg_iov[i].iov_base;i++) {
+				int done=0;
+again_wr:
+				rc=driver->ops->control(dh,WR_CHAR,msg_iov[i].iov_base+done,msg_iov[i].iov_len-done);
+
+				if (rc==-DRV_AGAIN&&(!(fdd->flags&O_NONBLOCK))) {
+					current->blocker.driver=driver;
+					sys_sleepon(&current->blocker,0);
+					goto again_wr;
+				}
+
+				if (rc==-DRV_INPROGRESS&&(!(fdd->flags&O_NONBLOCK))) {
+					int result;
+					current->blocker.driver=driver;
+					sys_sleepon(&current->blocker,0);
+					rc=driver->ops->control(dh,WR_GET_RESULT,&result,sizeof(result));
+					if (rc<0) {
+						set_svc_ret(svc_sp,rc);
+						set_svc_lret(svc_sp,0);
+					} else {
+						set_svc_ret(svc_sp,result+total_done);
+						set_svc_lret(svc_sp,0);
+					}
+					return 0;
+				}
+				if (rc>=0) {
+					done+=rc;
+					if ((done!=msg_iov[i].iov_len)&&(!(fdd->flags&O_NONBLOCK))) {
+						goto again_wr;
+					}
+				}
+				total_done+=done;
+			}
+			set_svc_ret(svc_sp,total_done);
+			set_svc_lret(svc_sp,0);
+			return 0;
+		}
+		case 0x1046: { // Linux nano sleep
+			struct timespec *req=
+			  (struct timespec *)get_svc_arg(svc_sp,0);
+			struct timespec *rem=
+			  (struct timespec *)get_svc_arg(svc_sp,1);
+			unsigned long int ms;
+			ms=(req->tv_sec*1000)+
+				(req->tv_nsec/1000000);
+			if (current->state!=TASK_STATE_RUNNING) return 0;
+			DEBUGP(DSYS_SCHED,DLEV_INFO,"sleep current task: %s\n", current->name);
+			current->blocker.driver=0;
+			sys_sleepon(&current->blocker,(unsigned int *)&ms);
+			set_svc_ret(svc_sp,0);
+			set_svc_lret(svc_sp,0);
 			return 0;
 		}
 		default:
@@ -913,19 +1152,19 @@ extern unsigned int irq_lev;
 void *sys_sleepon(struct blocker *so, unsigned int *tout) {
 	unsigned long int cpu_flags;
 	if (!task_sleepable()) {
-		DEBUGP(DLEV_SCHED,"sleep called from irq: %s, irq_lev %d\n", current->name,irq_lev);
+		DEBUGP(DSYS_SCHED,DLEV_INFO,"sleep called from irq: %s, irq_lev %d\n", current->name,irq_lev);
 		return 0;
 	}
 	cpu_flags=disable_interrupts();
 
 	if (so->wake) {
 		so->wake=0;
-		DEBUGP(DLEV_SCHED,"sleep called with wake up marked: %s\n", current->name);
+		DEBUGP(DSYS_SCHED,DLEV_INFO,"sleep called with wake up marked: %s\n", current->name);
 		restore_cpu_flags(cpu_flags);
 		return 0;
 	}
 	if (so->driver && device_ready(so)) {
-		DEBUGP(DLEV_SCHED,"sleep called with device ready: %s\n", current->name);
+		DEBUGP(DSYS_SCHED,DLEV_INFO,"sleep called with device ready: %s\n", current->name);
 		restore_cpu_flags(cpu_flags);
 		return 0;
 	}
@@ -947,7 +1186,7 @@ void *sys_sleepon(struct blocker *so, unsigned int *tout) {
 		so->wakeup_tic=0;
 	}
 
-	DEBUGP(DLEV_SCHED,"sys sleepon %x task: %s\n", so, current->name);
+	DEBUGP(DSYS_SCHED,DLEV_INFO,"sys sleepon %x task: %s\n", so, current->name);
 	switch_now();
 
 // Moved to architecture return, assymetric and uggly!!
@@ -1077,11 +1316,11 @@ void *sys_wakeup(struct blocker *so) {
 	restore_cpu_flags(cpu_flags);
 	
 	if (prio<GET_PRIO(current)) {
-		DEBUGP(DLEV_SCHED,"wakeup(immed readying) %x current task: %s, readying %s\n",so,current->name,n->name);
+		DEBUGP(DSYS_SCHED,DLEV_INFO,"wakeup(immed readying) %x current task: %s, readying %s\n",so,current->name,n->name);
 		switch_on_return();
 		return n;
 	}
-	DEBUGP(DLEV_SCHED,"wakeup(readying) %x current task: %s, readying %s\n",so,current->name,n->name);
+	DEBUGP(DSYS_SCHED,DLEV_INFO,"wakeup(readying) %x current task: %s, readying %s\n",so,current->name,n->name);
  	return n;
 }
 
@@ -1107,7 +1346,8 @@ void *sys_wakeup_from_list(struct blocker_list *bl) {
 /* DBG                                                     */
 /***********************************************************/
 #ifdef DEBUG
-int dbglev=0;
+int trace_lev=DEFAULT_TRACE_LEV;
+int trace_sys=DEFAULT_TRACE_SYS;
 #endif
 
 #define DRV_SYS_STAT_COLD	0
@@ -1206,8 +1446,6 @@ void driver_user_data_init(struct device_handle **root,
 			unsigned int num_handlers) {
 	int i;
 	struct device_handle **p=root;
-	sys_printf("driver_u_d_i: root=%x, handlers=%x, num_h=%d\n",
-				root,handlers,num_handlers);
 	for(i=0;i<num_handlers;i++) {
 		(*p)=&handlers[i];
 		p=&handlers[i].next;
@@ -1278,7 +1516,6 @@ typedef void (*ifunc)(void);
 
 void init_sys(void) {
 	unsigned long int *i;
-	sys_printf("In init_sys\n");
 	init_sys_arch();
 	init_memory_protection();
 #if 0
@@ -1289,13 +1526,12 @@ void init_sys(void) {
 	__builtin_memset(&slab_1024[15],0,900);
 #endif
 	activate_memory_protection();
-	init_task_list();
 	init_switcher();
 	init_irq();
 
 	config_sys_tic(10);
 	for(i=init_func_begin;i<init_func_end;i++) {
-		sys_printf("calling %x:%x\n",i,*i);
+		DEBUGP(DSYS_KERN,DLEV_INFO,"calling %x:%x\n",i,*i);
 		((ifunc)*i)();
 	}
 
@@ -1311,7 +1547,7 @@ void start_up(void) {
         init_io();
 
         /* start the executive */
-        sys_printf("Leanaux git ver %s, starting tasks\n",ver);
+        sys_printf("flexOmatic git ver %s, starting tasks\n",ver);
         start_sys();
 }
 
@@ -1333,7 +1569,6 @@ void start_sys(void) {
 		sys_printf("could not mount nand\n");
 	}
 	t=create_user_context();
-	sys_printf("enter start_sys: got task ptr %x\n", t);
 	load_init(t);
 #else
 	t=(struct task *)get_page();
@@ -1345,7 +1580,8 @@ void start_sys(void) {
 	}
 #endif
 
-	t->name="sys_mon";
+	t->name=alloc_kheap(t,strlen("sys_mon")+5);
+	sys_sprintf(t->name,"%s:%03d","sys_mon",t->asp->id);
 	t->state=TASK_STATE_READY;
 	t->prio_flags=3;
 	stackp=((unsigned long int)t)+4096;
@@ -1363,7 +1599,6 @@ void start_sys(void) {
 		ready_last[GET_PRIO(t)]->next=t;
 	}
 	ready_last[GET_PRIO(t)]=t;
-	sys_printf("leaving start_sys: got task ptr %x\n", t);
 	clear_all_interrupts();
 	switch_on_return();  /* will switch in the task on return from next irq */
 	while(1) {

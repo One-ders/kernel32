@@ -47,10 +47,18 @@
 
 
 #ifdef DEBUG
-#define DLEV_SCHED 4
-extern int dbglev;
+#define DSYS_SCHED	1
+#define DSYS_MEM	2
+#define DSYS_FS		4
+#define DSYS_KERN	8
+#define DLEV_CRIT	1
+#define DLEV_INFO	2
+
+extern int trace_sys;
+extern int trace_lev;
 extern int sys_printf(const char *format, ...);
-#define DEBUGP(lev,a ...) { if (dbglev>lev) sys_printf(a);}
+
+#define DEBUGP(subsys,lev,a ...) { if ((subsys&trace_sys)&&(trace_lev>lev)) sys_printf(a);}
 #else
 #define DEBUGP(lev,a ...)
 #endif
@@ -104,6 +112,21 @@ struct sel_data {
 	unsigned int *tout;
 };
 
+struct bitmap {
+	unsigned int *bm;
+	int size;
+};
+
+
+struct bitmap *create_bitmap(unsigned int *buf, int bm_size);
+#define CREATE_BITMAP(_bm_name,size)	\
+unsigned int _bm_name##_buf[((size-1)/32)+1];	\
+struct bitmap _bm_name##bub = {_bm_name##_buf,size}; \
+struct bitmap *_bm_name = &_bm_name##bub;
+
+int bitmap_alloc_first_free(struct bitmap *bm);
+void bitmap_dealloc(struct bitmap *bm, int id);
+
 struct address_space {
 #ifdef MMU
 	// an array of 1024 page tables
@@ -132,6 +155,7 @@ struct task {
 	int		sel_data_valid;
 	struct sel_data sel_data;
 	struct blocker  blocker;
+	unsigned long	kheap;
 };
 
 
@@ -177,6 +201,7 @@ int map_next_stack_page(unsigned long int new_addr, unsigned long int old_addr);
 int unmap_tmp_stack_page(void);
 int activate_memory_protection(void);
 struct task *create_user_context(void);
+int share_process_pages(struct task *to, struct task *from);
 int load_init(struct task *);
 
 void init_switcher(void);
@@ -191,6 +216,7 @@ void wait_irq(void);
 unsigned int get_svc_number(void *sp);
 unsigned long int get_svc_arg(void *sp, int arg_ix);
 void set_svc_ret(void *sp, long int val);
+void set_svc_lret(void *sp, long int val);
 unsigned long int get_stacked_pc(struct task *t);
 unsigned long int get_usr_pc(struct task *t);
 
@@ -239,8 +265,8 @@ struct device_handle {
 typedef int (*DRV_CBH)(struct device_handle *, int event, void *user_ref);
 
 struct dyn_open_args {
-	char *name;
-	struct device_handle *dh;
+	char			*name;
+	struct device_handle	*dh;
 };
 
 #define RD_CHAR 1
@@ -294,6 +320,7 @@ struct dent {
 #define SVC_GETTIC	SVC_REBOOT+1
 #define SVC_SBRK	SVC_GETTIC+1
 #define SVC_BRK		SVC_SBRK+1
+#define SVC_FORK	SVC_BRK+1
 #endif
 
 struct task_create_args {
@@ -305,6 +332,18 @@ struct task_create_args {
 };
 
 int allocate_task_id(struct task *t);
+int allocate_as_id(void);
+void *alloc_kheap(struct task *t, unsigned int size);
+int incr_address_space_users(struct task *t);
+struct task *lookup_task_for_name(char *task_name);
+int count_free_pages();
+int count_shared_pages();
+unsigned int get_pfn_sh(unsigned int ix);
+int free_asp_pages(struct address_space *asp);
+
+
+
+
 
 /*  driver */
 

@@ -169,6 +169,7 @@ int io_add_c(const char c);
 int io_setpolled(int enabled);
 
 int sys_printf(const char *format, ...);
+int sys_sprintf(char *buf, const char *format, ...);
 
 unsigned long int strtoul(char *str, char **endp, int base);
 

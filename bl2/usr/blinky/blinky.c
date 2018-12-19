@@ -57,7 +57,7 @@ void blink(struct blink_data *bd) {
 			rc=io_control(fd,LED_CTRL_ACTIVATE,&bd->led,sizeof(bd->led));
 		}
 
-		sleep(bd->delay);
+		msleep(bd->delay);
 	}
 }
 

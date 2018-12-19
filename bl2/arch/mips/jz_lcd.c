@@ -535,7 +535,6 @@ static int jzfb_set_var(struct fb_var_screeninfo *var, int con,
 	 * defaults used to create new consoles.
 	 */
 	fb_set_cmap(&cfb->fb.cmap, &cfb->fb);
-	sys_printf("jzfb_set_var: after fb_set_cmap...\n");
 
 	return 0;
 }
@@ -612,7 +611,6 @@ static int fb_map_smem(struct lcd_cfb_info *cfb) {
 			break;
 		}
 	}
-	sys_printf("page_shift=%x and needroom=%x\n", page_shift,needroom);
 
         /* lcd_palette room:
          * 0 -- 512: lcd palette
@@ -630,7 +628,6 @@ static int fb_map_smem(struct lcd_cfb_info *cfb) {
 	lcd_desc_base  = (struct lcd_desc *)(lcd_palette + 1024);
 
 	jz_lcd_buffer_addrs.fb_num = CONFIG_JZLCD_FRAMEBUFFER_MAX;
-	sys_printf("jzlcd use %d framebuffer:\n", CONFIG_JZLCD_FRAMEBUFFER_MAX);
 	/* alloc frame buffer space */
 	for ( t = 0; t < CONFIG_JZLCD_FRAMEBUFFER_MAX; t++ ) {
 		lcd_frame[t] = (unsigned char *)get_pages(page_shift);
@@ -646,8 +643,6 @@ static int fb_map_smem(struct lcd_cfb_info *cfb) {
 //			set_bit(PG_reserved, &map->flags);
 		}
 		jz_lcd_buffer_addrs.fb_phys_addr[t] = virt_to_phys((void *)lcd_frame[t]);
-		sys_printf("jzlcd fb[%d] phys addr =0x%08x\n",
-				t, jz_lcd_buffer_addrs.fb_phys_addr[t]);
 	}
 
 	cfb->fb.fix.smem_start = virt_to_phys((void *)lcd_frame[0]);

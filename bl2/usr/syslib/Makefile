@@ -1,8 +1,10 @@
 
 
-USR_LIB=$(OBJ)/usr/lib
+USR_LIB=$(OBJ)/usr/syslib
 
-OBJECTS:= $(USR_LIB)/c_start.o $(USR_LIB)/sys_env.o $(USR_LIB)/usr_io.o $(USR_LIB)/string.o $(USR_LIB)/ctype.o
+OFILES:=c_start.o sys_env.o usr_io.o  errno.o
+
+OBJECTS:=$(addprefix $(USR_LIB)/,$(OFILES))
 
 all: $(USR_LIB) $(USR_LIB)/usrlib.o
 

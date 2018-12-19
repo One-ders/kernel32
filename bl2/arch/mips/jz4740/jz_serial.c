@@ -294,10 +294,7 @@ static struct device_handle *usart_open(void *driver_instance, DRV_CBH cb_handle
 	int i=0;
 	for(i=0;i<MAX_USERS;i++) {
 		if (udata[i].drv_data==0) {
-			sys_printf("usart_open: index %x, is free\n", i);
 			break;
-		} else {
-			sys_printf("usart_open: index %x, not free\n", i);
 		}
 	}
 	if (i>=MAX_USERS) return 0;

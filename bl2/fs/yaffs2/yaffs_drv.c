@@ -10,6 +10,7 @@ static int yaffs_errno;
 
 unsigned yaffs_trace_mask =
 
+#if 0
         YAFFS_TRACE_SCAN |
         YAFFS_TRACE_GC |
         YAFFS_TRACE_ERASE |
@@ -19,6 +20,9 @@ unsigned yaffs_trace_mask =
         YAFFS_TRACE_BAD_BLOCKS |
         YAFFS_TRACE_VERIFY |
         0;
+#else
+	0;
+#endif
 
 
 
@@ -34,24 +38,24 @@ int yaffsfs_GetLastError(void) {
 }
 
 void yaffsfs_Lock(void) {
-	sys_printf("yaffs lock\n");
+//	sys_printf("yaffs lock\n");
 }
 
 void yaffsfs_Unlock(void) {
-	sys_printf("yaffs unlock\n");
+//	sys_printf("yaffs unlock\n");
 }
 
 unsigned int yaffsfs_CurrentTime(void) {
-	sys_printf("yaffs currentTime\n");
+//	sys_printf("yaffs currentTime\n");
 	return 0;
 }
 
 void yaffs_bug_fn(const char *file_name, int line_no) {
-	sys_printf("yaffs buf in %s:%d\n", file_name, line_no);
+	sys_printf("yaffs bug in %s:%d\n", file_name, line_no);
 }
 
 int yaffsfs_CheckMemRegion(const void *addr, size_t size, int write_request) {
-	sys_printf("yaffsfs check mem region  %x:%d\n", addr, size);
+//	sys_printf("yaffsfs check mem region  %x:%d\n", addr, size);
 	return 0;
 }
 
@@ -294,12 +298,10 @@ static int yaffs_nand_check_bad(struct yaffs_dev *dev, int block_no) {
 }
 
 static int yaffs_nand_init(struct yaffs_dev *dev) {
-	sys_printf("yaffs_nand_init\n");
 	return YAFFS_OK;
 }
 
 static int yaffs_nand_deinit(struct yaffs_dev *dev) {
-	sys_printf("yaffs_nand_deinit\n");
 	return YAFFS_OK;
 }
 
@@ -318,8 +320,6 @@ int mount_nand(char *nand_dev_name) {
 
 	memset(&ydev,0,sizeof(ydev));
 	memset(&stbuf,0,sizeof(stbuf));
-
-	sys_printf("mount_nand: enter\n");
 
 	if (!nand_dev) {
 		sys_printf("nand dev %s, not found\n", nand_dev_name);
@@ -380,7 +380,6 @@ int mount_nand(char *nand_dev_name) {
 	
 	yaffs_add_device(&ydev);
 
-	sys_printf("mount device\n");
 //	yaffs_mount("bajs");
 	rc=yaffs_mount_reldev(&ydev);
 

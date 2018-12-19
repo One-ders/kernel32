@@ -1,5 +1,5 @@
 
-USR_LIB=$(OBJ)/usr/lib
+USR_LIB=$(OBJ)/usr/syslib
 
 all: $(USR_LIB) $(USR_LIB)/start.o $(USR_LIB)/syscall_lib.o
 

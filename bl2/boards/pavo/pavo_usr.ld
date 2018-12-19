@@ -10,14 +10,18 @@ SECTIONS
         . = ALIGN(4);
         .text       :
         {
-          *(.text)
+          *(.text .text.*)
         }
 
         . = 0x10000000;
         . = ALIGN(4);
         .rodata  : { *(.rodata .rodata.* .gnu.linkonce.r.*) }
 	.rodata1 : { *(.rodata1) }
-	.sdata2   : {
+	/* thread local storage */
+	.tdata	: { *(.tdata .tdata.* .gnu.linkonce.td.*) }
+	.tbss	: { *(.tbss .tbss.* .gnu.linkonce.tb.*) *(.tcommon) }
+
+	.sdata2	: {
 		*(.sdata2 .sdata2.* .gnu.linkonce.s2.*)
 	}
 

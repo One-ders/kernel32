@@ -1,8 +1,10 @@
 
 #include <string.h>
-#include "sys.h"
-#include "io.h"
-#include <fb.h>
+#include <stdio.h>
+#include <unistd.h>
+#include "mycore/sys.h"
+#include "mycore/io.h"
+#include <mycore/fb.h>
 
 int fb_test(void *dum) {
 	int fb_fd;
@@ -18,7 +20,7 @@ int fb_test(void *dum) {
 	if (fb_fd<0) {
 		printf("could not open fb\n");
 		while(1) {
-			sleep(100);
+			usleep(100*1000);
 		}
 		return 0;
 	}
@@ -28,7 +30,7 @@ int fb_test(void *dum) {
 	if (io_control(fb_fd, FBIOGET_FSCREENINFO, &finfo,sizeof(finfo)) < 0) {
 		printf("could not get fscreeninfo\n");
 		while(1) {
-			sleep(100);
+			usleep(100*1000);
 		}
 	}
 
@@ -43,7 +45,7 @@ int fb_test(void *dum) {
 	if (io_control(fb_fd,FBIOGET_VSCREENINFO, &vinfo,sizeof(vinfo)) < 0) {
 		printf("could not get vscreeninfo\n");
 		while(1) {
-			sleep(100);
+			usleep(100*1000);
 		}
 	}
 
@@ -56,7 +58,7 @@ int fb_test(void *dum) {
 	printf("io_mmap returned %x\n", fbp);
 	if (!fbp) {
 		while(1) {
-			sleep(100);
+			usleep(100*1000);
 		}
 	}
 
@@ -95,7 +97,7 @@ int fb_test(void *dum) {
 	}
 
 	while(1) {
-		sleep(100);
+		usleep(100*1000);
 	}
 	return 0;
 }

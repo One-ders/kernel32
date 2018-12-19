@@ -50,8 +50,6 @@ static struct device_handle *fb_open(void *instance,
 		return 0;
 	}
 
-	sys_printf("fb_open: OK\n");
-
 	return DEVICE_H(ud);
 }
 
@@ -146,7 +144,6 @@ static int fb_control(struct device_handle *dh,
 }
 
 static int fb_init (void *inst) {
-	sys_printf("fb_init: for %x\n",inst);
 	driver_user_data_init(&root,
 			DEVICE_H(my_userdata),
 			(sizeof(my_userdata)/sizeof(struct my_userdata)));
@@ -155,7 +152,6 @@ static int fb_init (void *inst) {
 
 
 static int fb_start (void *inst) {
-	sys_printf("fb_start: for %x\n",inst);
 	return 0;
 }
 

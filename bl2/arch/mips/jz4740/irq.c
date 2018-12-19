@@ -113,5 +113,5 @@ void irq_dispatch(void *sp) {
 		}
 //		set_c0_status(get_c0_status()|CP0_CAUSE_IP2);
 	}
-	INTC->icmcr=cirq;
+//	INTC->icmcr=cirq;
 }

@@ -432,8 +432,6 @@ static int nand_control(struct device_handle *dh, int cmd, void *arg1, int arg2)
 			nand_config->bad_block_mark=bad_block_pos;
 			nand_config->oob_size=oob_size;
 			nand_config->ecc_count=ecc_count;
-			sys_printf("nand_get_cfg: ps=%d, ppb=%d, nb=%d, bbp=%d, sbpb=%d, eccc=%d, p_start=%d, p_size=%d, internal_partition=%d\n",
-				page_size,page_per_block, nand_config->n_blocks, bad_block_pos, oob_size, ecc_count, partitions[udh->partition].start, partitions[udh->partition].size, udh->partition);
 			return 0;
 		}
 		case NAND_CHECK_BLOCK: {
@@ -444,7 +442,7 @@ static int nand_control(struct device_handle *dh, int cmd, void *arg1, int arg2)
 }
 
 static int nand_start(void *inst) {
-	sys_printf("nand_start: inst=%x\n",inst);
+	return 0;
 }
 
 static void gpio_init(void) {
@@ -463,7 +461,6 @@ static void gpio_init(void) {
 static int nand_init(void *inst) {
 	int boot_sel;
 
-	sys_printf("nand_init: inst=%x\n",inst);
 	gpio_init();
 	boot_sel = REG_BCR >> 30;
 
@@ -480,7 +477,7 @@ static int nand_init(void *inst) {
         oob_size = page_size / 32;
         block_size = page_size * page_per_block;
         ecc_count = page_size / ECC_BLOCK;
-
+	return 1;
 }
 
 static struct driver_ops nand_drv_ops = {

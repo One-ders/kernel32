@@ -7,12 +7,13 @@
 #include <cgu.h>
 #include <pmc.h>
 #include <lcdc.h>
+#include <wdt.h>
 
 #define CGU	((struct CGU *)(APB+0))
 #define PMC	((struct PMC *)(APB+0))   //overlap with prev
 //#define INTC	((struct INTC *)(APB+0x1000))
 #define TCU	((struct TCU *)(APB+0x2000))
-// also WDT
+#define WDT     ((struct WDT *)(APB+0x2000))
 #define RTC	((struct RTC *)(APB+0x3000))
 #define GPIO	((struct GPIO *)(APB+0x10000))
 #define AIC	((struct AIC *)(APB+0x20000))

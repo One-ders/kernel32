@@ -1,5 +1,7 @@
 #include <string.h>
-#include <sys.h>
+#include <unistd.h>
+#include <sys/select.h>
+#include <mycore/sys.h>
 
 extern unsigned long int __bss_start__;
 extern unsigned long int __bss_end__;

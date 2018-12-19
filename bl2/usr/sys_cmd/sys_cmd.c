@@ -31,13 +31,19 @@
  * @(#)sys_cmd.c
  */
 
-#include <sys.h>
+#include <sys/select.h>
+#include <mycore/sys.h>
 #include <string.h>
-#include <io.h>
-#include <sys_env.h>
-#include <procps.h>
-#include <devls.h>
-#include "nand.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <limits.h>
+#include <unistd.h>
+#include <mycore/io.h>
+#include <mycore/sys_env.h>
+#include <mycore/procps.h>
+#include <mycore/devls.h>
+#include <mycore/nand.h>
+#include <mycore/kmem.h>
 
 struct dents {
 	char name[32];
@@ -63,13 +69,13 @@ static int get_procdata(int fd, char *name, struct Env *env) {
 	int fd2;
 
 	if ((fd2=io_control(fd, DYNOPEN, name, 0))<0) {
-		fprintf(env->io_fd, "could not open proc data\n");
+		dprintf(env->io_fd, "could not open proc data\n");
 		return -1;
 	}
 	
 	rc=io_read(fd2,&pd,sizeof(pd));
 	if(rc>0) {
-		fprintf(env->io_fd, "task(%3d@%x) %12s, sp=0x%08x, pc=0x%08x, prio=%x, state=%c, atics=%d\n",
+		dprintf(env->io_fd, "task(%3d@%08x) %14s, sp=0x%08x, pc=0x%08x, prio=%x, state=%c, atics=%d\n",
 		pd.id, pd.addr, pd.name, pd.sp, pd.pc, pd.prio_flags, toNum(pd.state),pd.active_tics);
 	}
 	io_close(fd2);
@@ -78,24 +84,25 @@ static int get_procdata(int fd, char *name, struct Env *env) {
 
 static int ps_fnc(int argc, char **argv, struct Env *env) {
 	int fd=io_open("procps");
-	struct dents dents[10];
+	struct dents dents[256];
+	char buf[16];
 	int rc,i=0;
 	int tic;
 
 	if (fd<0) {
-		fprintf(env->io_fd,"could not open ps driver\n");
+		dprintf(env->io_fd,"could not open ps driver\n");
 		return -1;
 	}
 	
-	rc=io_control(fd,READDIR,dents,10);
+	rc=io_control(fd,READDIR,dents,256);
 	
 	if (rc<0) {
-		fprintf(env->io_fd,"directory error\n");
+		dprintf(env->io_fd,"directory error\n");
 		return 0;
 	}
 
 	tic=get_current_tic();
-	fprintf(env->io_fd, "uptime: %t, current tic: %d\n", tic);
+	dprintf(env->io_fd, "uptime: %s, current tic: %d\n", ts_format(tic,buf,16), tic);
 	while(i<rc) {
 		get_procdata(fd,dents[i].name,env);
 		i++;
@@ -109,22 +116,22 @@ static int get_devdata(int fd, char *name, struct Env *env) {
 	int rc;
 	int fd2;
 	if ((fd2=io_control(fd, DYNOPEN, name, 0))<0) {
-		fprintf(env->io_fd, "could not open dev data\n");
+		dprintf(env->io_fd, "could not open dev data\n");
 		return -1;
 	}
 	
 	rc=io_read(fd2,&dd,sizeof(dd));
 	if(rc>0) {
 		int i;
-		fprintf(env->io_fd, "%12s: ", name);
+		dprintf(env->io_fd, "%12s: ", name);
 		for(i=0;i<dd.numofpids;i++) {
 			if (i) {
-				fprintf(env->io_fd,", %d",dd.pid[i]);
+				dprintf(env->io_fd,", %d",dd.pid[i]);
 			} else {
-				fprintf(env->io_fd,"%d",dd.pid[i]);
+				dprintf(env->io_fd,"%d",dd.pid[i]);
 			}
 		}
-		fprintf(env->io_fd,"\n");
+		dprintf(env->io_fd,"\n");
 	}
 	io_close(fd2);
 	return 0;
@@ -137,15 +144,15 @@ static int lsdrv_fnc(int argc, char **argv, struct Env *env) {
 	struct dents dents[32];
 	int i,rc;
 	if (fd<0) {
-		fprintf(env->io_fd,"could not open dev\n");
+		dprintf(env->io_fd,"could not open dev\n");
 		return -1;
 	}
 	rc=io_control(fd,READDIR,dents,128);
-	fprintf(env->io_fd,"=========== Installed drivers =============\n");
+	dprintf(env->io_fd,"=========== Installed drivers =============\n");
 	for(i=0;i<rc;i++) {
 		get_devdata(fd,dents[i].name,env);
         }
-        fprintf(env->io_fd,"========= End Installed drivers ===========\n");
+        dprintf(env->io_fd,"========= End Installed drivers ===========\n");
 	io_close(fd);
         return 0;
 }
@@ -154,44 +161,41 @@ static int kmem_fnc(int argc, char **argv, struct Env *env) {
 	int fd=io_open("kmem");
 	int rc=0;
 	int r=0,w=0;
-	struct getopt_data gd;
 	char *nptr;
 	int opt;
 	unsigned long int address=0;
 
 	if (fd<0) {
-		fprintf(env->io_fd,"could not open dev kmem\n");
+		dprintf(env->io_fd,"could not open dev kmem\n");
 		return -1;
 	}
 
-	getopt_data_init(&gd);
-
-	while((opt=getopt_r(argc,argv,"r:w:",&gd))!=-1) {
+	while((opt=getopt(argc,argv,"r:w:"))!=-1) {
 		switch(opt) {
 			case 'r':
-				nptr=gd.optarg;
-				address=strtoul(gd.optarg,&nptr,0);
-				if (nptr==gd.optarg) {
-					fprintf(env->io_fd, "address value %s, not a number\n",gd.optarg);
+				nptr=optarg;
+				address=strtoul(optarg,&nptr,0);
+				if (nptr==optarg) {
+					dprintf(env->io_fd, "address value %s, not a number\n",optarg);
 					rc = -1;
 					goto out;
 				}
 				r=1;
-				fprintf(env->io_fd,"read addr %x\n",address);
+				dprintf(env->io_fd,"read addr %x\n",address);
 				break;
 			case 'w':
-				nptr=gd.optarg;
-				address=strtoul(gd.optarg,&nptr,0);
-				if (nptr==gd.optarg) {
-					fprintf(env->io_fd, "address value %s, not a number\n",gd.optarg);
+				nptr=optarg;
+				address=strtoul(optarg,&nptr,0);
+				if (nptr==optarg) {
+					dprintf(env->io_fd, "address value %s, not a number\n",optarg);
 					rc = -1;
 					goto out;
 				}
 				w=1;
-				fprintf(env->io_fd,"write addr %x\n",address);
+				dprintf(env->io_fd,"write addr %x\n",address);
 				break;
 			default: {
-				fprintf(env->io_fd, "kmem arg error %c\n",opt);
+				dprintf(env->io_fd, "kmem arg error %c\n",opt);
 				rc=-1;
 				goto out;
 			}
@@ -204,11 +208,11 @@ static int kmem_fnc(int argc, char **argv, struct Env *env) {
 		int i=0,j;
 		unsigned int nwords;
 
-		if (gd.optind<argc) {
-			nptr=argv[gd.optind];
-			nbytes=strtoul(argv[gd.optind],&nptr,0);
-			if (nptr==argv[gd.optind]) {
-				fprintf(env->io_fd, "nbytes value %s, not a number\n",argv[gd.optind]);
+		if (optind<argc) {
+			nptr=argv[optind];
+			nbytes=strtoul(argv[optind],&nptr,0);
+			if (nptr==argv[optind]) {
+				dprintf(env->io_fd, "nbytes value %s, not a number\n",argv[optind]);
 				rc = -1;
 				goto out;
 			}
@@ -221,7 +225,7 @@ static int kmem_fnc(int argc, char **argv, struct Env *env) {
 
 		nwords=((nbytes+3)>>2);
 		while(i<nwords) {
-			fprintf(env->io_fd,"%08x:\t",address+(i<<2));
+			dprintf(env->io_fd,"%08x:\t",address+(i<<2));
 			for(j=0;(j<4)&&i<nwords;i++,j++) {
 				unsigned int vbuf;
 				rc=io_read(fd,&vbuf,4);
@@ -229,18 +233,18 @@ static int kmem_fnc(int argc, char **argv, struct Env *env) {
 					rc=-11;
 					goto out;
 				}
-				fprintf(env->io_fd,"%08x ", vbuf);
+				dprintf(env->io_fd,"%08x ", vbuf);
 			}
-			fprintf(env->io_fd,"\n");
+			dprintf(env->io_fd,"\n");
 		}
 	} else if (w) {
 		unsigned long int value;
 
-		if (gd.optind<argc) {
-			nptr=argv[gd.optind];
-			value=strtoul(argv[gd.optind],&nptr,0);
-			if (nptr==argv[gd.optind]) {
-				fprintf(env->io_fd, "value %s, not a number\n",argv[gd.optind]);
+		if (optind<argc) {
+			nptr=argv[optind];
+			value=strtoul(argv[optind],&nptr,0);
+			if (nptr==argv[optind]) {
+				dprintf(env->io_fd, "value %s, not a number\n",argv[optind]);
 				rc = -1;
 				goto out;
 			}
@@ -251,14 +255,14 @@ static int kmem_fnc(int argc, char **argv, struct Env *env) {
 			goto out;
 		}
 
-		fprintf(env->io_fd,"%08x:\t=%08x",address,value);
+		dprintf(env->io_fd,"%08x:\t=%08x",address,value);
 		rc=io_write(fd,&value,4);
 		if (rc<0) {
 			rc=-1;
 			goto out;
 		}
 	} else {
-		fprintf(env->io_fd, "kmem: unknown operation\n");
+		dprintf(env->io_fd, "kmem: unknown operation\n");
 	}
 out:
 	io_close(fd);
@@ -283,15 +287,15 @@ static int nand_fnc(int argc, char **argv, struct Env *env) {
 */
 
 	if (argc<2) {
-		fprintf(env->io_fd,"nand <nr> read  <offset> <size>\n");
-		fprintf(env->io_fd,"nand <nr> write <offset> <data>\n");
-		fprintf(env->io_fd,"nand <nr> erase <block>\n");
+		dprintf(env->io_fd,"nand <nr> read  <offset> <size>\n");
+		dprintf(env->io_fd,"nand <nr> write <offset> <data>\n");
+		dprintf(env->io_fd,"nand <nr> erase <block>\n");
 		return 0;
 	}
 
 	dev_no=strtoul(argv[1],&nptr,0);
 	if (nptr==argv[1]) {
-		fprintf(env->io_fd,"strtoul failed for nand %s\n",argv[1]);
+		dprintf(env->io_fd,"strtoul failed for nand %s\n",argv[1]);
 		return 0;
 	}
 	
@@ -304,14 +308,14 @@ static int nand_fnc(int argc, char **argv, struct Env *env) {
 	} else if (strcmp(argv[2],"erase")==0) {
 		cmd='e';
 	} else {
-		fprintf(env->io_fd,"nand: unknown cmd %s\n",argv[2]);
+		dprintf(env->io_fd,"nand: unknown cmd %s\n",argv[2]);
 		return 0;
 	}
 
 	if (cmd=='r' || cmd=='w') {
 		address=strtoul(argv[3],&nptr,0);
 		if (nptr==argv[3]) {
-			fprintf(env->io_fd,"not a offset %s\n", argv[3]);
+			dprintf(env->io_fd,"not a offset %s\n", argv[3]);
 			return 0;
 		}
 	}
@@ -319,7 +323,7 @@ static int nand_fnc(int argc, char **argv, struct Env *env) {
 	if (cmd=='e') {
 		block_no=strtoul(argv[3],&nptr,0);
 		if (nptr==argv[3]) {
-			fprintf(env->io_fd,"not a block number %s\n", argv[3]);
+			dprintf(env->io_fd,"not a block number %s\n", argv[3]);
 			return 0;
 		}
 	}
@@ -327,7 +331,7 @@ static int nand_fnc(int argc, char **argv, struct Env *env) {
 	if (cmd=='r') {
 		size=strtoul(argv[4],&nptr,0);
 		if (nptr==argv[4]) {
-			fprintf(env->io_fd,"not a size %s\n", argv[4]);
+			dprintf(env->io_fd,"not a size %s\n", argv[4]);
 			return 0;
 		}
 	}
@@ -335,17 +339,17 @@ static int nand_fnc(int argc, char **argv, struct Env *env) {
 	if (cmd=='w') {
 		value=strtoul(argv[4],&nptr,0);
 		if (nptr==argv[4]) {
-			fprintf(env->io_fd,"not a size %s\n", argv[4]);
+			dprintf(env->io_fd,"not a size %s\n", argv[4]);
 			return 0;
 		}
 	}
 
-	fprintf(env->io_fd,"nand %d %c\n", dev_no, cmd);
+	dprintf(env->io_fd,"nand %d %c\n", dev_no, cmd);
 
 
 	fd=io_open(dev_name);
 	if (fd<0) {
-		fprintf(env->io_fd,"could not open dev nand\n");
+		dprintf(env->io_fd,"could not open dev nand\n");
 		return -1;
 	}
 
@@ -366,22 +370,22 @@ static int nand_fnc(int argc, char **argv, struct Env *env) {
 //		nwords=((rc+3)>>2);
 		nwords=2048>>2;
 		while(i<nwords) {
-			fprintf(env->io_fd,"%08x:\t",address+(i<<2));
+			dprintf(env->io_fd,"%08x:\t",address+(i<<2));
 			for(j=0;(j<4)&&i<nwords;i++,j++) {
-				fprintf(env->io_fd,"%08x ", ((unsigned int *)vbuf)[i]);
+				dprintf(env->io_fd,"%08x ", ((unsigned int *)vbuf)[i]);
 			}
-			fprintf(env->io_fd,"\n");
+			dprintf(env->io_fd,"\n");
 		}
-		fprintf(env->io_fd, "=========== OOB Data ===========\n");
+		dprintf(env->io_fd, "=========== OOB Data ===========\n");
 		nwords=64>>2;
 		k=i;
 		i=0;
 		while(i<nwords) {
-			fprintf(env->io_fd,"%08x:\t",(i<<2));
+			dprintf(env->io_fd,"%08x:\t",(i<<2));
 			for(j=0;(j<4)&&i<nwords;i++,j++) {
-				fprintf(env->io_fd,"%08x ", ((unsigned int *)vbuf)[i+k]);
+				dprintf(env->io_fd,"%08x ", ((unsigned int *)vbuf)[i+k]);
 			}
-			fprintf(env->io_fd,"\n");
+			dprintf(env->io_fd,"\n");
 		}
 #if 0
 	} else if (w) {
@@ -391,7 +395,7 @@ static int nand_fnc(int argc, char **argv, struct Env *env) {
 			nptr=argv[gd.optind];
 			value=strtoul(argv[gd.optind],&nptr,0);
 			if (nptr==argv[gd.optind]) {
-				fprintf(env->io_fd, "value %s, not a number\n",argv[gd.optind]);
+				dprintf(env->io_fd, "value %s, not a number\n",argv[gd.optind]);
 				rc = -1;
 				goto out;
 			}
@@ -402,7 +406,7 @@ static int nand_fnc(int argc, char **argv, struct Env *env) {
 			goto out;
 		}
 
-		fprintf(env->io_fd,"%08x:\t=%08x",address,value);
+		dprintf(env->io_fd,"%08x:\t=%08x",address,value);
 		rc=io_write(fd,&value,4);
 		if (rc<0) {
 			rc=-1;
@@ -410,7 +414,7 @@ static int nand_fnc(int argc, char **argv, struct Env *env) {
 		}
 #endif
 	} else {
-		fprintf(env->io_fd, "nand: unknown operation\n");
+		dprintf(env->io_fd, "nand: unknown operation\n");
 	}
 out:
 	io_close(fd);
@@ -421,12 +425,16 @@ out:
 static int debug_fnc(int argc, char **argv, struct Env *env) {
 	int dbglev;
 	if (argc>1) {
-		if (__builtin_strcmp(argv[1],"on")==0) {
-			dbglev=10;
+		char *nptr;
+		unsigned int address=strtoul(argv[1],&nptr,0);
+		if (nptr!=optarg) {
+			dbglev=address;
+		} else if (__builtin_strcmp(argv[1],"on")==0) {
+			dbglev=0xffff;
 		} else if (__builtin_strcmp(argv[1],"off")==0) {
 			dbglev=0;
 		} else {
-			fprintf(env->io_fd,"debug <on> | <off>\n");
+			dprintf(env->io_fd,"debug <on> | <off>\n");
 			return 0;
 		}
 	} else {
@@ -438,27 +446,27 @@ static int debug_fnc(int argc, char **argv, struct Env *env) {
 
 static int block_fnc(int argc, char **argv, struct Env *env) {
 	int rc;
-	fprintf(env->io_fd, "blocking %s, ", argv[1]);
+	dprintf(env->io_fd, "blocking %s, ", argv[1]);
 	rc=block_task(argv[1]);
-	fprintf(env->io_fd, "returned %d\n", rc);
+	dprintf(env->io_fd, "returned %d\n", rc);
 
 	return 0;
 }
 
 static int unblock_fnc(int argc, char **argv, struct Env *env) {
 	int rc;
-	fprintf(env->io_fd, "unblocking %s, ", argv[1]);
+	dprintf(env->io_fd, "unblocking %s, ", argv[1]);
 	rc=unblock_task(argv[1]);
-	fprintf(env->io_fd, "returned %d\n", rc);
+	dprintf(env->io_fd, "returned %d\n", rc);
 
 	return 0;
 }
 
 static int kill_fnc(int argc, char **argv, struct Env *env) {
 	int rc;
-	fprintf(env->io_fd, "killing %s, ", argv[1]);
-	rc=kill_task(argv[1]);
-	fprintf(env->io_fd, "returned %d\n", rc);
+	dprintf(env->io_fd, "killing %s, ", argv[1]);
+	rc=kill_process(argv[1]);
+	dprintf(env->io_fd, "returned %d\n", rc);
 
 	return 0;
 }
@@ -468,19 +476,19 @@ static int setprio_fnc(int argc, char **argv, struct Env *env) {
 	int rc;
 	int prio=strtoul(argv[2],0,0);
 	if (prio>MAX_PRIO) {
-		fprintf(env->io_fd,"setprio: prio must be between 0-4\n");
+		dprintf(env->io_fd,"setprio: prio must be between 0-4\n");
 		return 0;
 	}
-	fprintf(env->io_fd, "set prio of %s to %d", argv[1], prio);
+	dprintf(env->io_fd, "set prio of %s to %d", argv[1], prio);
 	rc=setprio_task(argv[1],prio);
-	fprintf(env->io_fd, "returned %d\n", rc);
+	dprintf(env->io_fd, "returned %d\n", rc);
 
 	return 0;
 }
 
 static int reboot_fnc(int argc, char **argv, struct Env *env) {
-	fprintf(env->io_fd, "rebooting\n\n\n");
-	sleep(100);
+	dprintf(env->io_fd, "rebooting\n\n\n");
+	usleep(100*1000);
 	_reboot_(0x5a5aa5a5);
 	return 0;
 }
@@ -493,6 +501,113 @@ static int testprog(int argc, char **argv, struct Env *env) {
 	return 0;
 }
 #endif
+
+static int fork_test(int argc, char **argv, struct Env *env) {
+	int rc=my_fork();
+	if (!rc) {
+		dprintf(env->io_fd, "in new process\n");
+		while(1) {
+			msleep(100);
+		}
+	} else {
+		dprintf(env->io_fd, "in  parent, pid of new process is %d\n",rc);
+	}
+
+	return 0;
+}
+
+static int meminfo_fnc(int argc, char **argv, struct Env *env) {
+	int fd=io_open("kmem");
+	int rc=0;
+	int r=0,w=0;
+	char *nptr;
+	int opt;
+	unsigned long int address=0;
+	struct meminfo meminfo;
+
+	if (fd<0) {
+		dprintf(env->io_fd,"could not open dev kmem\n");
+		return -1;
+	}
+
+	memset(&meminfo,0,sizeof(meminfo));
+	rc=io_control(fd,KMEM_GET_MEMINFO, &meminfo, sizeof(meminfo));
+	if (rc<0) {
+		io_close(fd);
+		return -1;
+	}
+
+	dprintf(env->io_fd," Total ammount of Ram %d bytes\n", meminfo.totalRam);
+	dprintf(env->io_fd," Nr of free Pages %d\n", meminfo.freePages);
+	dprintf(env->io_fd," Nr of shared Pages %d\n", meminfo.sharedPages);
+	io_close(fd);
+	return 0;
+}
+
+static int psdumpmap_fnc(int argc, char **argv, struct Env *env) {
+	int fd=io_open("kmem");
+	int rc=0;
+	int r=0,w=0;
+	char *nptr;
+	int opt;
+	unsigned long int address=0;
+	struct ps_memmap ps_memmap;
+
+	if (fd<0) {
+		dprintf(env->io_fd,"could not open dev kmem\n");
+		return -1;
+	}
+
+	if (argc!=2) {
+		io_close(fd);
+		return -1;
+	}
+
+	memset(&ps_memmap,0,sizeof(ps_memmap));
+	ps_memmap.ps_name=argv[1];
+	ps_memmap.vaddr=0;
+	rc=io_control(fd,KMEM_GET_FIRST_PSMAP, &ps_memmap, sizeof(ps_memmap));
+	if (rc<0) {
+		io_close(fd);
+		return -1;
+	}
+	while(1) {
+		dprintf(env->io_fd, "vaddr=%8x, pte=%8x, sh info=%x\n", ps_memmap.vaddr, ps_memmap.pte, ps_memmap.sh_data);
+		rc=io_control(fd,KMEM_GET_NEXT_PSMAP, &ps_memmap, sizeof(ps_memmap));
+		if (rc<0) break;
+	}	
+
+	io_close(fd);
+	return 0;
+}
+
+static int dumptlb_fnc(int argc, char **argv, struct Env *env) {
+	int fd=io_open("kmem");
+	int rc=0;
+
+	if (fd<0) {
+		dprintf(env->io_fd,"could not open dev kmem\n");
+		return -1;
+	}
+	rc=io_control(fd,KMEM_DUMP_TLB, 0, 0);
+
+	io_close(fd);
+	return rc;
+}
+
+static int flushtlb_fnc(int argc, char **argv, struct Env *env) {
+	int fd=io_open("kmem");
+	int rc=0;
+
+	if (fd<0) {
+		dprintf(env->io_fd,"could not open dev kmem\n");
+		return -1;
+	}
+	rc=io_control(fd,KMEM_FLUSH_TLB, 0, 0);
+
+	io_close(fd);
+	return rc;
+}
 
 static struct cmd cmd_root[] = {
 		{"help", generic_help_fnc},
@@ -507,6 +622,11 @@ static struct cmd cmd_root[] = {
 		{"kmem",kmem_fnc},
 		{"nand",nand_fnc},
 		{"testprog",testprog},
+		{"fork",fork_test},
+		{"meminfo", meminfo_fnc},
+		{"dumpmap", psdumpmap_fnc},
+		{"dump_tlb", dumptlb_fnc},
+		{"flush_tlb", flushtlb_fnc},
 		{0,0}
 };
 
@@ -529,7 +649,7 @@ void main(void *dum) {
 	if (fd<0) return;
 
 	env.io_fd=fd;
-	fprintf(fd,"Starting sys_mon\n");
+	dprintf(fd,"Starting sys_mon\n");
 
 	if (!u_init) {
 		u_init=1;
@@ -563,11 +683,11 @@ void main(void *dum) {
 			cmd=lookup_cmd(argv[0],fd);
 			if (cmd) {
 				int rc;
-//				fprintf(fd,":iofd is %d\n",env.io_fd);
-				fprintf(fd,"\n");
+//				dprintf(fd,":iofd is %d\n",env.io_fd);
+				dprintf(fd,"\n");
 				rc=cmd->fnc(argc,argv,&env); 
 				if (rc<0) {
-					fprintf(fd,"%s returned %d\n",argv[0],rc);
+					dprintf(fd,"%s returned %d\n",argv[0],rc);
 				}
 			}
 		}

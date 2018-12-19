@@ -33,12 +33,17 @@
 #include <stdarg.h>
 #include <string.h>
 #include <assert.h>
-#include <io.h>
-#include <sys.h>
+#include <stdio.h>
+#include <sys/select.h>
+//#include <io.h>
+#include <mycore/sys.h>
 
 #define TICSPERHOUR	(100*60*60)
 #define TICSPERMIN	(100*60)
 #define TICSPERSEC	(100)
+
+char *itoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_num);
+char *xtoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_num);
 
 char *ts_format(unsigned int tics, char *buf, int bsize) {
 	unsigned int h=tics/TICSPERHOUR;
@@ -72,7 +77,72 @@ int parse_fmt(const char *fmt, int *field_width, int *zero_fill) {
 	return i;
 }
 
-int fprintf(int fd, const char *fmt, ...) {
+#if 0
+int printf(const char *fmt, ...) {
+	int i=0;
+	int fd=0;
+	va_list ap;
+	char numericbuf[17];
+	
+	va_start(ap,fmt);
+	while(1) {
+		int c=fmt[i++];
+		if (!c) break;
+		else if (c=='\n') {
+			io_write(fd,"\n\r",2);
+			continue;
+		} else if (c=='%') {
+			int prepend_zero=0, prepend_num=0;
+			i+=parse_fmt(&fmt[i],&prepend_num, &prepend_zero);
+			switch((c=fmt[i++])) {
+				case 's': {
+					char *s=va_arg(ap,char *);
+					int len=io_write(fd,s,strlen(s));
+					if ((prepend_num-len)>0) {
+						int j;
+						for(j=0;j<(prepend_num-len);j++) {
+							io_write(fd," ",1);
+						}
+					}
+					break;
+				}
+				case 'c': {
+					int gruuk=va_arg(ap, int);
+					io_write(fd,(char *)&gruuk,1);
+					break;
+				}
+				case 'd': {
+					char *s=itoa(va_arg(ap,unsigned int),numericbuf, 16,
+								prepend_zero, prepend_num);
+					io_write(fd,s,strlen(s));
+					break;
+				}
+				case 'x': {
+					char *s=xtoa(va_arg(ap,unsigned int),numericbuf, 16,
+							prepend_zero, prepend_num);
+					io_write(fd,s,strlen(s));
+					break;
+				}
+				case 't': {
+					char *s=ts_format(get_current_tic(),numericbuf, 16);
+					io_write(fd,s,strlen(s));
+					break;
+				}
+				default: {
+					io_write(fd,"%",1);
+					io_write(fd,(char *)&c,1);
+				}
+			}
+		} else {
+			io_write(fd,(char *)&c,1);
+		}
+		
+	}
+	va_end(ap);
+	return 0;
+}
+
+int dprintf(int fd, const char *fmt, ...) {
 	int i=0;
 	va_list ap;
 	char numericbuf[17];
@@ -212,7 +282,7 @@ int sprintf(char *sbuf, const char *fmt, ...) {
 	va_end(ap);
 	return p-sbuf;
 }
-
+#endif
 
 #define SET_CURSOR(BUF,X,Y) {BUF[0]=0x1b;BUF[1]='[';BUF[2]=X;BUF[3]=';';BUF[4]=Y;BUF[5]='H';BUF[6]=0;}
 #define FORW_CURSOR(BUF,X)	{BUF[0]=0x1b;BUF[1]='[';BUF[2]=X;BUF[3]='C';BUF[4]=0;}
@@ -273,7 +343,7 @@ int readline_r(int fd, char *prompt, char *buf, int buf_size) {
 	int tmp_h_ix=h_ix;
 	int state=STATE_C_NORMAL;
 
-	fprintf(fd,prompt,strlen(prompt));
+	dprintf(fd,prompt,strlen(prompt));
 
 	while (1) {
 		int ch=0;
@@ -380,6 +450,7 @@ handle_arrow:
 						back_cursor(fd);
 						bix--;
 					}
+					back_cursor(fd);
 					__builtin_strcpy(buf,history[tmp_h_ix&0x7]);
 					bix=strlen(buf);
 					buf[bix]=0;

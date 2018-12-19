@@ -56,13 +56,13 @@ char *strchr(const char *s, int c) {
 size_t strlen(const char *s) {
 	const char *start=s;
 	while(*s++);
-	return s-start;
+	return (s-1)-start;
 }
 
 size_t strnlen(const char *s,size_t n) {
 	const char *start=s;
 	while((*s++)&&(n--));
-	return s-start;
+	return (s-1)-start;
 }
 
 

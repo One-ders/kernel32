@@ -80,7 +80,6 @@ static const struct fb_cmap default_16_colors = {
 int fb_alloc_cmap(struct fb_cmap *cmap, int len, int transp) {
 	int size = len*sizeof(unsigned short int);
 
-	sys_printf("fb_alloc_cmap\n");
 	if (cmap->len != len) {
 		fb_dealloc_cmap(cmap);
 		if (!len) return 0;
@@ -113,7 +112,6 @@ fail:
  */
 
 void fb_dealloc_cmap(struct fb_cmap *cmap) {
-	sys_printf("fb_dealloc_cmap\n");
 	free(cmap->red);
 	free(cmap->green);
 	free(cmap->blue);
@@ -134,7 +132,6 @@ void fb_dealloc_cmap(struct fb_cmap *cmap) {
 int fb_copy_cmap(const struct fb_cmap *from, struct fb_cmap *to) {
 	int tooff = 0, fromoff = 0;
 	int size;
-	sys_printf("fb_copy_cmap\n");
 
 	if (to->start > from->start) {
 		fromoff = to->start - from->start;

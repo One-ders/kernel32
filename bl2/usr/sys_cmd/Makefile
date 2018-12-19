@@ -10,7 +10,7 @@ $(USR_SCMD)/sys_cmd.srec: $(USR_SCMD)/sys_cmd
 	$(OBJCOPY) -O srec $< $@
 	
 $(USR_SCMD)/sys_cmd: $(USR_SCMD)/sys_cmd.o $(USR_SCMD)/fb_user.o
-	$(LD) -o $@ $(LDFLAGS) $^
+	$(LD) -o $@ $(LDFLAGS) $^ $(LDLIBS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<

@@ -48,9 +48,6 @@ typedef int (*P_CHAR)(char );
 extern P_STR p_str;
 extern P_CHAR p_char;
 
-//P_STR p_str=0x800008d8;
-//P_CHAR p_char=0x80000880;
-
 void io_push() {
 }
 
@@ -89,6 +86,7 @@ void io_push() {
 int io_cb_handler(struct device_handle *dh, int ev, void *dum) {
 	return 0;
 }
+
 int io_add_c(const char c) {
 	if (!dh) return p_char(c);
 	return iodrv->ops->control(dh, WR_CHAR, (char *)&c,1);
@@ -342,7 +340,7 @@ int sys_printf(const char *fmt, ...) {
 		if (cppos) {
 			int len=cppos-ppos;
 			char *nl=__builtin_strchr(ppos,'\n');
-			if (nl<cppos) {
+			if (nl && nl<cppos) {
 				io_add_strn(ppos,(nl+1)-ppos);
 				io_add_c('\r');
 				ppos+=(nl+1)-ppos;
@@ -417,6 +415,114 @@ int sys_printf(const char *fmt, ...) {
 #endif
 //	io_setpolled(0);
 	in_print=0;
+	return 0;
+}
+
+int buf_add_c(char **buf,const char c) {
+	**buf=c;
+	(*buf)++;
+	return 1;
+}
+
+int buf_add_str(char **buf,const char *str) {
+	int sz=__builtin_strlen(str);
+	__builtin_memcpy(*buf,str,sz);
+	(*buf)+=sz;
+	return sz;
+}
+
+int buf_add_strn(char **buf, const char *bytes, int len) {
+	memcpy(*buf,bytes,len);
+	(*buf)[len]=0;
+	(*buf)+=len;
+	return len;
+}
+
+
+int sys_sprintf(char *buf, const char *fmt, ...) {
+	int i=0;
+	va_list ap;
+	char numericbuf[16];
+	const char *ppos=fmt;
+	int polled=0;
+
+	va_start(ap,fmt);
+	while(1) {
+		char *cppos;
+		int c;
+		if (!(*ppos)) break;
+		cppos=__builtin_strchr(ppos,'%');
+		if (cppos) {
+			int len=cppos-ppos;
+			char *nl=__builtin_strchr(ppos,'\n');
+			if (nl && nl<cppos) {
+				buf_add_strn(&buf,ppos,(nl+1)-ppos);
+				buf_add_c(&buf, '\r');
+				ppos+=(nl+1)-ppos;
+				continue;
+			}
+
+			if (len) buf_add_strn(&buf,ppos,len);
+			ppos=cppos;
+			i=0;
+		} else {
+			char *nl=__builtin_strchr(ppos,'\n');
+			if (nl) {
+				buf_add_strn(&buf,ppos,(nl+1)-ppos);
+				buf_add_c(&buf,'\r');
+				ppos+=(nl+1)-ppos;
+				continue;
+			}
+			buf_add_str(&buf,ppos);
+			break;
+		}
+		c=ppos[i++];
+		if (c=='%') {
+			int prepend_zero=0, prepend_num=0;
+			i+=parse_fmt(&ppos[i],&prepend_num, &prepend_zero);
+			switch((c=ppos[i++])) {
+				case 's': {
+					char *s=va_arg(ap,char *);
+					int len=buf_add_str(&buf,s);
+					if ((prepend_num-len)>0) {
+						int j;
+						for(j=0;j<(prepend_num-len);j++) {
+							buf_add_c(&buf,' ');
+						}
+					}
+					break;
+				}
+				case 'c': {
+					int gruuk=va_arg(ap, int);
+					buf_add_c(&buf,gruuk);
+					break;
+				}
+				case 'd': {
+					char *s=itoa(va_arg(ap,unsigned int),numericbuf, 16,
+								prepend_zero, prepend_num);
+					buf_add_str(&buf,s);
+					break;
+				}
+				case 'x': {
+					char *s=xtoa(va_arg(ap,unsigned int),numericbuf, 16,
+							prepend_zero, prepend_num);
+					buf_add_str(&buf,s);
+					break;
+				}
+				case 't': {
+					char *s=ts_format(tq_tic,numericbuf, 16);
+					buf_add_str(&buf,s);
+				}
+				default: {
+					buf_add_c(&buf, '%');
+					buf_add_c(&buf, c);
+				}
+			}
+		}
+		ppos+=i;
+	}
+	va_end(ap);
+	buf_add_c(&buf,0);
 	return 0;
 }
 
