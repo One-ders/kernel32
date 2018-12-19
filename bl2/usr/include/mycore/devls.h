@@ -1,1 +1,7 @@
-../../old-incl/devls.h
+
+struct devdata {
+	char name[32];
+	int numofpids;
+	unsigned char pid[16];
+};
+
