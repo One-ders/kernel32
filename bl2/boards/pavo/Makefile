@@ -2,8 +2,11 @@
 BOARD=pavo
 TOP:=$(shell pwd)/../..
 OBJ:=$(TOP)/boards/$(BOARD)/obj
+ARCH:=mips
 
 GIT_VERSION:=$(shell git describe --abbrev=4 --dirty --always --tags)
+
+export COMPILER_PREFIX:=/opt/cross/bin/mipsel-linux-
 
 export AS:=mipsel-linux-as
 export CC:=mipsel-linux-gcc
@@ -14,12 +17,12 @@ export OBJCOPY:=mipsel-linux-objcopy
 
 #CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4740 -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls
 CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/boards/$(BOARD) -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl/jz4740 -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4740 -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -D__KERNEL__ -DDEBUG -DDEFAULT_TRACE_LEV=0x0 -DDEFAULT_TRACE_SYS=0x0
-CFLAGS_USR:=-I$(TOP)/usr/include -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -DMMU -DMIPS -D__mips_o32 -msoft-float
+CFLAGS_USR:=-I$(TOP)/usr/include -I$(OBJ)/usr/libc/obj/include -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -DMMU -DMIPS -D__mips_o32 -msoft-float
 #CFLAGS_USR:=-I$(TOP)/usr/incl -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -DMMU -DMIPS -D__mips_o32
 LDFLAGS:=-g -T./pavo.ld 
 #LDFLAGS_USR:=-g $(OBJ)/usr/lib/start.o $(OBJ)/usr/lib/usrlib.o $(OBJ)/usr/lib/stdlib/stdlib.o $(OBJ)/usr/lib/stdio/libstdio.o $(OBJ)/usr/lib/sys/sys.o $(OBJ)/usr/lib/gdtoa/gdtoa.o $(OBJ)/usr/lib/termios/libtermios.o -T$(OBJ)/../pavo_usr.ld -L/opt/cross/lib/gcc/mipsel-linux/8.1.0 -lgcc
 LDFLAGS_USR:=-g -T$(OBJ)/../pavo_usr.ld  $(OBJ)/usr/syslib/start.o $(OBJ)/usr/syslib/usrlib.o
-LDLIBS_USR:=-L$(TOP)/usr/lib -lc -L/opt/cross/lib/gcc/mipsel-linux/8.1.0 -lgcc
+LDLIBS_USR:=-L$(OBJ)/usr/libc/lib -lc -L/opt/cross/lib/gcc/mipsel-linux/8.1.0 -lgcc
 
 
 all: uCore.img uroot.img
@@ -148,36 +151,14 @@ $(OBJ)/arch/mips/jz4740: $(TOP)/arch/mips/jz4740
 
 #usr.bin: $(OBJ)/usr/lib $(OBJ)/usr/sys_cmd $(OBJ)/usr/ls
 
-usr.bin: $(OBJ)/usr/syslib $(OBJ)/usr/sys_cmd $(OBJ)/usr/ls
+usr.bin: $(OBJ)/usr/libc $(OBJ)/usr/syslib $(OBJ)/usr/sys_cmd $(OBJ)/usr/ls
 
+$(OBJ)/usr/libc: $(TOP)/usr/libc
+	mkdir -p $@
+	lndir $< $@
+	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) ARCH=$(ARCH) $(MAKE) -C $@
 
-#$(OBJ)/usr/lib: $(TOP)/usr/lib $(OBJ)/usr/lib/mips $(OBJ)/usr/lib/stdlib $(OBJ)/usr/lib/stdio $(OBJ)/usr/lib/sys $(OBJ)/usr/lib/termios $(OBJ)/usr/lib/gdtoa
 $(OBJ)/usr/syslib: $(TOP)/usr/syslib $(OBJ)/usr/syslib/mips 
-	mkdir -p $@
-	lndir $< $@
-	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
-
-$(OBJ)/usr/lib/sys: $(TOP)/usr/lib/sys
-	mkdir -p $@
-	lndir $< $@
-	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
-
-$(OBJ)/usr/lib/stdlib: $(TOP)/usr/lib/stdlib
-	mkdir -p $@
-	lndir $< $@
-	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
-
-$(OBJ)/usr/lib/stdio: $(TOP)/usr/lib/stdio
-	mkdir -p $@
-	lndir $< $@
-	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
-
-$(OBJ)/usr/lib/gdtoa: $(TOP)/usr/lib/gdtoa
-	mkdir -p $@
-	lndir $< $@
-	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
-
-$(OBJ)/usr/lib/termios: $(TOP)/usr/lib/termios
 	mkdir -p $@
 	lndir $< $@
 	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
@@ -203,3 +184,4 @@ clean:
 	rm -rf $(OBJECTS) uCore uCore.bin uCore.img uroot rootf.img
 	rm -rf tmp obj *.o
 	$(MAKE) -C ipl clean
+	$(MAKE) -C $(TOP)/usr/libc clean
