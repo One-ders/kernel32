@@ -1,4 +1,4 @@
-/* $Nosix/Leanaux: , v1.1 2014/04/07 21:44:00 anders Exp $ */
+/* $TSOS: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
 /*
  * Copyright (c) 2014, Anders Franzen.
@@ -173,8 +173,11 @@ int sys_sprintf(char *buf, const char *format, ...);
 
 unsigned long int strtoul(char *str, char **endp, int base);
 
-#define sys_read(a,b,c) yaffs_read(a,b,c)
 #define sys_lseek(a,b,c) yaffs_lseek(a,b,c)
 #define sys_open yaffs_open
-#define sys_close(a) yaffs_close(a)
 
+struct stat;
+int sys_stat(char *path, struct stat *);
+int sys_fcntl(int fd, int cmd, unsigned long int p1, unsigned long int p2);
+int sys_close(int fd);
+int sys_read(int fd, void *buf, unsigned long int count);

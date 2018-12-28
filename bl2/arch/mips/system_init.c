@@ -76,7 +76,7 @@ extern unsigned long int *curr_pgd;
 int load_init(struct task *t) {
 	unsigned long brk_save;
 	unsigned int brk=0;
-	
+
 	struct elf_phdr phdr;
 
 	int rc=elf_get_first_phdr("/init",&phdr);
@@ -100,14 +100,14 @@ int load_init(struct task *t) {
 		}
 		if (phdr.p.p_memsz) {
 			sys_lseek(phdr.fd,phdr.p.p_offset,SEEK_SET);
-			sys_printf("load: at %x size %x\n", phdr.p.p_vaddr, phdr.p.p_memsz);
-			sys_read(phdr.fd,(void *)phdr.p.p_vaddr,phdr.p.p_memsz);
+			DEBUGP(DSYS_LOAD,DLEV_INFO, "load: at %x size %x\n", phdr.p.p_vaddr, phdr.p.p_memsz);
+			sys_read(phdr.fd,(void *)phdr.p.p_vaddr,phdr.p.p_filesz);
 		}
 		if (phdr.p.p_memsz-phdr.p.p_filesz) {
-			sys_printf("zero out %d bytes at %x\n",
+			DEBUGP(DSYS_LOAD,DLEV_INFO, "zero out %d bytes at %x\n",
 				phdr.p.p_memsz-phdr.p.p_filesz,
 				phdr.p.p_vaddr+phdr.p.p_memsz);
-			memset((void *)phdr.p.p_vaddr+phdr.p.p_memsz,0,phdr.p.p_memsz-phdr.p.p_filesz);
+			memset((void *)phdr.p.p_vaddr+phdr.p.p_filesz,0,phdr.p.p_memsz-phdr.p.p_filesz);
 		}
 
 		rc=elf_get_next_phdr(&phdr);
@@ -120,5 +120,45 @@ int load_init(struct task *t) {
 	current->asp->brk=brk_save;
 	curr_pgd=current->asp->pgd;  /* restore page table direcotry */
 	set_asid(current->asp->id);
+	return 0;
+}
+
+int load_binary(char *path) {
+	unsigned int brk=0;
+
+	struct elf_phdr phdr;
+
+	int rc=elf_get_first_phdr(path,&phdr);
+	if (rc<0) {
+		sys_printf("could not open %s\n", path);
+		return -1;
+	}
+
+	current->asp->brk=0x10000000;
+	current->asp->mmap_vaddr=0x10000000;
+
+	while(1) {
+		if (brk<phdr.p.p_vaddr+phdr.p.p_memsz) {
+			brk=phdr.p.p_vaddr+phdr.p.p_memsz;
+			sys_brk(current,(void *)brk);
+		}
+		if (phdr.p.p_memsz) {
+			sys_lseek(phdr.fd,phdr.p.p_offset,SEEK_SET);
+			DEBUGP(DSYS_LOAD,DLEV_INFO, "load: at %x size %x\n", phdr.p.p_vaddr, phdr.p.p_memsz);
+			sys_read(phdr.fd,(void *)phdr.p.p_vaddr,phdr.p.p_filesz);
+		}
+		if (phdr.p.p_memsz-phdr.p.p_filesz) {
+			DEBUGP(DSYS_LOAD,DLEV_INFO, "zero out %d bytes at %x\n",
+				phdr.p.p_memsz-phdr.p.p_filesz,
+				phdr.p.p_vaddr+phdr.p.p_memsz);
+			memset((void *)phdr.p.p_vaddr+phdr.p.p_filesz,0,phdr.p.p_memsz-phdr.p.p_filesz);
+		}
+
+		rc=elf_get_next_phdr(&phdr);
+		if (rc!=1) break;
+	}
+
+	elf_close(&phdr);
+
 	return 0;
 }

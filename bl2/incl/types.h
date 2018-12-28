@@ -5,10 +5,21 @@ typedef unsigned long int size_t;
 typedef long int ssize_t;
 
 typedef unsigned long int off_t;
-typedef unsigned long int loff_t;
 //typedef unsigned long long int loff_t;
+typedef unsigned long long int loff_t;
 
-typedef unsigned int dev_t;
+typedef unsigned long long int dev_t;
+typedef unsigned long long int ino_t;
+typedef unsigned int mode_t;
+typedef unsigned int nlink_t;
+typedef unsigned int uid_t;
+typedef unsigned int gid_t;
+typedef unsigned int blksize_t;
+typedef unsigned long long int blkcnt_t;
+
+typedef unsigned int time_t;
+
+struct timespec { time_t tv_sec; long tv_nsec;};
 
 #define NULL (0)
 #define BITS_PER_LONG (32)

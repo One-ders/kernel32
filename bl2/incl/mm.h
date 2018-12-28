@@ -27,5 +27,6 @@ struct task;
 
 unsigned long int get_mmap_vaddr(struct task *current, unsigned int size);
 int mapmem(struct task *t, unsigned long int vaddr, unsigned long int paddr, unsigned int attr);
+int unmapmem(struct task *t, unsigned long int vaddr);
 
 unsigned int virt_to_phys(void *v);

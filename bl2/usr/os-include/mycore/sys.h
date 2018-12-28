@@ -36,6 +36,7 @@ int io_close(int fd);
 int io_select(int nfds, fd_set *rfds, fd_set *wfds, fd_set *stfds, unsigned int *tout);
 unsigned long int io_lseek(int fd, unsigned long int offset, int whence);
 void *io_mmap(void *addr, unsigned int length, int prot, int flags, int fd, long int offset);
+int io_munmap(void *addr, unsigned int length);
 
 //void *sbrk(long int incr);
 int brk(void *);
@@ -49,7 +50,9 @@ int my_fork(void);
 #define IO_NOCALL 5
 #define WR_POLLED_MODE 6
 #define WR_GET_RESULT 7
-#define F_SETFL 8
+#ifndef F_SETFL
+#define F_SETFL 4
+#endif
 #define READDIR 9
 #define DYNOPEN 10
 #if 0
@@ -58,7 +61,9 @@ int my_fork(void);
 #define IO_MUNMAP 13
 #endif
 
-#define O_NONBLOCK 1
+#ifndef	O_NONBLOCK
+#define O_NONBLOCK 0200
+#endif
 
 #define EV_READ  1
 #define EV_WRITE 2

@@ -48,6 +48,9 @@ uroot.img: usr.bin
 	rm -rf uroot
 	mkdir uroot
 	cp obj/usr/sys_cmd/sys_cmd uroot/init
+	cp obj/usr/ls/ls uroot/ls
+	cp obj/usr/fb/fb uroot/fb
+	cp -r $(TOP)/usr/files/* uroot/.
 	mkyaffs2image 1 uroot rootf.img
 	
 tmp/fot3: tmp/fot2
@@ -151,7 +154,7 @@ $(OBJ)/arch/mips/jz4740: $(TOP)/arch/mips/jz4740
 
 #usr.bin: $(OBJ)/usr/lib $(OBJ)/usr/sys_cmd $(OBJ)/usr/ls
 
-usr.bin: $(OBJ)/usr/libc $(OBJ)/usr/syslib $(OBJ)/usr/sys_cmd $(OBJ)/usr/ls
+usr.bin: $(OBJ)/usr/libc $(OBJ)/usr/syslib $(OBJ)/usr/sys_cmd/sys_cmd $(OBJ)/usr/ls $(OBJ)/usr/fb
 
 $(OBJ)/usr/libc: $(TOP)/usr/libc
 	mkdir -p $@
@@ -168,12 +171,18 @@ $(OBJ)/usr/syslib/mips: $(TOP)/usr/syslib/mips
 	lndir $< $@
 	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
 
-$(OBJ)/usr/sys_cmd: $(TOP)/usr/sys_cmd
+$(OBJ)/usr/sys_cmd/sys_cmd: $(TOP)/usr/sys_cmd
+	mkdir -p $(dir $@)
+	lndir $< $(dir $@)
+	CFLAGS="$(CFLAGS_USR)" LDFLAGS="$(LDFLAGS_USR)" LDLIBS="$(LDLIBS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
+
+$(OBJ)/usr/ls: $(TOP)/usr/ls
 	mkdir -p $@
 	lndir $< $@
 	CFLAGS="$(CFLAGS_USR)" LDFLAGS="$(LDFLAGS_USR)" LDLIBS="$(LDLIBS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
 
-$(OBJ)/usr/ls: $(TOP)/usr/ls
+
+$(OBJ)/usr/fb: $(TOP)/usr/fb
 	mkdir -p $@
 	lndir $< $@
 	CFLAGS="$(CFLAGS_USR)" LDFLAGS="$(LDFLAGS_USR)" LDLIBS="$(LDLIBS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<

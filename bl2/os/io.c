@@ -1,4 +1,4 @@
-/* $Nosix/Leanaux: , v1.1 2014/04/07 21:44:00 anders Exp $ */
+/* $TSOS: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
 /*
  * Copyright (c) 2014, Anders Franzen.
@@ -539,4 +539,70 @@ void init_io(void) {
 	} else {
 		io_push();    /* to force out prints, done before open */
 	}
+}
+
+#include "yaffsfs.h"
+
+int sys_read(int fd, void *buf, unsigned long  size) {
+	return yaffs_read(fd,buf,size);
+}
+
+int sys_stat(char *path, struct stat *stbuf) {
+	struct yaffs_stat ystbuf;
+	int rc=yaffs_stat(path,&ystbuf);
+
+	if (rc<0) {
+		return rc;
+	}
+
+	stbuf->st_dev	= ystbuf.st_dev;
+	stbuf->st_ino	= ystbuf.st_ino;
+	stbuf->st_mode	= ystbuf.st_mode;
+	stbuf->st_nlink	= ystbuf.st_nlink;
+	stbuf->st_uid	= ystbuf.st_uid;
+	stbuf->st_gid	= ystbuf.st_gid;
+	stbuf->st_rdev	= ystbuf.st_rdev;
+	stbuf->st_size	= ystbuf.st_size;
+	stbuf->st_blksize=ystbuf.st_blksize;
+	stbuf->st_blocks= ystbuf.st_blocks;
+
+	return rc;
+}
+
+int sys_fcntl(int fd, int cmd, unsigned long arg1, unsigned long arg2) {
+	sys_printf("fcntl called: fd=%d, cmd=%x, arg1=%x,arg2=%x\n",
+			fd, cmd, arg1, arg2);
+	return 0;
+}
+
+int sys_close(int fd) {
+	return yaffs_close(fd);
+}
+
+struct dirent64 {
+	unsigned long long d_ino;
+	unsigned long long d_off;
+	unsigned short	d_reclen;
+	unsigned char d_type;
+	char d_name[256];
+};
+
+int sys_getdents64(unsigned int fd,
+			void *dirp,
+			unsigned int count) {
+
+	struct yaffs_dirent *yaffs_dirent;
+	struct dirent64 *de64=dirp;
+
+	yaffs_dirent=yaffs_readdir_fd(fd);
+
+	if (!yaffs_dirent) return 0;
+
+	de64->d_ino=yaffs_dirent->d_ino;
+	de64->d_off=yaffs_dirent->d_off;
+	de64->d_type=yaffs_dirent->d_type;
+	strcpy(de64->d_name,yaffs_dirent->d_name);
+	de64->d_reclen=strlen(yaffs_dirent->d_name)+2+offsetof(struct dirent64,d_name);
+
+	return de64->d_reclen;
 }

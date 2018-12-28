@@ -1,4 +1,4 @@
-/* $Nosix/Leanaux: , v1.1 2014/04/07 21:44:00 anders Exp $ */
+/* $TSOS: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
 /*
  * Copyright (c) 2014, Anders Franzen.
@@ -51,6 +51,8 @@
 #define DSYS_MEM	2
 #define DSYS_FS		4
 #define DSYS_KERN	8
+#define DSYS_LOAD	0x10
+
 #define DLEV_CRIT	1
 #define DLEV_INFO	2
 
@@ -189,11 +191,15 @@ void put_page(void *);
 /* interface towards arch functions */
 int init_memory_protection(void);
 void init_sys_arch(void);
-void setup_return_stack(struct task *t, void *stackp,
+int setup_return_stack(struct task *t, void *stackp,
 					unsigned long int fnc,
 					unsigned long int ret_fnc,
-					void *arg0, 
-					void *arg1);
+					char **args,
+					char **env);
+int array_size(char **argv);
+int args_size(char **argv);
+int copy_arguments(char **argv_new, char **argv,
+                        char *arg_storage, int nr_args);
 int unmap_stack_memory(unsigned long int addr);
 int map_stack_page(unsigned long int addr,unsigned int size);
 int map_tmp_stack_page(unsigned long int addr,unsigned int size);
@@ -203,6 +209,7 @@ int activate_memory_protection(void);
 struct task *create_user_context(void);
 int share_process_pages(struct task *to, struct task *from);
 int load_init(struct task *);
+int load_binary(char *npath);
 
 void init_switcher(void);
 void switch_on_return(void);
@@ -276,7 +283,7 @@ struct dyn_open_args {
 #define IO_NOCALL 5
 #define WR_POLLED_MODE 6
 #define WR_GET_RESULT 7
-#define F_SETFL	8
+#define F_SETFL	4
 #define READDIR 9
 #define DYNOPEN 10
 #define IO_LSEEK 11
@@ -284,7 +291,7 @@ struct dyn_open_args {
 #define IO_MUNMAP 13
 
 
-#define O_NONBLOCK 1
+#define O_NONBLOCK 0200
 
 /* Standard return codes from driver read, write control */
 #define DRV_OK 		0
@@ -334,7 +341,8 @@ struct task_create_args {
 int allocate_task_id(struct task *t);
 int allocate_as_id(void);
 void *alloc_kheap(struct task *t, unsigned int size);
-int incr_address_space_users(struct task *t);
+int incr_address_space_users(struct address_space *asp);
+int decr_address_space_users(struct address_space *asp);
 struct task *lookup_task_for_name(char *task_name);
 int count_free_pages();
 int count_shared_pages();

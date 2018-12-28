@@ -7,4 +7,3 @@ int *___errno_location(void)
 {
         return &my_errno;
 }
-

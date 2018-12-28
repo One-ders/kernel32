@@ -10,6 +10,9 @@
 #define U_INSTR_START   0x00001000
 
 
+int dump_tlb(void);
+static void flush_tlb_page(unsigned int vaddr, unsigned int pid);
+
 
 struct sh_page {
         unsigned long int pte_pfn;
@@ -202,16 +205,20 @@ unsigned long int get_pte_from_shared(unsigned long int pte_spfn) {
         return shp->pte_pfn|pte_flags;
 }
 
-void dealloc_pte_page(unsigned int pte) {
+unsigned long int dealloc_pte_page(unsigned int pte) {
+	unsigned long int paddr=0;
 	if (pte&P_SHARED) {
+		int real_pte=get_pte_from_shared(pte);
+		paddr=(0x80000000|((real_pte>>6)<<12));
 		if (decr_ref(pte)<1) {
-			int real_pte=get_pte_from_shared(pte);	
-			put_page((void *)(0x80000000|((real_pte>>6)<<12)));
+			put_page((void *)paddr);
 			del_shared_pte(pte);
 		}
 	} else {
-		put_page((void *)(0x80000000|((pte>>6)<<12)));
+		paddr=(0x80000000|((pte>>6)<<12));
+		put_page((void *)paddr);
 	}
+	return paddr;
 }
 
 
@@ -227,17 +234,26 @@ void handle_TLB1(void *sp) {   // a write to a non dirty pte (write protected
 	unsigned long int c0_index;
 
 	if (!curr_pgd) {
+		io_setpolled(1);
 		sys_printf("handle_TLB1: super error, no curr_pgd\n");
 		while(1);
 	}
-	DEBUGP(DSYS_MEM,DLEV_INFO,">>>>TLB1: handle_tlb_miss: tlb_context %x, context_user_data %x, tlb_hi %x\n",
-                        read_c0_context(), read_c0_context()>>23, read_c0_hi());
+	DEBUGP(DSYS_MEM,DLEV_INFO,">>>>TLB1: handle_tlb_miss: tlb_index %x, tlb_hi %x\n",
+                        read_c0_index(), read_c0_hi());
 	DEBUGP(DSYS_MEM,DLEV_INFO,"TLB1: curr_pgd at %x\n",curr_pgd);
 
 	DEBUGP(DSYS_MEM,DLEV_INFO,"TLB1: tlb_miss for %x\n", badvaddr);
 	pt=(unsigned long int *)curr_pgd[pgd_index];
 	if (!pt) {
-		sys_printf("no pte at index %x\n",pgd_index);
+		io_setpolled(1);
+
+	asm("tlbp");
+		sys_printf(">>>>TLB1: handle_tlb_miss: tlb_index %x, tlb_hi %x\n",
+                        read_c0_index(), read_c0_hi());
+		sys_printf("TLB1: curr_pgd at %x\n",curr_pgd);
+
+		sys_printf("TLB1: tlb_miss for %x\n", badvaddr);
+		sys_printf("no pt at index %x\n",pgd_index);
 		while(1);
 	}
 	DEBUGP(DSYS_MEM,DLEV_INFO, "TLB1: page_table at %x\n", pt);
@@ -246,6 +262,7 @@ void handle_TLB1(void *sp) {   // a write to a non dirty pte (write protected
 
 	pte=pt[pt_index];
 	if (!pte) {
+		io_setpolled(1);
 		sys_printf("no pte at  %x\n", pt_index);
 		while(1);
 	} else {
@@ -365,8 +382,8 @@ void handle_tlb_miss(void *sp) {
         } else {
 		io_setpolled(1);
                 sys_printf("User: Segmentation violation\n");
-	        sys_printf("invalid access from %x, address %x\n",
-                                   read_c0_epc(), read_c0_badvaddr());
+	        sys_printf("invalid access from 0x%08x, address 0x%08x, sp 0x%08x, current=%s\n",
+                                   read_c0_epc(), read_c0_badvaddr(), sp, current->name);
                 while(1);
         }
 
@@ -439,7 +456,9 @@ void handle_TLBL(void *sp) {
         sys_printf("handle tlb load trap, badvaddr %x\n",badvaddr);
 #endif
         if (!curr_pgd) {
-                sys_printf("handle_TLBL: super error, no curr_pgd for addr %x\n",badvaddr);
+		io_setpolled(1);
+		sys_printf("handle_TLBL: at 0x%08x, address 0x%08x, sp=0x%08x, current=%s\n",
+                      read_c0_epc(), read_c0_badvaddr(),sp, current->name);
                 while(1);
         }
 //      sys_printf("TLBL: curr_pgd at %x\n",curr_pgd);
@@ -612,9 +631,41 @@ int mapmem(struct task *t, unsigned long int vaddr, unsigned long int paddr, uns
         return 0;
 }
 
+int unmapmem(struct task *t, unsigned long int vaddr) {
+        unsigned int pgd_index=vaddr>>PT_SHIFT;
+        unsigned int pt_index=(vaddr&P_MASK)>>P_SHIFT;
+        unsigned long int *pt, pte;
+	unsigned long int cpu_flags;
+
+	cpu_flags=disable_interrupts();
+        pt=(unsigned long int *)t->asp->pgd[pgd_index];
+        if (!pt) {
+		restore_cpu_flags(cpu_flags);
+		return 0;
+	}
+
+        pte=pt[pt_index];
+        if (!pte) {
+		restore_cpu_flags(cpu_flags);
+                return 0;
+        }
+
+	dealloc_pte_page(pte);
+
+        pt[pt_index]=0;
+	flush_tlb_page(vaddr,t->asp->id);
+	restore_cpu_flags(cpu_flags);
+
+        return 0;
+}
+
+
 static void flush_tlb_page(unsigned int vaddr, unsigned int pid) {
         int index;
+	int cpu_flags;
         DEBUGP(DSYS_MEM,DLEV_INFO,"flush_tlb: %x, pid %d\n", vaddr, pid);
+
+	cpu_flags=disable_interrupts();
         set_c0_hi((vaddr&0xffffe000)|pid);
         asm("tlbp");
         index=read_c0_index();
@@ -625,19 +676,17 @@ static void flush_tlb_page(unsigned int vaddr, unsigned int pid) {
         }
 
 //      sys_printf("flush flush\n");
+        set_c0_hi(0);
         if (vaddr&(1<<12)) {
-//                unsigned long int pte=read_c0_lo1();
-//                set_c0_lo1(pte & ~P_VALID);
                 set_c0_lo1(0);
         } else {
-//                unsigned long int pte=read_c0_lo0();
-//                set_c0_lo0(pte & ~P_VALID);
                 set_c0_lo0(0);
         }
         asm("tlbwi");
 
 out:
         set_asid(current->id);
+	restore_cpu_flags(cpu_flags);
 }
 
 static int share_pt_pages(unsigned int pgd_index,struct task *to,
@@ -713,24 +762,24 @@ int free_asp_pages(struct address_space *asp) {
 				}
 			}
              		put_page((void *)pt);
+			pgd[i]=0;
                 }
         }
-        put_page(pgd);
         return 0;
 }
 
 void handle_address_err_load(void *sp) { 
 	io_setpolled(1);
-	sys_printf("address read error: at 0x%08x, address 0x%08x, sp=0x%08x\n",
-                      read_c0_epc(), read_c0_badvaddr(),sp);
+	sys_printf("address read error: at 0x%08x, address 0x%08x, sp=0x%08x, current=%s\n",
+                      read_c0_epc(), read_c0_badvaddr(),sp, current->name);
 
 	while(1);
 }
 
 void handle_address_err_store(void *sp) { 
 	io_setpolled(1);
-	sys_printf("address write error: at 0x%08x, address 0x%08x, sp=0x%08x\n",
-                      read_c0_epc(), read_c0_badvaddr(),sp);
+	sys_printf("address write error: at 0x%08x, address 0x%08x, sp=0x%08x, current=%s\n",
+                      read_c0_epc(), read_c0_badvaddr(),sp, current->name);
 
 	while(1);
 }

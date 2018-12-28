@@ -1,4 +1,4 @@
-/* $Nosix: , v1.1 2014/04/07 21:44:00 anders Exp $ */
+/* $TSOS: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
 /*
  * Copyright (c) 2014, Anders Franzen.
@@ -255,6 +255,9 @@ __attribute__ ((noinline)) int svc_my_fork(void) {
 	return rc;
 }
 
+__attribute__ ((noinline)) void svc_exit(int st) {
+	svc(SVC_EXIT);
+}
 
 
 
@@ -365,4 +368,8 @@ int brk(void *nbrk) {
 
 int my_fork(void) {
 	return svc_my_fork();
+}
+
+void exit(int st) {
+	svc_exit(st);
 }

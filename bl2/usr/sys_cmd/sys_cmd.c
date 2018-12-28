@@ -1,4 +1,4 @@
-/* $Nosix/Leanaux: , v1.1 2014/04/07 21:44:00 anders Exp $ */
+/* $TSOS: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
 /*
  * Copyright (c) 2014, Anders Franzen.
@@ -32,9 +32,14 @@
  */
 
 #include <sys/select.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <mycore/sys.h>
 #include <string.h>
 #include <stdio.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <limits.h>
 #include <unistd.h>
@@ -44,6 +49,8 @@
 #include <mycore/devls.h>
 #include <mycore/nand.h>
 #include <mycore/kmem.h>
+
+static int dumptlb_fnc(int argc, char **argv, struct Env *env);
 
 struct dents {
 	char name[32];
@@ -516,6 +523,37 @@ static int fork_test(int argc, char **argv, struct Env *env) {
 	return 0;
 }
 
+static int loadnrun_fnc(int argc, char **argv, struct Env *env) {
+	int fd;
+	int rc;
+	int npid;
+	struct stat stbuf;
+
+	if (argc<2) {
+		dprintf(env->io_fd, "need at least file name of loadfile\n");
+		return -1;
+	}
+
+	memset(&stbuf,0,sizeof(stbuf));
+	rc=stat(argv[1], &stbuf);
+	if (rc<0) {
+		dprintf(env->io_fd, "error %d for stat file %s\n",errno,argv[1]);
+		return -errno;
+	}
+
+	npid=my_fork();
+
+	if (npid) {
+		msleep(5000);
+	} else {
+		char *newenviron[] = { NULL };
+		execve(argv[1], &argv[1], newenviron);
+		dprintf(env->io_fd, "return after execve... Errrir\n");
+		exit(0);
+	}
+	return 0;
+}
+
 static int meminfo_fnc(int argc, char **argv, struct Env *env) {
 	int fd=io_open("kmem");
 	int rc=0;
@@ -627,6 +665,7 @@ static struct cmd cmd_root[] = {
 		{"dumpmap", psdumpmap_fnc},
 		{"dump_tlb", dumptlb_fnc},
 		{"flush_tlb", flushtlb_fnc},
+		{"loadnrun", loadnrun_fnc},
 		{0,0}
 };
 
@@ -643,13 +682,15 @@ char *barg[] = {"blinky", "on"};
 
 void main(void *dum) {
 	char buf[256];
-	int fd=io_open(dum);
+//	int fd=io_open(dum);
 	struct Env env;
 	static int u_init=0;
-	if (fd<0) return;
+//	if (fd<0) return;
 
-	env.io_fd=fd;
-	dprintf(fd,"Starting sys_mon\n");
+	env.io_fd=1;
+
+	fflush(stdout);
+	printf("Starting sys_mon\n");
 
 	if (!u_init) {
 		u_init=1;
@@ -666,7 +707,7 @@ void main(void *dum) {
 
 	while(1) {
 		int rc;
-		rc=readline_r(fd,"\n--->",buf,200);
+		rc=readline_r(0,"\n--->",buf,200);
 		if (rc>0) {
 			struct cmd *cmd;
 			int argc;
@@ -680,14 +721,14 @@ void main(void *dum) {
 				continue;
 			}
 			argc=rc;
-			cmd=lookup_cmd(argv[0],fd);
+			cmd=lookup_cmd(argv[0],1);
 			if (cmd) {
 				int rc;
-//				dprintf(fd,":iofd is %d\n",env.io_fd);
-				dprintf(fd,"\n");
+				printf(":iofd is %d\n",env.io_fd);
+				dprintf(1,"\n");
 				rc=cmd->fnc(argc,argv,&env); 
 				if (rc<0) {
-					dprintf(fd,"%s returned %d\n",argv[0],rc);
+					dprintf(1,"%s returned %d\n",argv[0],rc);
 				}
 			}
 		}

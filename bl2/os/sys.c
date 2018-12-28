@@ -1,4 +1,4 @@
-/* $Nosix/leanaux: , v1.1 2014/04/07 21:44:00 anders Exp $ */
+/* $TSOS: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
 /*
  * Copyright (c) 2014, Anders Franzen.
@@ -36,22 +36,22 @@
 
 #include <string.h>
 
+void sys_thread_exit(int status);
+int sys_getdents64(unsigned int fd,
+                        void *dirp,
+                        unsigned int count);
+
 struct iovec {
 	void *iov_base;
 	size_t iov_len;
-};
-
-typedef long int time_t;
-
-struct timespec {
-	time_t tv_sec;
-	long int tv_nsec;
 };
 
 unsigned int sys_irqs;
 
 struct task * volatile ready[5];
 struct task * volatile ready_last[5];
+
+struct task * task_cemetery;
 
 struct task *troot =&main_task;
 struct task * volatile current = &main_task;
@@ -140,6 +140,8 @@ void SysTick_Handler(void) {
 			        b=bnext;
 				restore_cpu_flags(cpu_flags);
 				free_asp_pages(t->asp);
+				put_page(t->asp->pgd);
+				t->asp->pgd=0;
 				dealloc_as_id(t->asp->id);
 				dealloc_task_id(t->id);
 				put_page(t);
@@ -212,7 +214,9 @@ struct driver *drv_root=&console;
 
 #define FDTAB_SIZE 16
 
-struct user_fd fd_tab[FDTAB_SIZE] = {{&console,0,}, };
+struct user_fd fd_tab[FDTAB_SIZE] = {{&console,0,},
+					{&console,0,},
+					{&console,0,}, };
 
 int get_user_fd(struct driver *d, struct device_handle *dh) {
 	int i;
@@ -333,6 +337,8 @@ void *handle_syscall(unsigned long int *svc_sp) {
 			unsigned char *estack=((unsigned char *)t)+2048;
 			unsigned long int *stackp=(unsigned long int *)(estack+2048);
 			unsigned char *uval=tca->val;
+			char *targs[]={uval,(char *)0x0};
+			char *environ[] = { (char *)0};
 
 			if (!t) {
 				set_svc_ret(svc_sp,-1);
@@ -359,15 +365,17 @@ void *handle_syscall(unsigned long int *svc_sp) {
 			}
 			__builtin_memset(estack,0,2048);
 			t->estack=estack;
+#if 0
 			if (tca->val_size) {
 				int aval_size=(tca->val_size+7)&~0x7;
 				uval=((unsigned char *)stackp)-aval_size;
 				memcpy(uval,tca->val,tca->val_size);
 				stackp=(unsigned long int *)uval;
 			}
+#endif
 			t->asp=current->asp;
 			t->asp->ref++;
-			setup_return_stack(t,(void *)stackp,(unsigned long int)tca->fnc,0,uval,(void *)8);
+			setup_return_stack(t,(void *)stackp,(unsigned long int)tca->fnc,0,targs,environ);
 
 			t->state=TASK_STATE_READY;
 			t->name=alloc_kheap(t,strlen(tca->name)+5);
@@ -780,6 +788,24 @@ again:
 			set_svc_ret(svc_sp,start_vaddr);
 			return 0;
 		}
+		case SVC_IO_MUNMAP: {
+			unsigned long int vaddr=(unsigned long int)get_svc_arg(svc_sp,0);
+			unsigned int len=(unsigned int)get_svc_arg(svc_sp,1);
+			unsigned int npages;
+			int i;
+
+			npages=((len-1)/PAGE_SIZE)+1;
+			for(i=0;i<npages;i++) {
+				int rc=unmapmem(current,vaddr);
+				if (rc<0) {
+					set_svc_ret(svc_sp,0);
+					return 0;
+				}
+				vaddr+=PAGE_SIZE;
+			}
+			set_svc_ret(svc_sp,0);
+			return 0;
+		}
 		case SVC_BLOCK_TASK: {
 			char *name=(char *)get_svc_arg(svc_sp,0);
 			struct task *t=lookup_task_for_name(name);
@@ -1008,6 +1034,102 @@ check_resched:
 			return 0;
 			break;
 		}
+		case SVC_EXIT: {
+			int status=(int)get_svc_arg(svc_sp,0);
+			sys_thread_exit(status);
+			switch_on_return();
+			return 0;
+			break;
+		}
+		case 0x0fa3: {  // Linux read
+			int fd=(int)get_svc_arg(svc_sp,0);
+			void *buf=(void *)get_svc_arg(svc_sp,1);
+			size_t count=get_svc_arg(svc_sp,2);
+			int rc=0;
+			if (fd>2) {
+				rc=sys_read(fd-3,buf,count);
+			}
+
+			if (rc<0) {
+				set_svc_ret(svc_sp, yaffsfs_GetLastError());
+				set_svc_lret(svc_sp,-1);
+			} else {
+				set_svc_ret(svc_sp,rc);
+				set_svc_lret(svc_sp,0);
+			}
+
+			return 0;
+		}
+		case 0x0fa5: {  // Linux open
+			char *path=(char *)get_svc_arg(svc_sp,0);
+			int  flags=(int)get_svc_arg(svc_sp,1);
+			int  mode=(int)get_svc_arg(svc_sp,2);
+			int fd=0;
+
+			fd=sys_open(path,flags,mode);
+			if (fd<0) {
+				set_svc_ret(svc_sp, yaffsfs_GetLastError());
+				set_svc_lret(svc_sp,-1);
+			} else {
+				set_svc_ret(svc_sp,fd+3);
+				set_svc_lret(svc_sp,0);
+			}
+			return 0;
+		}
+		case 0x0fa6: {  // Linux close
+			int fd=(int)get_svc_arg(svc_sp,0);
+			int rc=sys_close(fd-3);
+			set_svc_ret(svc_sp,rc);
+			set_svc_lret(svc_sp,0);
+			return 0;
+		}
+		case 0x0fab: {  // Linux execve
+			char *path=(char *)get_svc_arg(svc_sp,0);
+			char npath[strlen(path + 1)];
+			char **argv=(char **)get_svc_arg(svc_sp,1);
+//			char **envp=(char **)get_svc_arg(svc_sp,2);
+			int nr_args=array_size(argv);
+			int argv_storage_size=args_size(argv);
+			char *nargv[nr_args+1];
+			char argv_storage[argv_storage_size];
+			struct address_space *asp=current->asp;
+			char *envp[]={ NULL };
+
+			// copy stuff we need to kernel space
+			strcpy(npath,path);
+
+			copy_arguments(nargv,argv,argv_storage,nr_args);
+			nargv[nr_args]=0;
+
+			// forget all about this process
+			free_asp_pages(asp);
+			if (load_binary(npath)<0) {
+				sys_printf("must kill self\n");
+			}
+
+			setup_return_stack(current, (void *)(((unsigned long int)svc_sp)+148), 0x40000, 0, nargv, envp);
+
+			return 0;
+		}
+		case 0x0fcd: { // Linux sys brk
+			unsigned long int nbrk=(unsigned long int)get_svc_arg(svc_sp,0);
+			unsigned long int ret=0;
+			if (!nbrk) {
+				ret=(unsigned long int)sys_sbrk(current,0);
+				set_svc_ret(svc_sp,ret);
+				set_svc_lret(svc_sp,0);
+			} else {
+				int rc=sys_brk(current,(void *)nbrk);
+				if (!rc) {
+					set_svc_ret(svc_sp,nbrk);
+					set_svc_lret(svc_sp,0);
+				} else {
+					set_svc_ret(svc_sp,rc);
+					set_svc_lret(svc_sp,rc);
+				}
+			}
+			return 0;
+		}
 		case 0x0fd6: {  // Linux ioctl
 			int fd=(int)get_svc_arg(svc_sp,0);
 			int cmd=(int)get_svc_arg(svc_sp,1);
@@ -1085,6 +1207,60 @@ again_wr:
 			current->blocker.driver=0;
 			sys_sleepon(&current->blocker,(unsigned int *)&ms);
 			set_svc_ret(svc_sp,0);
+			set_svc_lret(svc_sp,0);
+			return 0;
+		}
+		case 0x1072: { // Linux mmap2
+			unsigned long int addr=(unsigned long int)get_svc_arg(svc_sp,0);
+			unsigned long int length=(unsigned long int)get_svc_arg(svc_sp,1);
+			unsigned long int prot=(unsigned long int)get_svc_arg(svc_sp,2);
+			unsigned long int flags=(unsigned long int)get_svc_arg(svc_sp,3);
+			unsigned long int fd=(unsigned long int)get_svc_arg(svc_sp,4);
+			unsigned long int pgoffset=(unsigned long int)get_svc_arg(svc_sp,5);
+
+			sys_printf("mmap: addr %x, len %x, prot %x, flags %x, fd %x, pgoffset %x\n",
+					addr, length, prot, flags, fd, pgoffset);
+
+			set_svc_ret(svc_sp,-8);
+			set_svc_lret(svc_sp,-1);
+
+			return 0;
+		}
+		case 0x1075: { // Linux stat
+			char *path=(char *)get_svc_arg(svc_sp,0);
+			struct stat *stbuf=(struct stat *)get_svc_arg(svc_sp,1);
+			int rc;
+
+			rc=sys_stat(path,stbuf);
+			if (rc<0) {
+				set_svc_ret(svc_sp, yaffsfs_GetLastError());
+			} else {
+				set_svc_ret(svc_sp,rc);
+			}
+			set_svc_lret(svc_sp,0);
+			return 0;
+		}
+		case 0x107b: { // Linux dirent64
+			int fd=(int)get_svc_arg(svc_sp,0);
+			void *dirp64=(void *)get_svc_arg(svc_sp,1);
+			int count=(int)get_svc_arg(svc_sp,2);
+			int rc=sys_getdents64(fd-3,dirp64,count);
+			set_svc_ret(svc_sp,rc);
+			if (rc<0) {
+				set_svc_lret(svc_sp,-1);
+			} else {
+				set_svc_lret(svc_sp,0);
+			}
+			return 0;
+		}
+		case 0x107c: { // Linux fcntl
+			int fd=(int)get_svc_arg(svc_sp,0);
+			int cmd=(int)get_svc_arg(svc_sp,1);
+			unsigned long int p1=(unsigned long int)get_svc_arg(svc_sp,2);
+			unsigned long int p2=(unsigned long int)get_svc_arg(svc_sp,3);
+			int rc;
+			rc=sys_fcntl(fd-3,cmd,p1,p2);
+			set_svc_ret(svc_sp,rc);
 			set_svc_lret(svc_sp,0);
 			return 0;
 		}
@@ -1342,6 +1518,69 @@ void *sys_wakeup_from_list(struct blocker_list *bl) {
 	return rc;
 }
 
+
+/***********************************************************/
+/*                                                         */
+/***********************************************************/
+
+void sys_thread_exit(int status) {
+	struct task **prevp;
+	struct task *i;
+	int nt=0;
+
+	current->state=TASK_STATE_DEAD;
+
+	prevp=&troot;
+	i=troot;
+
+	// link task out from main task list
+	while(i) {
+		if (i==current) {
+			*prevp=current->next2;
+			break;
+		}
+		prevp=&i->next2;
+		i=i->next2;
+	}
+
+	// link task out from ready list (should never be there)
+	prevp=(struct task **)&ready[current->prio_flags&0xf];
+	i=ready[current->prio_flags&0xf];
+
+	while(i) {
+		if (i==current) {
+			sys_printf("found task %s in ready list at exit\n",
+					current->name);
+			*prevp=current->next;
+			break;
+		}
+		prevp=&i->next;
+		i=i->next;
+	}
+
+	if (current->blocker.wakeup_tic) {
+		sys_timer_remove(&current->blocker);
+		sys_printf("task %s, blocked on timer\n", current->name);
+	}
+
+	if (current->blocker.driver) {
+		sys_printf("task %s, blocked from driver\n", current->name);
+	}
+
+	nt=decr_address_space_users(current->asp);
+
+	if(!nt) {
+		close_drivers(current);
+		free_asp_pages(current->asp);
+		put_page(current->asp->pgd);
+		current->asp->pgd=0;
+		dealloc_as_id(current->asp->id);
+	}
+
+	current->next2=task_cemetery;
+	task_cemetery=current;
+}
+
 /***********************************************************/
 /* DBG                                                     */
 /***********************************************************/
@@ -1483,12 +1722,11 @@ static int console_close(struct device_handle *dh) {
 }
 
 static int console_control(struct device_handle *dh, int cmd, void *arg1, int arg2) {
-	if(cmd==WR_CHAR) {
+	int rc=0;
 		if (my_usart_dh) {
-			my_usart->ops->control(my_usart_dh,cmd,arg1,arg2);
+			rc=my_usart->ops->control(my_usart_dh,cmd,arg1,arg2);
 		}
-	}
-	return arg2;
+	return rc;
 }
 
 static int console_init(void *instance) {
@@ -1547,7 +1785,7 @@ void start_up(void) {
         init_io();
 
         /* start the executive */
-        sys_printf("flexOmatic git ver %s, starting tasks\n",ver);
+        sys_printf("tsos git ver %s, starting tasks\n",ver);
         start_sys();
 }
 
@@ -1563,6 +1801,8 @@ void start_sys(void) {
 	
 	unsigned long int stackp;
 	struct task *t;
+	char *targs[]={"usart0", (char *)0x0};
+	char *environ[]={(char *)0x0};
 
 #ifdef MMU
 	if(mount_nand("nand1")<0) {
@@ -1586,9 +1826,7 @@ void start_sys(void) {
 	t->prio_flags=3;
 	stackp=((unsigned long int)t)+4096;
 	t->estack=(void *)(((unsigned long int)t)+2048);
-	stackp=stackp-8;
-	strcpy((void *)stackp,"usart0");
-	setup_return_stack(t,(void *)stackp,(unsigned long int)usr_init,0, (void *)stackp, (void *)8);
+	setup_return_stack(t,(void *)stackp,(unsigned long int)usr_init,0, targs, environ);
 
 	t->next2=troot;
 	troot=t;

@@ -114,6 +114,7 @@ int argit(char *str, int len, char *argv[16]) {
 		while((*p)==' ') {
 			p++;
 			if (p>=(str+len)) {
+				argv[ac]=0;
 				return ac;
 			}
 		}
@@ -122,6 +123,7 @@ int argit(char *str, int len, char *argv[16]) {
 			p++;
 			if (p>=(str+len)) {
 				ac++;
+				argv[ac]=0;
 				return ac;
 			}		
 		}
@@ -129,9 +131,11 @@ int argit(char *str, int len, char *argv[16]) {
 		p++;
 		ac++;
 		if (ac>=16) {
+			argv[0]=0;
 			return 0;
 		}
 	}
+	argv[ac]=0;
 	return ac;
 }
 

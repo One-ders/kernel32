@@ -35,15 +35,52 @@ void set_svc_lret(void *sp, long int val)  {
 	ff->a3=val;
 }
 
+int array_size(char **argv) {
+	int i=0;
+	while(argv[i]) {
+		i++;
+	}
+	return i;
+}
 
-void setup_return_stack(struct task *t, void *stackp_v,
+int args_size(char **argv) {
+	int total_size=0;
+	int i=0;
+
+	while(argv[i]) {
+		total_size+=(strlen(argv[i])+1);
+		i++;
+	}
+	return total_size;
+}
+
+int copy_arguments(char **argv_new, char **argv,
+			char *arg_storage, int nr_args) {
+	int i=0;
+	char *to=arg_storage;
+	while(argv[i]) {
+		argv_new[i]=strcpy(to,argv[i]);
+		to+=strlen(argv[i]);
+		*to=0;
+		to++;
+		i++;
+	}
+	return to-arg_storage;
+}
+
+
+int setup_return_stack(struct task *t, void *stackp_v,
 			unsigned long int fnc,
 			unsigned long int ret_fnc,
-			void *arg0,
-			void *arg1) {
+			char **argv,
+			char **envp) {
 //	unsigned long int *stackp=(unsigned long int *)(((char *)t)+4096);
 	unsigned long int *stackp=(unsigned long int *)stackp_v;
 	unsigned long int v_stack;
+	int nr_args;
+	char **argv_new;
+	char *args_storage;
+	int  args_storage_size;
 
 	DEBUGP(DSYS_SCHED,DLEV_INFO, "t at %x, stackp at %x\n",
 			t, stackp);
@@ -56,9 +93,24 @@ void setup_return_stack(struct task *t, void *stackp_v,
 		v_stack = t->asp->brk;
 	}
 
+	nr_args=array_size(argv);
+	if (nr_args>=20) {
+		return -1;
+	}
+
+	args_storage_size=args_size(argv);
+
+	// allocate space on process stack
+	v_stack-=args_storage_size;			// arguments
+	v_stack=v_stack&(~7);
+	args_storage=(char *)v_stack;
+
+	v_stack-=((nr_args+1)*sizeof(unsigned long int)); // argument pointers
+	argv_new=(char **)v_stack;
+
 	curr_pgd=t->asp->pgd;  /* repoint page table directory while loading */
-//	strcpy(((void *)0x3f000),arg0);
-	strcpy(((void *)(v_stack-8)),arg0);
+	copy_arguments(argv_new, argv, args_storage, nr_args);
+	argv_new[nr_args]=0;
 	curr_pgd=current->asp->pgd;
 	
 	*(--stackp)=0;		// hi
@@ -70,8 +122,7 @@ void setup_return_stack(struct task *t, void *stackp_v,
 	*(--stackp)=0xfc13;	// status
 	*(--stackp)=0;		// ra
 	*(--stackp)=0;		// fp
-//	*(--stackp)=0x80000000;	// user sp
-	*(--stackp)=v_stack-((unsigned int)arg1); // user sp
+	*(--stackp)=v_stack; // user sp
 
 	*(--stackp)=0;		// gp
 	*(--stackp)=0;		// k1
@@ -98,12 +149,13 @@ void setup_return_stack(struct task *t, void *stackp_v,
 	*(--stackp)=0;		// t1
 
 	*(--stackp)=0;		// t0
-	*(--stackp)=v_stack-((unsigned int)arg1);	// a3
-	*(--stackp)=0;		// a2
-	*(--stackp)=0;		// a1
-//	*(--stackp)=(unsigned long int)arg1; // a1
 
-	*(--stackp)=0x0000ff10; // a0
+	*(--stackp)=0;		// a3
+	*(--stackp)=0;		// a2
+	*(--stackp)=(long unsigned int)argv_new;// a1
+	*(--stackp)=(long unsigned int)nr_args; // a0
+
+//	*(--stackp)=0x0000ff10; // a0
 //	*(--stackp)=(unsigned long int)arg0; // a0
 	*(--stackp)=0x00000000; // v1
 	*(--stackp)=fnc; // v0
@@ -112,6 +164,13 @@ void setup_return_stack(struct task *t, void *stackp_v,
 	*(--stackp)=0;		// zero
 
 	t->sp=stackp;	// kernel sp
+}
+
+void adjust_stackptr(struct task *t) {
+	register unsigned long int sp=(unsigned long int)t->sp;
+	__asm__ __volatile__("move $sp,%0\n\t"
+				:
+				: "r" (sp));
 }
 
 unsigned long int get_usr_pc(struct task *t) {

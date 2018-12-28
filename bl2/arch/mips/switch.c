@@ -40,9 +40,14 @@ struct task *create_user_context(void) {
 	return t;
 }
 
-int incr_address_space_users(struct task *t) {
-	return t->asp->ref++;
+int incr_address_space_users(struct address_space *asp) {
+	return ++asp->ref;
 }
+
+int decr_address_space_users(struct address_space *asp) {
+	return --asp->ref;
+}
+
 
 unsigned long int handle_switch(unsigned long int *v_sp) {
 	int i=0;

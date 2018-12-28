@@ -1,0 +1,13 @@
+--- musl/include/errno.h.orig	2018-12-20 20:09:05.019967392 +0100
++++ musl/include/errno.h	2018-12-20 19:48:43.829819626 +0100
+@@ -12,8 +12,8 @@ extern "C" {
+ #ifdef __GNUC__
+ __attribute__((const))
+ #endif
+-int *__errno_location(void);
+-#define errno (*__errno_location())
++int *___errno_location(void);
++#define errno (*___errno_location())
+ 
+ #ifdef _GNU_SOURCE
+ extern char *program_invocation_short_name, *program_invocation_name;

@@ -1,4 +1,5 @@
 #include <sys.h>
+
 #include "yaffs_trace.h"
 #include "yaffs_guts.h"
 #include "yaffs_osglue.h"
@@ -28,7 +29,9 @@ unsigned yaffs_trace_mask =
 
 
 void yaffsfs_SetError(int err) {
-	sys_printf("yaffs set error: %d\n", err);
+	if (err) {
+		sys_printf("yaffs set error: %d\n", err);
+	}
 	yaffs_errno=err;
 }
 

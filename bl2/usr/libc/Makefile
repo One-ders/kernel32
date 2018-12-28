@@ -15,7 +15,8 @@ $(TOP)/usr/include: $(TOP)/usr/libc/musl/configure
 	ln -s $(TOP)/usr/libc/musl/include $(TOP)/usr/
 	ln -s $(TOP)/usr/os-include/mycore $(TOP)/usr/include/
 	ln -s $(TOP)/usr/libc/musl/arch/$(ARCH)/bits $(TOP)/usr/include/
-#                         libc/musl/arch/mips/bits
+	patch -p 0 -d $(TOP)/usr/libc < musl_001.patch
+	patch -p 0 -d $(TOP)/usr/libc < musl_002.patch
 
 $(TOP)/usr/libc/musl/configure:
 	(cd $(TOP)/usr/libc; git clone git://git.musl-libc.org/musl)

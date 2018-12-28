@@ -139,11 +139,13 @@ unsigned int read_c0_hi(void);
 int dump_tlb(void) {
 	int top_tlb_entry;
 	int i;
+	unsigned long int cpu_flags;
 
 	top_tlb_entry=(read_c0_config1()>>25)&0x3f;
 
 	sys_printf("JZ tlb has %d entries\n", top_tlb_entry+1);
 
+	cpu_flags=disable_interrupts();
 	for(i=0;i<=top_tlb_entry;i++) {
 		unsigned long int entryHi;
 		unsigned long int entryLo0;
@@ -158,6 +160,7 @@ int dump_tlb(void) {
 		sys_printf("%04d hi(vaddr):%08x lo0:%08x, lo1:%08x\n",
 			i,entryHi,entryLo0,entryLo1);
 	}
+	restore_cpu_flags(cpu_flags);
 	return 0;
 }
 
