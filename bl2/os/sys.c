@@ -237,14 +237,17 @@ int get_user_fd(struct driver *d, struct device_handle *dh) {
 int close_drivers(struct task *t) {
 	struct user_fd *fdl=t->fd_list;
 
+	sys_printf("close_drivers: p=%s\n", t->name);
 	t->fd_list=0;
 	while(fdl) {
 		struct user_fd *fdlnext=fdl->next;
+		sys_printf("calling close for %s\n", fdl->driver->name);
 		fdl->driver->ops->close(fdl->dev_handle);
 		fdl->driver=0;
 		fdl->next=0;
 		fdl=fdlnext;
 	}
+	sys_printf("leaving close drivers\n");
 	return 0;
 }
 

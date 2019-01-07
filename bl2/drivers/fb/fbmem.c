@@ -54,6 +54,18 @@ static struct device_handle *fb_open(void *instance,
 }
 
 static int fb_close(struct device_handle *dh) {
+	struct my_userdata *ud=DEVICE_UDATA(struct my_userdata,dh);
+	struct fb_info *fi;
+
+	if (!ud) return 0;
+
+	fi=ud->fb_data->fi;
+	if (fi->fbops->fb_release) {
+		int rc;
+		rc=fi->fbops->fb_release(fi,1);
+	}
+
+	driver_user_put_udata(root,DEVICE_H(ud));
 	return 0;
 }
 

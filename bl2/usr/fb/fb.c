@@ -121,7 +121,7 @@ int main(int argc, char **argv) {
 
 		while(1) {
 			int rc=read(fd,fbp+offs,4096);
-			printf("read %d bytes\n", rc);
+//			printf("read %d bytes\n", rc);
 			if (rc!=4096) {
 				break;
 			}
