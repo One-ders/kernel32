@@ -45,7 +45,8 @@ struct partition {
 
 static struct partition partitions[] = {
 	{0, 	0x80000},	// 2 blocks
-	{0x80000, 0x280000},	// 10 blocks
+	{0x400000, 0x00800000},// x blocks
+	{0x800000, 0x01800000},	// x blocks
 };
 
 #define NAND_DATAPORT   0xb8000000
@@ -500,9 +501,17 @@ static struct driver nand_drv1 = {
 	&nand_drv_ops,
 };
 
+static struct driver nand_drv2 = {
+	"nand2",
+	(void *)2,
+	&nand_drv_ops,
+};
+
+
 void init_jz_nand() {
 	driver_publish(&nand_drv0);
 	driver_publish(&nand_drv1);
+	driver_publish(&nand_drv2);
 }
 
 INIT_FUNC(init_jz_nand);

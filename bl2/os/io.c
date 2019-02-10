@@ -43,7 +43,7 @@ typedef int (*P_STR)(const char *);
 typedef int (*P_CHAR)(char );
 
 
-#ifdef MIPS
+#ifdef MUPS
 
 extern P_STR p_str;
 extern P_CHAR p_char;

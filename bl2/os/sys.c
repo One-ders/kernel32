@@ -1808,7 +1808,7 @@ void start_sys(void) {
 	char *environ[]={(char *)0x0};
 
 #ifdef MMU
-	if(mount_nand("nand1")<0) {
+	if(mount_nand("nand2")<0) {
 		sys_printf("could not mount nand\n");
 	}
 	t=create_user_context();

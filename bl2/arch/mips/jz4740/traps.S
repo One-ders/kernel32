@@ -1364,6 +1364,6 @@ _start:
         /* Set up temporary stack.
          */
         la      sp, 0x84000000
-        j	c_start
+        j	uboot_start
         nop
 
