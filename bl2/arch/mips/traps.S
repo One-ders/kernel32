@@ -1,4 +1,6 @@
 
+#define __ASSEMBLY__
+
 #include "config.h"
 #include <regdef.h>
 
@@ -41,6 +43,9 @@ tlb_refill_user:
 	.set	pop
 	.org 0x00000100
 cache_error:
+	lui	a0,%hi(cache_err)
+	addiu	a0,%lo(cache_err);
+	j	sputs
 2:	j	2b
 	nop
 	.org 0x00000180
@@ -100,6 +105,9 @@ _handle_irq:
 	and	k0, ST0_IE
 	bnez	k0, 1f
 	nop
+	lui	a0,%hi(h_irq_e1)
+	addiu	a0,%lo(h_irq_e1);
+	j	sputs
 4:	j	4b
 	nop
 1:
@@ -799,6 +807,9 @@ _handle_AdES:
 	j	4f
 	nop
 3:	move	k1,sp	    # continue on actual stack
+	lui	a0,%hi(ades)
+	addiu	a0,%lo(ades);
+	j	sputs
 6:	j	6b
 	nop
 4: 	move 	k0,sp
@@ -859,10 +870,16 @@ _handle_AdES:
 	move	a0,sp
 
 _handle_IBE:    //
+	lui	a0,%hi(ibe)
+	addiu	a0,%lo(ibe);
+	j	sputs
 8:	j	8b
 	ssnop
 
 _handle_DBE:
+	lui	a0,%hi(dbe)
+	addiu	a0,%lo(dbe);
+	j	sputs
 9:	j	9b
 	ssnop
 
@@ -881,6 +898,9 @@ _handle_Sys:
 	j	4f
 	nop
 3:	move	k1,sp	    # continue on actual stack
+	lui	a0,%hi(sys_e)
+	addiu	a0,%lo(sys_e);
+	j	sputs
 6:	j	6b
 	nop
 4: 	move 	k0,sp
@@ -1287,6 +1307,9 @@ do_switch:
 	.set pop
 
 _handle_Bp:
+	lui	a0,%hi(bp)
+	addiu	a0,%lo(bp);
+	j	sputs
 6:	j	6b
 	nop
 
@@ -1310,42 +1333,72 @@ _handle_RI:
 	eret
 	ssnop
 	ssnop
+	lui	a0,%hi(ri)
+	addiu	a0,%lo(ri);
+	j	sputs
 6:	j	6b
 	ssnop
 
 _handle_CpU:
+	lui	a0,%hi(cpu)
+	addiu	a0,%lo(cpu);
+	j	sputs
 6:	j	6b
 	nop
 
 _handle_Ov:
+	lui	a0,%hi(ov)
+	addiu	a0,%lo(ov);
+	j	sputs
 6:	j	6b
 	nop
 
 _handle_Tr:
+	lui	a0,%hi(tr)
+	addiu	a0,%lo(tr);
+	j	sputs
 6:	j	6b
 	nop
 
 _handle_FPE:
+	lui	a0,%hi(fpe)
+	addiu	a0,%lo(fpe);
+	j	sputs
 6:	j	6b
 	nop
 
 _handle_c2E:
+	lui	a0,%hi(c2e)
+	addiu	a0,%lo(c2e);
+	j	sputs
 6:	j	6b
 	nop
 
 _handle_MDMX:
+	lui	a0,%hi(mdmx)
+	addiu	a0,%lo(mdmx);
+	j	sputs
 6:	j	6b
 	nop
 
 _handle_WATCH:
+	lui	a0,%hi(watch)
+	addiu	a0,%lo(watch);
+	j	sputs
 6:	j	6b
 	nop
 
 _handle_Mcheck:
+	lui	a0,%hi(mcheck)
+	addiu	a0,%lo(mcheck);
+	j	sputs
 6:	j	6b
 	nop
 
 _handle_CacheErr:
+	lui	a0,%hi(cache_e2)
+	addiu	a0,%lo(cache_e2);
+	j	sputs
 6:	j	6b
 	nop
 
@@ -1366,4 +1419,40 @@ _start:
         la      sp, 0x84000000
         j	uboot_start
         nop
+
+sputs:
+	lui	t1,%hi(0xb0031000)
+	addiu	t1,%lo(0xb0031000)
+1:
+	lw	t2,0x14(t1)
+	andi	t2,0x60
+	beqz	t2, 1b
+	ssnop
+2:
+	lb k0,0(a0)
+3:	beqz	k0,3b
+	ssnop
+	sb	k0,0x00(t1)
+	addiu	a0,a0,1
+	j	1b
+	ssnop
+
+hej: .asciiz "\nhej\n"
+cache_err:	.asciiz "\nCache err 0x100\n"
+h_irq_e1:	.asciiz "\nhandleIrq\n"
+ades:		.asciiz "\nADes\n"
+ibe:		.asciiz "\nibe\n"
+dbe:		.asciiz "\ndbe\n"
+sys_e:		.asciiz "\nSys trap\n"
+bp:		.asciiz "\nBP\n"
+ri:		.asciiz "\nRI\n"
+cpu:		.asciiz "\nCPU\n"
+ov:		.asciiz "\nov\n"
+tr:		.asciiz "\ntr\n"
+fpe:		.asciiz "\nfpe\n"
+c2e:		.asciiz "\nc2e\n"
+mdmx:		.asciiz "\nmdmx\n"
+watch:		.asciiz "\nwatch\n"
+mcheck:		.asciiz "\nmcheck\n"
+cache_e2:	.asciiz "\nCache err 2\n"
 

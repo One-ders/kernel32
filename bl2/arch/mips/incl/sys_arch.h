@@ -1,4 +1,4 @@
-#include <../jz4740/mmu.h>
+#include <../mmu.h>
 
 #define MIPS
 

@@ -1,0 +1,5 @@
+
+eccsteps = 4
+NAND_ECC_POS = 28
+par_size = 7
+bch_bit =4

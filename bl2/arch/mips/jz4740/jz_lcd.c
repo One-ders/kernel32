@@ -34,7 +34,7 @@
 #include "irq.h"
 #include "jz_lcd.h"
 
-#include "jz4740/clocks.h"
+#include "clocks.h"
 
 #include <devices.h>
 #include <fb.h>

@@ -5,6 +5,10 @@
 #include "io.h"
 #include "irq.h"
 #include "frame.h"
+#include "jz4750_clocks.h"
+
+//#include "jz4750d.h"  via sys.h -> config.h
+#include "devices.h"
 
 #define TXB_SIZE 1024
 #define TXB_MASK (TXB_SIZE-1)
@@ -24,7 +28,7 @@ struct usart_data {
         volatile int rx_o;
         struct blocker_list rblocker_list;
         struct blocker_list wblocker_list;
-	struct UART_regs *regs;
+	struct UART *regs;
 };
 
 struct user_data {
@@ -35,7 +39,7 @@ struct user_data {
         int     events;
 };
 
-static struct usart_data usart_data0;
+static struct usart_data usart_data1;
 
 #define MAX_USERS 4
 //static struct user_data udata[MAX_USERS];
@@ -43,7 +47,7 @@ struct user_data udata[MAX_USERS];
 
 #endif
 
-#define UART_BASE	UART0_BASE
+#define UART_BASE	UART1_BASE
 
 void serial_setbrg (void);
 int serial_tstc (void);
@@ -53,7 +57,7 @@ int serial_init (void) {
 	volatile unsigned char *uart_fcr = (volatile unsigned char *)(UART_BASE + OFF_FCR);
 	volatile unsigned char *uart_lcr = (volatile unsigned char *)(UART_BASE + OFF_LCR);
 	volatile unsigned char *uart_ier = (volatile unsigned char *)(UART_BASE + OFF_IER);
-	volatile unsigned char *uart_sircr = (volatile unsigned char *)(UART_BASE + OFF_SIRCR);
+	volatile unsigned char *uart_isr = (volatile unsigned char *)(UART_BASE + OFF_ISR);
 
 	/* Disable port interrupts while changing hardware */
 	*uart_ier = 0;
@@ -62,11 +66,11 @@ int serial_init (void) {
 	*uart_fcr = ~UART_FCR_UME;
 
 	/* Set both receiver and transmitter in UART mode (not SIR) */
-	*uart_sircr = ~(SIRCR_RSIRE | SIRCR_TSIRE);
+	*uart_isr = ~(ISR_RCVEIR | ISR_XMITIR);
 
 	/* Set databits, stopbits and parity. 
                 (8-bit data, 1 stopbit, no parity) */
-	*uart_lcr = UART_LCR_WLEN_8 | UART_LCR_STOP_1;
+	*uart_lcr = UART_LCR_WLS_8 | UART_LCR_SBLS_1;
 
 	/* Set baud rate */
 	serial_setbrg();
@@ -96,14 +100,14 @@ void serial_setbrg (void) {
 
 void serial_putc (const char c) {
 	volatile unsigned char *uart_lsr = (volatile unsigned char *)(UART_BASE + OFF_LSR);
-	volatile unsigned char *uart_tdr = (volatile unsigned char *)(UART_BASE + OFF_TDR);
+	volatile unsigned char *uart_thr = (volatile unsigned char *)(UART_BASE + OFF_THR);
 
 	if (c == '\n') serial_putc ('\r');
 
 	/* Wait for fifo to shift out some bytes */
 	while ( !((*uart_lsr & (UART_LSR_TDRQ | UART_LSR_TEMP)) == 0x60) );
 
-	*uart_tdr = (unsigned char)c;
+	*uart_thr = (unsigned char)c;
 }
 
 void serial_puts (const char *s) {
@@ -113,11 +117,11 @@ void serial_puts (const char *s) {
 }
 
 int serial_getc (void) {
-	volatile unsigned char *uart_rdr = (volatile unsigned char *)(UART_BASE + OFF_RDR);
+	volatile unsigned char *uart_rbr = (volatile unsigned char *)(UART_BASE + OFF_RBR);
 
 	while (!serial_tstc());
 
-	return *uart_rdr;
+	return *uart_rbr;
 }
 
 int serial_tstc (void) {
@@ -239,7 +243,6 @@ static int usart_read(struct user_data *u, char *buf, int len) {
 	struct usart_data *ud=u->drv_data;
 	unsigned long int cpu_flags;
 	int i=0;
-	volatile unsigned char *uart_tdr = (volatile unsigned char *)(UART_BASE + OFF_TDR);
 
 	while(i<len) {
 		int ix=ud->rx_o%(RX_BSIZE);
@@ -270,7 +273,7 @@ static int usart_write(struct user_data *u,
 
 
 static int tx_buf_empty(void) {
-	struct usart_data *ud=&usart_data0;
+	struct usart_data *ud=&usart_data1;
 	if (!(ud->tx_in-ud->tx_out))  {
 		return 1;
 	}
@@ -278,7 +281,7 @@ static int tx_buf_empty(void) {
 }
 
 static int rx_data_avail(void) {
-	struct usart_data *ud=&usart_data0;
+	struct usart_data *ud=&usart_data1;
 	if (ud->rx_i-ud->rx_o) {
 		return 1;
 	}
@@ -369,7 +372,9 @@ static int usart_control(struct device_handle *dh,
 
 static int usart_init(void *instance) {
 	struct usart_data *ud=(struct usart_data *)instance;
-	unsigned short bauddivisor=2; /* -> 115200 (3686400/'2'*16) */
+	unsigned short bauddivisor=
+			__cpm_get_extalclk()/(16*CONFIG_BAUDRATE);
+//	char pbuf[200];
 
 	usart_putc_fnc=usart_putc;
 //	usart_putc_fnc=usart_polled_putc;
@@ -380,18 +385,22 @@ static int usart_init(void *instance) {
 	ud->txr=1;
 	ud->regs->ulcr=0x80;
 	ud->regs->ufcr=0;
-//	ud->regs->ufcr&=~UART_FCR_UME;
 	ud->regs->udllr=bauddivisor&0xff;
 	ud->regs->udlhr=bauddivisor>>8;
-	
+//	sys_sprintf(pbuf,"udlhr=%x, udllr=%x\n",
+//			ud->regs->udlhr, ud->regs->udllr);
 	ud->regs->umcr=0;
 	ud->regs->ulcr=0x03;
+
 	ud->regs->uier|=(UART_IER_TDRIE | UART_IER_RDRIE);
 	ud->regs->ufcr=UART_FCR_FME|UART_FCR_RFRT|UART_FCR_TFRT;
 //	ud->regs->ufcr=UART_FCR_RFRT|UART_FCR_TFRT|UART_FCR_UME;
-	install_irq_handler(UART0_IRQ, uart_irq_handler, ud);
+	
+
+	install_irq_handler(UART1_IRQ, uart_irq_handler, ud);
 	ud->regs->ufcr|=UART_FCR_UME;
 	
+//	serial_puts(pbuf);
 
 	return 0;
 }
@@ -408,15 +417,15 @@ static struct driver_ops usart_ops = {
 	usart_start
 };
 
-static struct driver usart0 = {
-	"usart0",
-	&usart_data0,
+static struct driver usart1 = {
+	"usart1",
+	&usart_data1,
 	&usart_ops,
 };
 
 void init_usart_drv(void) {
-	usart_data0.regs=(struct UART_regs *)UART0_BASE;
-	driver_publish(&usart0);
+	usart_data1.regs=(struct UART *)UART1_BASE;
+	driver_publish(&usart1);
 }
 
 INIT_FUNC(init_usart_drv);

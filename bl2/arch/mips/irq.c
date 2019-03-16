@@ -1,6 +1,7 @@
 #include <regdef.h>
 #include <frame.h>
 #include <irq.h>
+#include <devices.h>
 #include <sys.h>
 
 unsigned int read_c0_count(void);
@@ -12,14 +13,13 @@ struct IH_DATA {
 
 static struct IH_DATA handlers[32];
 
-static unsigned int valid_mask = 0x7ff7d20e;
 static unsigned int installed_mask;
 
 int install_irq_handler(int irq_num,
 			IRQ_HANDLER irq_handler,
 			void *handler_data) {
 
-	if (!((1<<irq_num)&valid_mask)) {
+	if (!((1<<irq_num)&VALID_IRQS)) {
 		sys_printf("someone installing invalid irq handler\n");
 		return -1;
 	}
@@ -70,6 +70,9 @@ void config_sys_tic(unsigned int ms) {
 	compare=read_c0_count();
 	compare+=compare_increment;
 	set_c0_compare(compare);
+	set_c0_status(get_c0_status()|CP0_CAUSE_IP7);
+	sys_printf("config_sys_tic: status %x, count %x, compare %x\n",
+		get_c0_status(), read_c0_count(), read_c0_compare());
 }
 
 void irq_dispatch(void *sp) {
@@ -86,7 +89,9 @@ void irq_dispatch(void *sp) {
 	INTC->icpr=cirq;
 
 	if (cause&CP0_CAUSE_IP7) {
+		set_c0_compare(compare);
 //		set_c0_status(get_c0_status()&~CP0_CAUSE_IP7);
+	sys_printf("in irq: cause %x, irq_lev %x, current cause %x\n", cause, irq_lev, get_c0_cause());
 		if (cause&CP0_CAUSE_TI) {
 			unsigned long int cpu_flags;
 			compare+=compare_increment;
@@ -97,7 +102,7 @@ void irq_dispatch(void *sp) {
 			restore_cpu_flags(cpu_flags);
 			
 		}
-//		set_c0_status(get_c0_status()|CP0_CAUSE_IP7);
+		set_c0_status(get_c0_status()|CP0_CAUSE_IP7);
 	}
 
 	if (cause&CP0_CAUSE_IP2) {
@@ -106,6 +111,9 @@ void irq_dispatch(void *sp) {
 			int i;
 			for(i=0;i<32;i++) {
 				if (cirq&(1<<i)) {
+					if (i!=8) {
+	sys_printf("in irq: cause %x, irq_lev %x, current cause %x, irqs %x, curr %x\n", cause, irq_lev, get_c0_cause(), cirq, i);
+					}
 					INTC->icmcr=cirq&(1<<i);
 					handlers[i].handler(i,handlers[i].h_data);
 				}
@@ -115,3 +123,14 @@ void irq_dispatch(void *sp) {
 	}
 //	INTC->icmcr=cirq;
 }
+
+unsigned int wi=0;
+void wait_irq(void) {
+	wi=1;
+//	asm volatile ("wait\t\n\t"
+//			: : );
+	sys_printf("config_sys_tic: status %x, count %x, compare %x\n",
+		get_c0_status(), read_c0_count(), read_c0_compare());
+	wi=0;
+}
+

@@ -34,6 +34,8 @@
 #include "io.h"
 #include "sys.h"
 
+#include <nand.h>
+
 #include <string.h>
 
 void sys_thread_exit(int status);
@@ -117,7 +119,7 @@ void SysTick_Handler(void) {
 
 	enable_interrupts();
 
-#if 0
+#if 1
 	if (!(sys_irqs%1000)) {
 		sys_printf("sys_tic: current %x\n",current);
 	}
@@ -1737,7 +1739,7 @@ static int console_init(void *instance) {
 }
 
 static int console_start(void *instance) {
-	my_usart=driver_lookup("usart0");
+	my_usart=driver_lookup(CFG_CONSOLE_DEV);
 	if (!my_usart) {
 		sys_printf("dont have usart\n");
 		return 0;
@@ -1800,18 +1802,62 @@ extern void *usr_init;
 
 int mount_nand(char *nand_dev_name);
 
+int dump_page(unsigned char *buf, int len, char *prefix) {
+	int i=0;
+	sys_printf("\nStart of dump\n");
+
+	while (i<len) {
+		if ((i%16)==0) {
+			sys_printf("%s%08x:", prefix,i);
+		}
+	
+		sys_printf(" %02x", buf[i]);
+
+		if ((i+1)%16) {
+			sys_printf(",");
+		} else {
+			sys_printf("\n");
+		}
+		i++;
+	}
+}
+
 void start_sys(void) {
 	
 	unsigned long int stackp;
 	struct task *t;
-	char *targs[]={"usart0", (char *)0x0};
+	char *targs[]={CFG_CONSOLE_DEV, (char *)0x0};
 	char *environ[]={(char *)0x0};
 
 #ifdef MMU
-	if(mount_nand("nand2")<0) {
+#if 0
+	struct driver *nand_drv=driver_lookup("nand4");
+	
+	if (nand_drv) {
+		struct device_handle *dh;
+		unsigned char buf[4096];
+		dh=nand_drv->ops->open(nand_drv->instance,0,0);
+		if (dh) {
+			memset(buf,9,4096);
+			nand_drv->ops->control(dh,
+						NAND_READ_RAW,
+						buf,
+						2048+64);
+			dump_page(buf,2048,"Data: ");
+			dump_page(buf+2048,64,"OOB Data: ");
+		}
+	} else {
+		sys_printf("did not find : driver nand4\n");
+		
+	}
+#endif
+
+	if(mount_nand("nand4")<0) {
 		sys_printf("could not mount nand\n");
 	}
+
 	t=create_user_context();
+	sys_printf("load_init:\n");
 	load_init(t);
 #else
 	t=(struct task *)get_page();
@@ -1823,6 +1869,7 @@ void start_sys(void) {
 	}
 #endif
 
+	sys_printf("back from load init\n");
 	t->name=alloc_kheap(t,strlen("sys_mon")+5);
 	sys_sprintf(t->name,"%s:%03d","sys_mon",t->asp->id);
 	t->state=TASK_STATE_READY;
@@ -1841,8 +1888,10 @@ void start_sys(void) {
 	}
 	ready_last[GET_PRIO(t)]=t;
 	clear_all_interrupts();
+	sys_printf("setup switch on next irq\n");
 	switch_on_return();  /* will switch in the task on return from next irq */
 	while(1) {
+		sys_printf("call wait irq\n");
 		wait_irq();
 	}
 

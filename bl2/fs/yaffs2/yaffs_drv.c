@@ -351,7 +351,7 @@ int mount_nand(char *nand_dev_name) {
 	param->start_block=0;
 	param->end_block=nand_cfg.n_blocks-1;
 	param->is_yaffs2=1;
-//	param->use_nand_ecc=0;
+	param->use_nand_ecc=1;
 	param->no_tags_ecc=1;
 	param->n_caches=10;
 	param->stored_endian=1;

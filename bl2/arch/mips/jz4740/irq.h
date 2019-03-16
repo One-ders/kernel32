@@ -23,6 +23,7 @@ extern unsigned int irq_lev;
 #define IPU_IRQ		29
 #define LCD_IRQ		30
 
+#define VALID_IRQS	0x7ff7d20e
 
 typedef int (*IRQ_HANDLER)(int irq_num, void *hdata);
 

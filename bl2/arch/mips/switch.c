@@ -53,7 +53,7 @@ unsigned long int handle_switch(unsigned long int *v_sp) {
 	int i=0;
 	struct task *t;
 	sys_irqs++;
-//	sys_printf("handle_switch: sp %x\n", v_sp);
+	sys_printf("handle_switch: sp %x\n", v_sp);
 
 //	disable_interrupts();
 	while(i<MAX_PRIO) {
@@ -106,11 +106,6 @@ unsigned long int handle_switch(unsigned long int *v_sp) {
 
 //	sys_printf("in switch: returning %x\n", t);
 	return (unsigned long int)t;
-}
-
-void wait_irq(void) {
-	asm volatile ("wait\t\n\t"
-			: : );
 }
 
 int task_sleepable(void) {

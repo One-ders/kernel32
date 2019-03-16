@@ -57,6 +57,7 @@ P_STR p_str;
 P_CHAR p_char;
 
 
+#ifndef UBOOT
 void c_start(void *bsp_funcs) {
 //        nand_load(0x1000, 0x4000,
 //                (unsigned char *)0x80000000);
@@ -112,6 +113,8 @@ void c_start(void *bsp_funcs) {
 	}
 }
 
+#else 
+
 void uboot_start(void *bsp_funcs) {
 //        nand_load(0x1000, 0x4000,
 //                (unsigned char *)0x80000000);
@@ -147,9 +150,8 @@ void uboot_start(void *bsp_funcs) {
 		"mtc0	$t0,$13\n\t"
 		:::"t0","t1");
 
-	pll_init();
         sdram_init();
-
+	pll_init();
 
 //	init_usart_drv();
 //	driver_init();
@@ -173,6 +175,7 @@ void uboot_start(void *bsp_funcs) {
 	}
 }
 
+#endif
 
 #if 0
 static int irq_cnt=0;

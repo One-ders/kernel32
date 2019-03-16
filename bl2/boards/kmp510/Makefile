@@ -1,5 +1,5 @@
 
-BOARD=pavo
+BOARD=kmp510
 TOP:=$(shell pwd)/../..
 OBJ:=$(TOP)/boards/$(BOARD)/obj
 ARCH:=mips
@@ -19,9 +19,9 @@ export OBJCOPY:=mipsel-linux-objcopy
 CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/boards/$(BOARD) -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl/jz4740 -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4740 -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -D__KERNEL__ -DDEBUG -DDEFAULT_TRACE_LEV=0x0 -DDEFAULT_TRACE_SYS=0x0
 CFLAGS_USR:=-I$(TOP)/usr/include -I$(OBJ)/usr/libc/obj/include -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -DMMU -DMIPS -D__mips_o32 -msoft-float
 #CFLAGS_USR:=-I$(TOP)/usr/incl -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -DMMU -DMIPS -D__mips_o32
-LDFLAGS:=-g -T./pavo.ld 
-#LDFLAGS_USR:=-g $(OBJ)/usr/lib/start.o $(OBJ)/usr/lib/usrlib.o $(OBJ)/usr/lib/stdlib/stdlib.o $(OBJ)/usr/lib/stdio/libstdio.o $(OBJ)/usr/lib/sys/sys.o $(OBJ)/usr/lib/gdtoa/gdtoa.o $(OBJ)/usr/lib/termios/libtermios.o -T$(OBJ)/../mips_usr.ld -L/opt/cross/lib/gcc/mipsel-linux/8.1.0 -lgcc
-LDFLAGS_USR:=-g -T$(OBJ)/../mips_usr.ld  $(OBJ)/usr/syslib/start.o $(OBJ)/usr/syslib/usrlib.o
+LDFLAGS:=-g -T./$(BOARD).ld 
+#LDFLAGS_USR:=-g $(OBJ)/usr/lib/start.o $(OBJ)/usr/lib/usrlib.o $(OBJ)/usr/lib/stdlib/stdlib.o $(OBJ)/usr/lib/stdio/libstdio.o $(OBJ)/usr/lib/sys/sys.o $(OBJ)/usr/lib/gdtoa/gdtoa.o $(OBJ)/usr/lib/termios/libtermios.o -T$(OBJ)/../cetus_usr.ld -L/opt/cross/lib/gcc/mipsel-linux/8.1.0 -lgcc
+LDFLAGS_USR:=-g -T$(OBJ)/../usr.ld  $(OBJ)/usr/syslib/start.o $(OBJ)/usr/syslib/usrlib.o
 LDLIBS_USR:=-L$(OBJ)/usr/libc/lib -lc -L/opt/cross/lib/gcc/mipsel-linux/8.1.0 -lgcc
 
 
@@ -73,7 +73,7 @@ ipl/boot.bin:
 	$(MAKE) -C ipl
 
 uCore: os version mips jz mm stddrv stdlib fb fs bin_fmt
-	$(LD) $(LDFLAGS) -o $@ $(OBJ)/lib/init_sect.o $(OBJ)/lib/mips.o $(OBJ)/lib/jz.o $(OBJ)/version.o $(OBJ)/lib/os.o $(OBJ)/lib/mm.o $(OBJ)/stddrv/stddrv.o $(OBJ)/stdlib/stdlib.o $(OBJ)/lib/fb.o $(OBJ)/lib/fs.o $(OBJ)/lib/bin_fmt.o $(OBJ)/lib/end_sect.o -L/opt/cross/lib/gcc/mipsel-linux/8.1.0 -lgcc
+	$(LD) $(LDFLAGS) -o $@ $(OBJ)/lib/init_sect.o $(OBJ)/lib/jz.o $(OBJ)/version.o $(OBJ)/lib/mips.o $(OBJ)/lib/os.o $(OBJ)/lib/mm.o $(OBJ)/stddrv/stddrv.o $(OBJ)/stdlib/stdlib.o $(OBJ)/lib/fb.o $(OBJ)/lib/fs.o $(OBJ)/lib/bin_fmt.o $(OBJ)/lib/end_sect.o -L/opt/cross/lib/gcc/mipsel-linux/8.1.0 -lgcc
 
 #traps.o: ../../mips/jz4740/traps.S
 #	$(CC) $(CFLAGS) -c -o $@ $<

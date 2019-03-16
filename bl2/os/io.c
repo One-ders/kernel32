@@ -52,9 +52,23 @@ void io_push() {
 }
 
 #else
+
+
+extern int serial_init(void);
+extern void serial_putc(const char c); 
+int dum_p_char(char a);
+static int serinit=0;
+
 static char buf[1024];
 static int bp=0;
 int dum_p_str(const char *dum) {
+	int i=0;
+	while(*dum) {
+		dum_p_char(*dum++);
+		i++;
+	}
+	return i;
+#if 0
 	if (dum) {
 		int sz=strlen(dum);
 		if (bp+sz>1023) return 1;
@@ -62,13 +76,21 @@ int dum_p_str(const char *dum) {
 		bp+=sz;
 		return 1;
 	}
+#endif
 	return 0;
 }
 
 int dum_p_char(char a) {
+	if (!serinit) {
+		serinit=1;
+//		serial_init();
+	}
+	serial_putc(a);
+#if 0
 	if (bp<1023) {
 		buf[bp++]=a;
 	}
+#endif
 	return 0;
 }
 
@@ -76,6 +98,7 @@ P_STR p_str=dum_p_str;
 P_CHAR p_char=dum_p_char;
 
 void io_push() {
+	if (!bp) return;
 	iodrv->ops->control(dh, WR_CHAR, (char *)buf, bp);
 }
 

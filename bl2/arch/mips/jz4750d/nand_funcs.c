@@ -1,5 +1,6 @@
 
 #include <config.h>
+#include "jz4750d.h"
 #include <mtd_nand.h>
 
 
@@ -25,11 +26,18 @@
 #define __nand_ecc_encode_sync() while (!(REG_NFINTS & NFINTS_ENCF))
 #define __nand_ecc_decode_sync() while (!(REG_NFINTS & NFINTS_DECF))
 
+#define PORT_A 0
+#define PORT_B 1
+#define PORT_C 2
+#define PORT_D 3
+#define PORT_E 4
+#define PORT_F 5
+
 static inline void __nand_dev_ready(void)
 {
         unsigned int timeout = 10000;
-        while ((REG_GPIO_PxPIN(PORT_C) & 0x40000000) && timeout--);
-        while (!(REG_GPIO_PxPIN(PORT_C) & 0x40000000));
+        while ((REG_GPIO_PXPIN(PORT_C) & 0x40000000) && timeout--);
+        while (!(REG_GPIO_PXPIN(PORT_C) & 0x40000000));
 }
 
 #define __nand_cmd(n)           (REG8(NAND_COMMPORT) = (n))

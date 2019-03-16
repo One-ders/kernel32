@@ -109,10 +109,13 @@ int setup_return_stack(struct task *t, void *stackp_v,
 	argv_new=(char **)v_stack;
 
 	curr_pgd=t->asp->pgd;  /* repoint page table directory while loading */
+	sys_printf("copy arguments to user stack\n");
 	copy_arguments(argv_new, argv, args_storage, nr_args);
+	sys_printf("done copy arguments to user stack\n");
 	argv_new[nr_args]=0;
 	curr_pgd=current->asp->pgd;
 	
+	sys_printf("setting up stack for new process\n");
 	*(--stackp)=0;		// hi
 	*(--stackp)=0;		// lo
 

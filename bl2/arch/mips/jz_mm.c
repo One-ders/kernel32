@@ -131,6 +131,10 @@ void set_c0_index(unsigned int index);
 void set_c0_lo0(unsigned int value);
 void set_c0_lo1(unsigned int value);
 void set_c0_hi(unsigned int value);
+unsigned int read_c0_index();
+unsigned int read_c0_random();
+unsigned int read_c0_pagemask();
+unsigned int read_c0_wired();
 unsigned int read_c0_lo0(void);
 unsigned int read_c0_lo1(void);
 unsigned int read_c0_hi(void);
@@ -146,6 +150,11 @@ int dump_tlb(void) {
 	sys_printf("JZ tlb has %d entries\n", top_tlb_entry+1);
 
 	cpu_flags=disable_interrupts();
+	sys_printf("index_register %x\n", read_c0_index());
+	sys_printf("random_register %x\n", read_c0_random());
+	sys_printf("pageMask: %x\n", read_c0_pagemask());
+	sys_printf("Wired register: %x\n", read_c0_wired());
+	
 	for(i=0;i<=top_tlb_entry;i++) {
 		unsigned long int entryHi;
 		unsigned long int entryLo0;
@@ -164,20 +173,46 @@ int dump_tlb(void) {
 	return 0;
 }
 
+#define UNIQUE_ENTRYHI(idx) (0x80000000 + ((idx) << (PAGE_SHIFT + 1)))
+
+
 
 int flush_tlb(void) {
 	int top_tlb_entry;
 	int i;
+	unsigned int old_hi;
+	unsigned long int cpu_flags=disable_interrupts();
 
 	top_tlb_entry=(read_c0_config1()>>25)&0x3f;
 
+	old_hi=read_c0_hi();
+	set_c0_lo0(0);
+	set_c0_lo1(0);
+
+sys_printf("looping the tlb\n");
 	for(i=0;i<=top_tlb_entry;i++) {
-		set_c0_hi(0);
-		set_c0_lo0(0);
-		set_c0_lo1(0);
+		unsigned long int hi;
+		sys_printf("loop entry %d\n",i);
+		hi=UNIQUE_ENTRYHI(i);
+		sys_printf("loop entry %d to %x \n",i,hi);
+		set_c0_hi(hi);
+sys_printf("wait after set hi\n");
 		set_c0_index(i);
+		asm("ssnop;ssnop;ssnop;ssnop;ssnop");
+sys_printf("wait after set ix\n");
 		asm("tlbwi");
-		set_c0_hi(current->asp->id);
 	}
+sys_printf("loop done\n");
+	asm("ssnop;ssnop;ssnop;ssnop;ssnop");
+	set_c0_hi(old_hi);
+sys_printf("wait after set hi, enable irq\n");
+	restore_cpu_flags(cpu_flags);
 	return 0;
+}
+
+void init_tlb() {
+
+	set_c0_pagemask(0);
+	flush_tlb();
+
 }

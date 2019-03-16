@@ -93,6 +93,11 @@ int load_init(struct task *t) {
 	curr_pgd=t->asp->pgd;  /* repoint page table directory while loading */
 	set_asid(t->asp->id);
 
+	dump_tlb();
+	sys_printf("init tlb:");
+	init_tlb();
+	sys_printf("init tlb: done");
+
 	while(1) {
 		if (brk<phdr.p.p_vaddr+phdr.p.p_memsz) {
 			brk=phdr.p.p_vaddr+phdr.p.p_memsz;

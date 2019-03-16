@@ -1,7 +1,5 @@
 
 
-#irq.c  jz4740.c  jz4740.h  jz_serial.c  jz_lcd.c traps.S
-
 all: $(OBJ)/lib	$(OBJ)/lib/jz.o
 
 $(OBJ)/lib:
@@ -10,7 +8,8 @@ $(OBJ)/lib:
 $(OBJ)/lib/jz.o: jz.o
 	cp $^ $@
 
-jz.o: jz4740.o jz_serial.o jz_lcd.o nand_funcs.o clocks.o jz_nand.o
+#jz.o: setup.o jz4750d.o jz_serial.o jz4750_lcd.o jz_nand.o clocks.o
+jz.o: setup.o jz4750d.o jz_serial.o jz4750_lcd.o jz_nand.o
 	$(CC) $(LDFLAGS) -r -nostdlib -o $@ $^
 
 %.o: %.S

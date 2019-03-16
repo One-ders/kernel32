@@ -2,9 +2,9 @@
 #include "sys.h"
 #include <string.h>
 
-#include <mtd_nand.h>
+#include "jz_mmc.h"
 
-#include <nand.h>
+#include <mmc.h>
 
 
 struct userdata {
@@ -442,7 +442,7 @@ static int nand_control(struct device_handle *dh, int cmd, void *arg1, int arg2)
 	return -1;
 }
 
-static int nand_start(void *inst) {
+static int mmc_start(void *inst) {
 	return 0;
 }
 
@@ -481,37 +481,29 @@ static int nand_init(void *inst) {
 	return 1;
 }
 
-static struct driver_ops nand_drv_ops = {
-	nand_open,
-	nand_close,
-	nand_control,
-	nand_init,
-	nand_start,
+static struct driver_ops mmc_drv_ops = {
+	mmc_open,
+	mmc_close,
+	mmc_control,
+	mmc_init,
+	mmc_start,
 };
 
-static struct driver nand_drv0 = {
-	"nand0",
+static struct driver mmc_drv0 = {
+	"mmc0",
 	(void *)0,
-	&nand_drv_ops,
+	&mmc_drv_ops,
 };
 
-static struct driver nand_drv1 = {
-	"nand1",
+static struct driver mmc_drv1 = {
+	"mmc1",
 	(void *)1,
-	&nand_drv_ops,
+	&mmc_drv_ops,
 };
 
-static struct driver nand_drv2 = {
-	"nand2",
-	(void *)2,
-	&nand_drv_ops,
-};
-
-
-void init_jz_nand() {
-	driver_publish(&nand_drv0);
-	driver_publish(&nand_drv1);
-	driver_publish(&nand_drv2);
+void init_jz_mmc() {
+	driver_publish(&mmc_drv0);
+	driver_publish(&mmc_drv1);
 }
 
-INIT_FUNC(init_jz_nand);
+INIT_FUNC(init_jz_mmc);

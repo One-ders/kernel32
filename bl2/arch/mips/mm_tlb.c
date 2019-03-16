@@ -94,6 +94,11 @@ unsigned int read_c0_pagemask(void) {
         return ret;
 }
 
+void set_c0_pagemask(unsigned int mask) {
+        asm volatile ("mtc0\t%z0, $5\n\t"
+                        : : "Jr" (mask));
+}
+
 unsigned int read_c0_wired(void) {
         unsigned int ret=0;
         __asm__ __volatile__("mfc0\t%z0, $6\n\t"
