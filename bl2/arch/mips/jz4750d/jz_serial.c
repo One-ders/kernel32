@@ -139,7 +139,7 @@ int serial_tstc (void) {
 static int (*usart_putc_fnc)(struct user_data *, int c);
 static int usart_putc(struct user_data *u, int c);
 
-int uart_irq_handler(int irq_num, void *dum) {
+static int uart_irq_handler(int irq_num, void *dum) {
 	struct usart_data *ud=(struct usart_data *)dum;
 	unsigned int uirq=ud->regs->uiir&0xf;
 
@@ -322,7 +322,6 @@ static int usart_control(struct device_handle *dh,
 	switch(cmd) {
 		case RD_CHAR: {
 			int rc=usart_read(u,arg1,arg2);
-//sys_printf("read got %x\n",((unsigned char *)arg1)[0]);
 			return rc;
 		}
 		case WR_CHAR: {
@@ -383,8 +382,8 @@ static int usart_init(void *instance) {
 	ud->rblocker_list.is_ready=rx_data_avail;
 
 	ud->txr=1;
-	ud->regs->ulcr=0x80;
 	ud->regs->ufcr=0;
+	ud->regs->ulcr=0x80;
 	ud->regs->udllr=bauddivisor&0xff;
 	ud->regs->udlhr=bauddivisor>>8;
 //	sys_sprintf(pbuf,"udlhr=%x, udllr=%x\n",
@@ -397,8 +396,8 @@ static int usart_init(void *instance) {
 //	ud->regs->ufcr=UART_FCR_RFRT|UART_FCR_TFRT|UART_FCR_UME;
 	
 
-	install_irq_handler(UART1_IRQ, uart_irq_handler, ud);
-	ud->regs->ufcr|=UART_FCR_UME;
+	install_irq_handler(IRQ_UART1, uart_irq_handler, ud);
+	ud->regs->ufcr=UART_FCR_FME|UART_FCR_RFRT|UART_FCR_TFRT|UART_FCR_UME;
 	
 //	serial_puts(pbuf);
 

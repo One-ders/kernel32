@@ -52,6 +52,7 @@
 #define DSYS_FS		4
 #define DSYS_KERN	8
 #define DSYS_LOAD	0x10
+#define DSYS_TIMER	0x20
 
 #define DLEV_CRIT	1
 #define DLEV_INFO	2

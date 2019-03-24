@@ -49,13 +49,17 @@ int decr_address_space_users(struct address_space *asp) {
 }
 
 
+/*
+ * Called from assembly context restore after interrupts/traps.
+ * Interrupts are disabled
+ *
+ */
 unsigned long int handle_switch(unsigned long int *v_sp) {
 	int i=0;
 	struct task *t;
-	sys_irqs++;
-	sys_printf("handle_switch: sp %x\n", v_sp);
+//	sys_irqs++;
+//	sys_printf("handle_switch: sp %x\n", v_sp);
 
-//	disable_interrupts();
 	while(i<MAX_PRIO) {
 		t=ready[i];
 		if (t) {
@@ -66,14 +70,17 @@ unsigned long int handle_switch(unsigned long int *v_sp) {
 		i++;
 	}
 	if (t==current) {
+		sys_printf("t==current==%s\n", current->name);
 		ASSERT(0);
 	}
-//	enable_interrupts();
 
 	if (!t) {
+		sys_printf("no ready proc\n");
 		ASSERT(0);
 	}
+
 	if (t==current) {
+		sys_printf("t==current==%s, again\n", current->name);
 		ASSERT(0);
 	}
 
@@ -82,16 +89,14 @@ unsigned long int handle_switch(unsigned long int *v_sp) {
 		/* fall through and set state ready */
 		current->blocker.wake=0;
 		current->state=TASK_STATE_RUNNING;
-//		sys_printf("in pendsv: readying blocked task\n");
 	}
-	/* Have next, move away current if still here, 
+	/* Should not have next, move away current if still here,
 	   timer and blocker move themselves */
 	if (current->state==TASK_STATE_RUNNING) {
 		int prio=current->prio_flags&0xf;
 		ASSERT(!current->next);
 		CLR_TMARK(current);
 		if (prio>4) prio=4;
-//		disable_interrupts();
 		current->state=TASK_STATE_READY;
 		if (ready[prio]) {
 			ready_last[prio]->next=current;
@@ -99,12 +104,10 @@ unsigned long int handle_switch(unsigned long int *v_sp) {
 			ready[prio]=current;
 		}
 		ready_last[prio]=current;
-//		enable_interrupts();
 	}
 
         DEBUGP(DSYS_SCHED,DLEV_INFO, "switch in task: %s\n", t->name);
 
-//	sys_printf("in switch: returning %x\n", t);
 	return (unsigned long int)t;
 }
 

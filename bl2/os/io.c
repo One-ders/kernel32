@@ -552,7 +552,7 @@ int sys_sprintf(char *buf, const char *fmt, ...) {
 
 void init_io(void) {
 	if (iodrv) return;
-	iodrv=driver_lookup("usart0");
+	iodrv=driver_lookup(CFG_CONSOLE_DEV);
 	if (!iodrv) {
 		return;
 	}
@@ -560,6 +560,7 @@ void init_io(void) {
 	if (!dh) {
 		iodrv=0;
 	} else {
+//		io_setpolled(1);
 		io_push();    /* to force out prints, done before open */
 	}
 }

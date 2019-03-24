@@ -153,6 +153,7 @@ static inline u32 jz_readl(u32 address)
 
 // 1st-level interrupts
 #define IRQ_ETH		0
+#define IRQ_SFT		4
 #define IRQ_I2C		5
 #define IRQ_RTC		6
 #define IRQ_UART2	7
@@ -421,33 +422,39 @@ static inline u32 jz_readl(u32 address)
 #define TCU_TDHR0	(TCU_BASE + 0x44) /* Timer Data Half Register */
 #define TCU_TCNT0	(TCU_BASE + 0x48) /* Timer Counter Register */
 #define TCU_TCSR0	(TCU_BASE + 0x4C) /* Timer Control Register */
-#define TCU_TDFR1	(TCU_BASE + 0x50)
-#define TCU_TDHR1	(TCU_BASE + 0x54)
-#define TCU_TCNT1	(TCU_BASE + 0x58)
-#define TCU_TCSR1	(TCU_BASE + 0x5C)
-#define TCU_TDFR2	(TCU_BASE + 0x60)
-#define TCU_TDHR2	(TCU_BASE + 0x64)
-#define TCU_TCNT2	(TCU_BASE + 0x68)
-#define TCU_TCSR2	(TCU_BASE + 0x6C)
-#define TCU_TDFR3	(TCU_BASE + 0x70)
-#define TCU_TDHR3	(TCU_BASE + 0x74)
-#define TCU_TCNT3	(TCU_BASE + 0x78)
-#define TCU_TCSR3	(TCU_BASE + 0x7C)
-#define TCU_TDFR4	(TCU_BASE + 0x80)
-#define TCU_TDHR4	(TCU_BASE + 0x84)
-#define TCU_TCNT4	(TCU_BASE + 0x88)
-#define TCU_TCSR4	(TCU_BASE + 0x8C)
-#define TCU_TDFR5	(TCU_BASE + 0x90)
-#define TCU_TDHR5	(TCU_BASE + 0x94)
-#define TCU_TCNT5	(TCU_BASE + 0x98)
-#define TCU_TCSR5	(TCU_BASE + 0x9C)
+#define TCU_TDFR1	(TCU_BASE + 0x50) //
+#define TCU_TDHR1	(TCU_BASE + 0x54) //
+#define TCU_TCNT1	(TCU_BASE + 0x58) //
+#define TCU_TCSR1	(TCU_BASE + 0x5C) //
+#define TCU_TDFR2	(TCU_BASE + 0x60) //
+#define TCU_TDHR2	(TCU_BASE + 0x64) //
+#define TCU_TCNT2	(TCU_BASE + 0x68) //
+#define TCU_TCSR2	(TCU_BASE + 0x6C) //
+#define TCU_TDFR3	(TCU_BASE + 0x70) //
+#define TCU_TDHR3	(TCU_BASE + 0x74) //
+#define TCU_TCNT3	(TCU_BASE + 0x78) //
+#define TCU_TCSR3	(TCU_BASE + 0x7C) //
+#define TCU_TDFR4	(TCU_BASE + 0x80) //
+#define TCU_TDHR4	(TCU_BASE + 0x84) //
+#define TCU_TCNT4	(TCU_BASE + 0x88) //
+#define TCU_TCSR4	(TCU_BASE + 0x8C) //
+#define TCU_TDFR5	(TCU_BASE + 0x90) //
+#define TCU_TDHR5	(TCU_BASE + 0x94) //
+#define TCU_TCNT5	(TCU_BASE + 0x98) //
+#define TCU_TCSR5	(TCU_BASE + 0x9C) //
+#define TCU_OSTDR	(TCU_BASE + 0xE0) //
+#define TCU_OSTCNT	(TCU_BASE + 0xE8) //
+#define TCU_OSTCSR	(TCU_BASE + 0xEC) //
+#define TCU_TSTR	(TCU_BASE + 0xF0)   // Timer Status Reg.
+#define TCU_TSTSR	(TCU_BASE + 0xF4)   // Timer Status Set Reg.
+#define TCU_TSTCR	(TCU_BASE + 0xF8)   // Timer Status Clr Reg.
 
 #define REG_TCU_TSR	REG32(TCU_TSR)
 #define REG_TCU_TSSR	REG32(TCU_TSSR)
 #define REG_TCU_TSCR	REG32(TCU_TSCR)
-#define REG_TCU_TER	REG8(TCU_TER)
-#define REG_TCU_TESR	REG8(TCU_TESR)
-#define REG_TCU_TECR	REG8(TCU_TECR)
+#define REG_TCU_TER	REG16(TCU_TER)
+#define REG_TCU_TESR	REG16(TCU_TESR)
+#define REG_TCU_TECR	REG16(TCU_TECR)
 #define REG_TCU_TFR	REG32(TCU_TFR)
 #define REG_TCU_TFSR	REG32(TCU_TFSR)
 #define REG_TCU_TFCR	REG32(TCU_TFCR)
@@ -486,9 +493,18 @@ static inline u32 jz_readl(u32 address)
 #define REG_TCU_TCNT(n)	REG16(TCU_TCNT((n)))
 #define REG_TCU_TCSR(n)	REG16(TCU_TCSR((n)))
 
+#define REG_TCU_OSTDR	REG32(TCU_OSTDR)
+#define REG_TCU_OSTCNT	REG32(TCU_OSTCNT)
+#define REG_TCU_OSTCSR	REG16(TCU_OSTCSR)
+
+#define REG_TCU_TSTR	REG32(TCU_TSTR)
+#define REG_TCU_TSTSR	REG32(TCU_TSTSR)
+#define REG_TCU_TSTCR	REG32(TCU_TSTCR)
+
 // Register definitions
-#define TCU_TCSR_PWM_SD		(1 << 9)
-#define TCU_TCSR_PWM_INITL_HIGH	(1 << 8)
+#define TCU_TCSR_CLRZ		(1 << 10)       // Clear counter in TCU2 mode
+#define TCU_TCSR_SD		(1 << 9)
+#define TCU_TCSR_INITL		(1 << 8)
 #define TCU_TCSR_PWM_EN		(1 << 7)
 #define TCU_TCSR_PRESCALE_BIT	3
 #define TCU_TCSR_PRESCALE_MASK	(0x7 << TCU_TCSR_PRESCALE_BIT)
@@ -502,6 +518,22 @@ static inline u32 jz_readl(u32 address)
 #define TCU_TCSR_RTC_EN		(1 << 1)
 #define TCU_TCSR_PCK_EN		(1 << 0)
 
+#define TCU_OSTCSR_CNT_MD	(1 << 15)
+#define TCU_OSTCSR_SD		(1 << 9)
+#define TCU_OSTCSR_PRESCALE_BIT	3
+#define TCU_OSTCSR_PRESCALE_MASK (0x7 << TCU_TCSR_PRESCALE_BIT)
+  #define TCU_OSTCSR_PRESCALE1	(0x0 << TCU_TCSR_PRESCALE_BIT)
+  #define TCU_OSTCSR_PRESCALE4	(0x1 << TCU_TCSR_PRESCALE_BIT)
+  #define TCU_OSTCSR_PRESCALE16	(0x2 << TCU_TCSR_PRESCALE_BIT)
+  #define TCU_OSTCSR_PRESCALE64	(0x3 << TCU_TCSR_PRESCALE_BIT)
+  #define TCU_OSTCSR_PRESCALE256	(0x4 << TCU_TCSR_PRESCALE_BIT)
+  #define TCU_OSTCSR_PRESCALE1024	(0x5 << TCU_TCSR_PRESCALE_BIT)
+#define TCU_OSTCSR_EXT_EN		(1 << 2)
+#define TCU_OSTCSR_RTC_EN		(1 << 1)
+#define TCU_OSTCSR_PCK_EN		(1 << 0)
+
+
+#define TCU_TER_OSTEN		(1 << 15)
 #define TCU_TER_TCEN5		(1 << 5)
 #define TCU_TER_TCEN4		(1 << 4)
 #define TCU_TER_TCEN3		(1 << 3)
@@ -509,6 +541,7 @@ static inline u32 jz_readl(u32 address)
 #define TCU_TER_TCEN1		(1 << 1)
 #define TCU_TER_TCEN0		(1 << 0)
 
+#define TCU_TESR_OSTST		(1 << 15)
 #define TCU_TESR_TCST5		(1 << 5)
 #define TCU_TESR_TCST4		(1 << 4)
 #define TCU_TESR_TCST3		(1 << 3)
@@ -516,6 +549,7 @@ static inline u32 jz_readl(u32 address)
 #define TCU_TESR_TCST1		(1 << 1)
 #define TCU_TESR_TCST0		(1 << 0)
 
+#define TCU_TECR_OSTCL		(1 << 15)
 #define TCU_TECR_TCCL5		(1 << 5)
 #define TCU_TECR_TCCL4		(1 << 4)
 #define TCU_TECR_TCCL3		(1 << 3)
@@ -529,6 +563,7 @@ static inline u32 jz_readl(u32 address)
 #define TCU_TFR_HFLAG2		(1 << 18)
 #define TCU_TFR_HFLAG1		(1 << 17)
 #define TCU_TFR_HFLAG0		(1 << 16)
+#define TCU_TFR_OSTFLAG		(1 << 15)
 #define TCU_TFR_FFLAG5		(1 << 5)
 #define TCU_TFR_FFLAG4		(1 << 4)
 #define TCU_TFR_FFLAG3		(1 << 3)
@@ -542,6 +577,7 @@ static inline u32 jz_readl(u32 address)
 #define TCU_TFSR_HFLAG2		(1 << 18)
 #define TCU_TFSR_HFLAG1		(1 << 17)
 #define TCU_TFSR_HFLAG0		(1 << 16)
+#define TCU_TFSR_OSTFST		(1 << 15)
 #define TCU_TFSR_FFLAG5		(1 << 5)
 #define TCU_TFSR_FFLAG4		(1 << 4)
 #define TCU_TFSR_FFLAG3		(1 << 3)
@@ -555,6 +591,7 @@ static inline u32 jz_readl(u32 address)
 #define TCU_TFCR_HFLAG2		(1 << 18)
 #define TCU_TFCR_HFLAG1		(1 << 17)
 #define TCU_TFCR_HFLAG0		(1 << 16)
+#define TCU_TFCR_OSTFCL		(1 << 15)
 #define TCU_TFCR_FFLAG5		(1 << 5)
 #define TCU_TFCR_FFLAG4		(1 << 4)
 #define TCU_TFCR_FFLAG3		(1 << 3)
@@ -568,6 +605,7 @@ static inline u32 jz_readl(u32 address)
 #define TCU_TMR_HMASK2		(1 << 18)
 #define TCU_TMR_HMASK1		(1 << 17)
 #define TCU_TMR_HMASK0		(1 << 16)
+#define TCU_TMR_OSTMASK		(1 << 15)
 #define TCU_TMR_FMASK5		(1 << 5)
 #define TCU_TMR_FMASK4		(1 << 4)
 #define TCU_TMR_FMASK3		(1 << 3)
@@ -581,6 +619,7 @@ static inline u32 jz_readl(u32 address)
 #define TCU_TMSR_HMST2		(1 << 18)
 #define TCU_TMSR_HMST1		(1 << 17)
 #define TCU_TMSR_HMST0		(1 << 16)
+#define TCU_TMSR_OSTMST		(1 << 15)
 #define TCU_TMSR_FMST5		(1 << 5)
 #define TCU_TMSR_FMST4		(1 << 4)
 #define TCU_TMSR_FMST3		(1 << 3)
@@ -594,6 +633,7 @@ static inline u32 jz_readl(u32 address)
 #define TCU_TMCR_HMCL2		(1 << 18)
 #define TCU_TMCR_HMCL1		(1 << 17)
 #define TCU_TMCR_HMCL0		(1 << 16)
+#define TCU_TMCR_OSTMCL		(1 << 15)
 #define TCU_TMCR_FMCL5		(1 << 5)
 #define TCU_TMCR_FMCL4		(1 << 4)
 #define TCU_TMCR_FMCL3		(1 << 3)
@@ -602,6 +642,7 @@ static inline u32 jz_readl(u32 address)
 #define TCU_TMCR_FMCL0		(1 << 0)
 
 #define TCU_TSR_WDTS		(1 << 16)
+#define TCU_TSR_OSTS		(1 << 15)
 #define TCU_TSR_STOP5		(1 << 5)
 #define TCU_TSR_STOP4		(1 << 4)
 #define TCU_TSR_STOP3		(1 << 3)
@@ -610,6 +651,7 @@ static inline u32 jz_readl(u32 address)
 #define TCU_TSR_STOP0		(1 << 0)
 
 #define TCU_TSSR_WDTSS		(1 << 16)
+#define TCU_TSSR_OSTSS		(1 << 15)
 #define TCU_TSSR_STPS5		(1 << 5)
 #define TCU_TSSR_STPS4		(1 << 4)
 #define TCU_TSSR_STPS3		(1 << 3)
@@ -617,13 +659,31 @@ static inline u32 jz_readl(u32 address)
 #define TCU_TSSR_STPS1		(1 << 1)
 #define TCU_TSSR_STPS0		(1 << 0)
 
-#define TCU_TSSR_WDTSC		(1 << 16)
-#define TCU_TSSR_STPC5		(1 << 5)
-#define TCU_TSSR_STPC4		(1 << 4)
-#define TCU_TSSR_STPC3		(1 << 3)
-#define TCU_TSSR_STPC2		(1 << 2)
-#define TCU_TSSR_STPC1		(1 << 1)
-#define TCU_TSSR_STPC0		(1 << 0)
+#define TCU_TSCR_WDTSC		(1 << 16)
+#define TCU_TSCR_OSTSC		(1 << 15)
+#define TCU_TSCR_STPC5		(1 << 5)
+#define TCU_TSCR_STPC4		(1 << 4)
+#define TCU_TSCR_STPC3		(1 << 3)
+#define TCU_TSCR_STPC2		(1 << 2)
+#define TCU_TSCR_STPC1		(1 << 1)
+#define TCU_TSCR_STPC0		(1 << 0)
+
+#define TCU_TSTR_REAL2		(1 << 18)
+#define TCU_TSTR_REAL1		(1 << 17)
+#define TCU_TSTR_BUSY2		(1 << 2)
+#define TCU_TSTR_BUSY1		(1 << 1)
+
+#define TCU_TSTSR_REALS2	(1 << 18)
+#define TCU_TSTSR_REALS1	(1 << 17)
+#define TCU_TSTSR_BUSYS2	(1 << 2)
+#define TCU_TSTSR_BUSYS1	(1 << 1)
+
+#define TCU_TSTCR_REALC2	(1 << 18)
+#define TCU_TSTCR_REALC1	(1 << 17)
+#define TCU_TSTCR_BUSYC2	(1 << 2)
+#define TCU_TSTCR_BUSYC1	(1 << 1)
+
+
 
 
 #if 0
@@ -3928,6 +3988,14 @@ static inline void __cpm_select_msc_clk(int n, int sd)
 #define __tcu_select_pclk(n) \
 	(REG_TCU_TCSR((n)) = (REG_TCU_TCSR((n)) & ~(TCU_TCSR_EXT_EN | TCU_TCSR_RTC_EN | TCU_TCSR_PCK_EN)) | TCU_TCSR_PCK_EN)
 
+#define __ost_select_extalclk() \
+	(REG_TCU_OSTCSR = (REG_TCU_OSTCSR & ~(TCU_OSTCSR_EXT_EN | TCU_OSTCSR_RTC_EN | TCU_OSTCSR_PCK_EN)) | TCU_OSTCSR_EXT_EN)
+#define __ost_select_rtcclk() \
+	(REG_TCU_OSTCSR = (REG_TCU_OSTCSR & ~(TCU_OSTCSR_EXT_EN | TCU_OSTCSR_RTC_EN | TCU_OSTCSR_PCK_EN)) | TCU_OSTCSR_RTC_EN)
+#define __ost_select_pclk() \
+	(REG_TCU_OSTCSR = (REG_TCU_OSTCSR & ~(TCU_OSTCSR_EXT_EN | TCU_OSTCSR_RTC_EN | TCU_OSTCSR_PCK_EN)) | TCU_OSTCSR_PCK_EN)
+
+
 #define __tcu_select_clk_div1(n) \
 	(REG_TCU_TCSR((n)) = (REG_TCU_TCSR((n)) & ~TCU_TCSR_PRESCALE_MASK) | TCU_TCSR_PRESCALE1)
 #define __tcu_select_clk_div4(n) \
@@ -3941,18 +4009,39 @@ static inline void __cpm_select_msc_clk(int n, int sd)
 #define __tcu_select_clk_div1024(n) \
 	(REG_TCU_TCSR((n)) = (REG_TCU_TCSR((n)) & ~TCU_TCSR_PRESCALE_MASK) | TCU_TCSR_PRESCALE1024)
 
+#define __ost_select_clk_div1() \
+	(REG_TCU_OSTCSR = (REG_TCU_OSTCSR & ~TCU_OSTCSR_PRESCALE_MASK) | TCU_OSTCSR_PRESCALE1)
+#define __ost_select_clk_div4() \
+	(REG_TCU_OSTCSR = (REG_TCU_OSTCSR & ~TCU_OSTCSR_PRESCALE_MASK) | TCU_OSTCSR_PRESCALE4)
+#define __ost_select_clk_div16() \
+	(REG_TCU_OSTCSR = (REG_TCU_OSTCSR & ~TCU_OSTCSR_PRESCALE_MASK) | TCU_OSTCSR_PRESCALE16)
+#define __ost_select_clk_div64() \
+	(REG_TCU_OSTCSR = (REG_TCU_OSTCSR & ~TCU_OSTCSR_PRESCALE_MASK) | TCU_OSTCSR_PRESCALE64)
+#define __ost_select_clk_div256() \
+	(REG_TCU_OSTCSR = (REG_TCU_OSTCSR & ~TCU_OSTCSR_PRESCALE_MASK) | TCU_OSTCSR_PRESCALE256)
+#define __ost_select_clk_div1024() \
+	(REG_TCU_OSTCSR = (REG_TCU_OSTCSR & ~TCU_OSTCSR_PRESCALE_MASK) | TCU_OSTCSR_PRESCALE1024)
+
+
 #define __tcu_enable_pwm_output(n)	( REG_TCU_TCSR((n)) |= TCU_TCSR_PWM_EN )
 #define __tcu_disable_pwm_output(n)	( REG_TCU_TCSR((n)) &= ~TCU_TCSR_PWM_EN )
 
-#define __tcu_init_pwm_output_high(n)	( REG_TCU_TCSR((n)) |= TCU_TCSR_PWM_INITL_HIGH )
-#define __tcu_init_pwm_output_low(n)	( REG_TCU_TCSR((n)) &= ~TCU_TCSR_PWM_INITL_HIGH )
+#define __tcu_init_pwm_output_high(n)	( REG_TCU_TCSR((n)) |= TCU_TCSR_INITL )
+#define __tcu_init_pwm_output_low(n)	( REG_TCU_TCSR((n)) &= ~TCU_TCSR_INITL )
 
-#define __tcu_set_pwm_output_shutdown_graceful(n)	( REG_TCU_TCSR((n)) &= ~TCU_TCSR_PWM_SD )
-#define __tcu_set_pwm_output_shutdown_abrupt(n)		( REG_TCU_TCSR((n)) |= TCU_TCSR_PWM_SD )
+#define __tcu_set_pwm_output_shutdown_graceful(n)	( REG_TCU_TCSR((n)) &= ~TCU_TCSR_SD )
+#define __tcu_set_pwm_output_shutdown_abrupt(n)		( REG_TCU_TCSR((n)) |= TCU_TCSR_SD )
 
+#define __ost_set_shutdown_graceful()	( REG_TCU_OSTCSR &= ~TCU_OSTCSR_SD )
+#define __ost_set_shutdown_abrupt()	( REG_TCU_OSTCSR |= TCU_OSTCSR_SD )
+
+
+#define __tcu_read_ter()		( REG_TCU_TER )
 #define __tcu_start_counter(n)		( REG_TCU_TESR |= (1 << (n)) )
 #define __tcu_stop_counter(n)		( REG_TCU_TECR |= (1 << (n)) )
 
+#define __tcu_read_tfr()		( REG_TCU_TFR )
+#define __tcu_read_tmr()		( REG_TCU_TMR )
 #define __tcu_half_match_flag(n)	( REG_TCU_TFR & (1 << ((n) + 16)) )
 #define __tcu_full_match_flag(n)	( REG_TCU_TFR & (1 << (n)) )
 #define __tcu_set_half_match_flag(n)	( REG_TCU_TFSR = (1 << ((n) + 16)) )
@@ -3964,13 +4053,21 @@ static inline void __cpm_select_msc_clk(int n, int sd)
 #define __tcu_unmask_half_match_irq(n)	( REG_TCU_TMCR = (1 << ((n) + 16)) )
 #define __tcu_unmask_full_match_irq(n)	( REG_TCU_TMCR = (1 << (n)) )
 
-#define __tcu_wdt_clock_stopped()	( REG_TCU_TSR & TCU_TSSR_WDTSC )
+#define __tcu_ost_mask_match_irq()	( REG_TCU_TMSR = TCU_TMSR_OSTMST)
+#define __tcu_ost_unmask_match_irq()	( REG_TCU_TMCR = TCU_TMCR_OSTMCL)
+
+#define __tcu_clear_ost_match_flag()	( REG_TCU_TFCR = TCU_TFCR_OSTFCL )
+
+#define __tcu_wdt_clock_stopped()	( REG_TCU_TSR & TCU_TSCR_WDTSC )
+#define __tcu_ost_clock_stopped()	( REG_TCU_TSR & TCU_TSCR_OSTSC )
 #define __tcu_timer_clock_stopped(n)	( REG_TCU_TSR & (1 << (n)) )
 
-#define __tcu_start_wdt_clock()		( REG_TCU_TSCR = TCU_TSSR_WDTSC )
+#define __tcu_start_wdt_clock()		( REG_TCU_TSCR = TCU_TSCR_WDTSC )
+#define __tcu_start_ost_clock()		( REG_TCU_TSCR = TCU_TSCR_OSTSC )
 #define __tcu_start_timer_clock(n)	( REG_TCU_TSCR = (1 << (n)) )
 
 #define __tcu_stop_wdt_clock()		( REG_TCU_TSSR = TCU_TSSR_WDTSC )
+#define __tcu_stop_ost_clock()		( REG_TCU_TSSR = TCU_TSSR_OSTSC )
 #define __tcu_stop_timer_clock(n)	( REG_TCU_TSSR = (1 << (n)) )
 
 #define __tcu_get_count(n)		( REG_TCU_TCNT((n)) )
@@ -3978,6 +4075,10 @@ static inline void __cpm_select_msc_clk(int n, int sd)
 #define __tcu_set_full_data(n,v)	( REG_TCU_TDFR((n)) = (v) )
 #define __tcu_set_half_data(n,v)	( REG_TCU_TDHR((n)) = (v) )
 
+#define __ost_set_count(v)		( REG_TCU_OSTCNT = (v) )
+#define __ost_get_count()		( REG_TCU_OSTCNT )
+#define __ost_set_data(v)		( REG_TCU_OSTDR = (v) )
+#define __ost_get_data()		( REG_TCU_OSTDR )
 
 #if 0
 /***************************************************************************

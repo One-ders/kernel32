@@ -56,6 +56,14 @@
 #define JZ4740_BOOT_NAND_CFG_3PC16B	0x0f
 #define JZ4740_BOOT_NAND_CFG_2PC16B	0xff
 
+#ifndef __ASSEMBLY__
+typedef unsigned char     u8;
+typedef unsigned short int u16;
+typedef unsigned int u32;
+typedef unsigned long long int u64;
+typedef signed int s32;
+typedef unsigned int u_int;
+#endif
 
 
 #define APB_BUS 0xb0000000

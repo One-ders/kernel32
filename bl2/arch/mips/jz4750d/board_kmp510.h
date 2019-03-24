@@ -75,7 +75,7 @@
 
 #define LCD_MAX_BACKLIGHT               100
 #define LCD_MIN_BACKLIGHT               1
-#define LCD_DEFAULT_BACKLIGHT           100
+#define LCD_DEFAULT_BACKLIGHT           80
 
 /* LCD Backlight PWM Control - River. */
 #define HAVE_LCD_PWM_CONTROL    1

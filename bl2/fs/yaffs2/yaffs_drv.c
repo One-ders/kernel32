@@ -30,13 +30,13 @@ unsigned yaffs_trace_mask =
 
 void yaffsfs_SetError(int err) {
 	if (err) {
-		sys_printf("yaffs set error: %d\n", err);
+		DEBUGP(DSYS_FS,DLEV_INFO, "yaffs set error: %d\n", err);
 	}
 	yaffs_errno=err;
 }
 
 int yaffsfs_GetLastError(void) {
-	sys_printf("yaffs get error -> %d\n",yaffs_errno);
+	DEBUGP(DSYS_FS,DLEV_INFO,"yaffs get error -> %d\n",yaffs_errno);
 	return yaffs_errno;
 }
 

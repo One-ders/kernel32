@@ -14,6 +14,7 @@ int fb_test(void *dum) {
 	unsigned char *fbp;
 	int x=0,y=0;
 	int location=0;
+	int x_size,y_size;
 
 	fb_fd=io_open("fb0");
 
@@ -24,6 +25,8 @@ int fb_test(void *dum) {
 		}
 		return 0;
 	}
+
+	setlinebuf(stdout);
 
 	printf("fb opened fd=%d\n",fb_fd);
 
@@ -83,8 +86,8 @@ int fb_test(void *dum) {
 	}
 #endif
 	x = 0; y = 0;
-	for (y = 0; y < 272; y++) {
-		for (x = 0; x < 480; x++) {
+	for (y = 0; y < vinfo.yres_virtual; y++) {
+		for (x = 0; x < vinfo.xres_virtual; x++) {
 			location = (x+vinfo.xoffset) * (vinfo.bits_per_pixel/8) +
 				(y+vinfo.yoffset) * finfo.line_length;
 

@@ -378,9 +378,8 @@ static int usart_init(void *instance) {
 	ud->rblocker_list.is_ready=rx_data_avail;
 
 	ud->txr=1;
-	ud->regs->ulcr=0x80;
 	ud->regs->ufcr=0;
-//	ud->regs->ufcr&=~UART_FCR_UME;
+	ud->regs->ulcr=0x80;
 	ud->regs->udllr=bauddivisor&0xff;
 	ud->regs->udlhr=bauddivisor>>8;
 	
@@ -390,7 +389,7 @@ static int usart_init(void *instance) {
 	ud->regs->ufcr=UART_FCR_FME|UART_FCR_RFRT|UART_FCR_TFRT;
 //	ud->regs->ufcr=UART_FCR_RFRT|UART_FCR_TFRT|UART_FCR_UME;
 	install_irq_handler(UART0_IRQ, uart_irq_handler, ud);
-	ud->regs->ufcr|=UART_FCR_UME;
+	ud->regs->ufcr=UART_FCR_FME|UART_FCR_RFRT|UART_FCR_TFRT|UART_FCR_UME;
 	
 
 	return 0;

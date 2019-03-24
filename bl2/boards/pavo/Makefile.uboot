@@ -16,7 +16,7 @@ export OBJCOPY:=mipsel-linux-objcopy
 #include $(TOP)/os/Makefile
 
 #CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4740 -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls
-CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/boards/$(BOARD) -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl/jz4740 -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4740 -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -D__KERNEL__ -DDEBUG -DDEFAULT_TRACE_LEV=0x0 -DDEFAULT_TRACE_SYS=0x0
+CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/boards/$(BOARD) -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl/jz4740 -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4740 -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -D__KERNEL__ -DQEMU -DUBOOT -DDEBUG -DDEFAULT_TRACE_LEV=0x0 -DDEFAULT_TRACE_SYS=0x0
 CFLAGS_USR:=-I$(TOP)/usr/include -I$(OBJ)/usr/libc/obj/include -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -DMMU -DMIPS -D__mips_o32 -msoft-float
 #CFLAGS_USR:=-I$(TOP)/usr/incl -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -DMMU -DMIPS -D__mips_o32
 LDFLAGS:=-g -T./pavo-uboot.ld 
@@ -41,8 +41,8 @@ nblock=$(shell expr $(fsize) / 4096)
 ##	dd if=tmp/fot4 of=tmp/fot5 ibs=4096 count=$(nblock)
 ##
 ##tmp/fot4: tmp/fot3 uCore.bin
-uCore.img: uCore.bin
-	cat uCore.bin > uCore.img
+#uCore.img: uCore.bin
+#	cat uCore.bin > uCore.img
 
 uroot.img: usr.bin
 	rm -rf uroot

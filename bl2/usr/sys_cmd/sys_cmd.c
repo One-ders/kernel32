@@ -529,15 +529,20 @@ static int loadnrun_fnc(int argc, char **argv, struct Env *env) {
 	int npid;
 	struct stat stbuf;
 
-	if (argc<2) {
+	if (strcmp(argv[0],"loadnrun")==0) {
+		argv++;
+		argc--;
+	}
+
+	if (argc<1) {
 		dprintf(env->io_fd, "need at least file name of loadfile\n");
 		return -1;
 	}
 
 	memset(&stbuf,0,sizeof(stbuf));
-	rc=stat(argv[1], &stbuf);
+	rc=stat(argv[0], &stbuf);
 	if (rc<0) {
-		dprintf(env->io_fd, "error %d for stat file %s\n",errno,argv[1]);
+		dprintf(env->io_fd, "error %d for stat file %s\n",errno,argv[0]);
 		return -errno;
 	}
 
@@ -547,7 +552,7 @@ static int loadnrun_fnc(int argc, char **argv, struct Env *env) {
 		msleep(5000);
 	} else {
 		char *newenviron[] = { NULL };
-		execve(argv[1], &argv[1], newenviron);
+		execve(argv[0], &argv[0], newenviron);
 		dprintf(env->io_fd, "return after execve... Errrir\n");
 		exit(0);
 	}
@@ -689,6 +694,7 @@ void main(void *dum) {
 
 	env.io_fd=1;
 
+	setlinebuf(stdout);
 	fflush(stdout);
 	printf("Starting sys_mon\n");
 
@@ -724,12 +730,13 @@ void main(void *dum) {
 			cmd=lookup_cmd(argv[0],1);
 			if (cmd) {
 				int rc;
-				printf(":iofd is %d\n",env.io_fd);
 				dprintf(1,"\n");
 				rc=cmd->fnc(argc,argv,&env); 
 				if (rc<0) {
 					dprintf(1,"%s returned %d\n",argv[0],rc);
 				}
+			} else {
+				rc=loadnrun_fnc(argc,argv,&env);
 			}
 		}
 	}

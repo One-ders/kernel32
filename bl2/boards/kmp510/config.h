@@ -5,8 +5,6 @@
 #define CONFIG_JZ4750D_KMP510
 #define CONFIG_JZ4750D_KMP510_LCD
 
-#define LCD_DEFAULT_BACKLIGHT		100
-
 /*-----------------------------------------------------------------------
  * NAND FLASH configuration
  */
@@ -32,6 +30,8 @@
 
 #define CFG_UART_BASE           UART1_BASE      /* Base of the UART channel */
 #define CFG_CONSOLE_DEV		"usart1"
+
+#define CFG_ROOT_FS_DEV         "nand4"
 
 #define CONFIG_BAUDRATE         57600
 

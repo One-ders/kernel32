@@ -10,7 +10,7 @@ $(OBJ)/lib:
 $(OBJ)/lib/jz.o: jz.o
 	cp $^ $@
 
-jz.o: jz4740.o jz_serial.o jz_lcd.o nand_funcs.o clocks.o jz_nand.o
+jz.o: jz4740.o jz_serial.o jz_tic.o jz_lcd.o nand_funcs.o clocks.o jz_nand.o
 	$(CC) $(LDFLAGS) -r -nostdlib -o $@ $^
 
 %.o: %.S

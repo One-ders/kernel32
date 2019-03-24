@@ -664,6 +664,7 @@ int unmapmem(struct task *t, unsigned long int vaddr) {
         return 0;
 }
 
+#define UNIQUE_ENTRYHI(idx) (0x80000000 + ((idx) << (PAGE_SHIFT + 1)))
 
 static void flush_tlb_page(unsigned int vaddr, unsigned int pid) {
         int index;
@@ -681,7 +682,7 @@ static void flush_tlb_page(unsigned int vaddr, unsigned int pid) {
         }
 
 //      sys_printf("flush flush\n");
-        set_c0_hi(0);
+        set_c0_hi(UNIQUE_ENTRYHI(index));
         if (vaddr&(1<<12)) {
                 set_c0_lo1(0);
         } else {

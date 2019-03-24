@@ -16,8 +16,11 @@
 #define CFG_HZ                  (CFG_EXTAL/256) /* incrementer freq */
 
 #define CFG_UART_BASE           UART0_BASE      /* Base of the UART channel */
+#define CFG_CONSOLE_DEV		"usart0"
 
 #define CONFIG_BAUDRATE         57600
+
+#define CFG_ROOT_FS_DEV		"nand2"
 
 #define GPIO_DISP_OFF_N         118 /* GPD22 */
 #define GPIO_LED_EN             124 /* GPD28 */

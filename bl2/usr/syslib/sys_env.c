@@ -103,7 +103,7 @@ struct cmd *lookup_cmd(char *name, int fd) {
 		}
 		return 0;
 	}
-	dprintf(fd,"\ncmd %s, not found\n", name);
+//	dprintf(fd,"\ncmd %s, not found\n", name);
 	return 0;
 }
 

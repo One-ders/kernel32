@@ -3151,6 +3151,7 @@ static void jz4750fb_dev_enable(void) {
 
 	return;
 }
+
 static int jz4750fb_dev_init(void) {
 	__lcd_clr_dis();
 	__lcd_clr_ena();
@@ -3189,7 +3190,7 @@ static int jz4750fb_dev_init(void) {
 	__lcd_display_pin_init();
 	__lcd_slcd_special_on();
 
-	install_irq_handler(LCD_IRQ, jz4750fb_interrupt_handler,0);
+	install_irq_handler(IRQ_LCD, jz4750fb_interrupt_handler,0);
 
 	return 0;
 }

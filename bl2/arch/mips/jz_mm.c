@@ -189,30 +189,21 @@ int flush_tlb(void) {
 	set_c0_lo0(0);
 	set_c0_lo1(0);
 
-sys_printf("looping the tlb\n");
 	for(i=0;i<=top_tlb_entry;i++) {
 		unsigned long int hi;
-		sys_printf("loop entry %d\n",i);
 		hi=UNIQUE_ENTRYHI(i);
-		sys_printf("loop entry %d to %x \n",i,hi);
 		set_c0_hi(hi);
-sys_printf("wait after set hi\n");
 		set_c0_index(i);
 		asm("ssnop;ssnop;ssnop;ssnop;ssnop");
-sys_printf("wait after set ix\n");
 		asm("tlbwi");
 	}
-sys_printf("loop done\n");
 	asm("ssnop;ssnop;ssnop;ssnop;ssnop");
 	set_c0_hi(old_hi);
-sys_printf("wait after set hi, enable irq\n");
 	restore_cpu_flags(cpu_flags);
 	return 0;
 }
 
 void init_tlb() {
-
 	set_c0_pagemask(0);
 	flush_tlb();
-
 }

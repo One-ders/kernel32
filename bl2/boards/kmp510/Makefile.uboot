@@ -4,6 +4,9 @@ TOP:=$(shell pwd)/../..
 OBJ:=$(TOP)/boards/$(BOARD)/obj
 ARCH:=mips
 
+TRACE_LEV=0x0
+TRACE_SYS=0x0
+
 GIT_VERSION:=$(shell git describe --abbrev=4 --dirty --always --tags)
 
 export COMPILER_PREFIX:=/opt/cross/bin/mipsel-linux-
@@ -14,7 +17,7 @@ export LD:=mipsel-linux-ld
 export OBJCOPY:=mipsel-linux-objcopy
  
 
-CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/boards/$(BOARD) -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl/jz4750d -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4750d -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -D__KERNEL__ -DUBOOT -DDEBUG -DDEFAULT_TRACE_LEV=0xffff -DDEFAULT_TRACE_SYS=0xffff
+CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/boards/$(BOARD) -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl/jz4750d -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4750d -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -D__KERNEL__ -DUBOOT -DDEBUG -DDEFAULT_TRACE_LEV=$(TRACE_LEV) -DDEFAULT_TRACE_SYS=$(TRACE_SYS)
 CFLAGS_USR:=-I$(TOP)/usr/include -I$(OBJ)/usr/libc/obj/include -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -DMMU -DMIPS -D__mips_o32 -msoft-float
 #CFLAGS_USR:=-I$(TOP)/usr/incl -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -DMMU -DMIPS -D__mips_o32
 LDFLAGS:=-g -T./$(BOARD)-uboot.ld 

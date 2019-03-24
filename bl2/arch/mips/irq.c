@@ -37,10 +37,14 @@ int install_irq_handler(int irq_num,
 	return 0;
 }
 
+#if 0
 void set_c0_compare(unsigned int val) {
 	__asm__ __volatile__("mtc0\t%z0, $11\n\t"
 			: : "Jr" (val));
 }
+#endif
+
+void set_c0_compare(unsigned int val);
 
 unsigned long int get_c0_status() {
 	unsigned long int ret=0;
@@ -62,7 +66,8 @@ unsigned long int get_c0_cause() {
 }
 
 
-static unsigned int compare_increment;
+unsigned int compare_increment;
+#if 0
 static unsigned int compare;
 
 void config_sys_tic(unsigned int ms) {
@@ -74,6 +79,7 @@ void config_sys_tic(unsigned int ms) {
 	sys_printf("config_sys_tic: status %x, count %x, compare %x\n",
 		get_c0_status(), read_c0_count(), read_c0_compare());
 }
+#endif
 
 void irq_dispatch(void *sp) {
 	struct fullframe *ff=(struct fullframe *)sp;
@@ -86,15 +92,17 @@ void irq_dispatch(void *sp) {
 
 	INTC->icmr=cirq;
 // jz-qemu bug
+#ifdef QEMU
 	INTC->icpr=cirq;
+#endif
 
+#if 1
 	if (cause&CP0_CAUSE_IP7) {
-		set_c0_compare(compare);
 //		set_c0_status(get_c0_status()&~CP0_CAUSE_IP7);
-	sys_printf("in irq: cause %x, irq_lev %x, current cause %x\n", cause, irq_lev, get_c0_cause());
 		if (cause&CP0_CAUSE_TI) {
 			unsigned long int cpu_flags;
-			compare+=compare_increment;
+			unsigned long int compare;
+			compare=read_c0_count()+compare_increment;
 			set_c0_compare(compare);
 			cpu_flags=save_cpu_flags();
 			enable_interrupts();
@@ -102,8 +110,9 @@ void irq_dispatch(void *sp) {
 			restore_cpu_flags(cpu_flags);
 			
 		}
-		set_c0_status(get_c0_status()|CP0_CAUSE_IP7);
+//		set_c0_status(get_c0_status()|CP0_CAUSE_IP7);
 	}
+#endif
 
 	if (cause&CP0_CAUSE_IP2) {
 //		set_c0_status(get_c0_status()&~CP0_CAUSE_IP2);
@@ -111,9 +120,6 @@ void irq_dispatch(void *sp) {
 			int i;
 			for(i=0;i<32;i++) {
 				if (cirq&(1<<i)) {
-					if (i!=8) {
-	sys_printf("in irq: cause %x, irq_lev %x, current cause %x, irqs %x, curr %x\n", cause, irq_lev, get_c0_cause(), cirq, i);
-					}
 					INTC->icmcr=cirq&(1<<i);
 					handlers[i].handler(i,handlers[i].h_data);
 				}
@@ -124,13 +130,20 @@ void irq_dispatch(void *sp) {
 //	INTC->icmcr=cirq;
 }
 
-unsigned int wi=0;
+int gruux=0;
 void wait_irq(void) {
-	wi=1;
-//	asm volatile ("wait\t\n\t"
-//			: : );
-	sys_printf("config_sys_tic: status %x, count %x, compare %x\n",
-		get_c0_status(), read_c0_count(), read_c0_compare());
-	wi=0;
+#if 1
+	set_c0_status(get_c0_status()|0x1c00);
+	asm volatile ("wait\t\n\t"
+			: : );
+#endif
+#if 0
+	if ((gruux%10000000)==0) {
+		sys_printf("wait irq: c0_status %x, c0_cause %x, INTC.icmr %x\n",
+			get_c0_status(), get_c0_cause(), INTC->icmr);
+	        set_c0_status(get_c0_status()|0x1c00);
+	}
+	gruux++;
+#endif
 }
 

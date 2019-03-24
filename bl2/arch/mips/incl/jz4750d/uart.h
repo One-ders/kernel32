@@ -40,4 +40,12 @@ struct UART {
                 volatile unsigned char isr;
                 volatile unsigned int  fill9;
         };
+	union {
+		volatile unsigned char umr;
+		volatile unsigned int fill10;
+	};
+	union {
+		volatile unsigned char uacr;
+		volatile unsigned int fill11;
+	};
 };
