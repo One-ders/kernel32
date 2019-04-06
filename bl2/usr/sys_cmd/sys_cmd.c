@@ -528,9 +528,15 @@ static int loadnrun_fnc(int argc, char **argv, struct Env *env) {
 	int rc;
 	int npid;
 	struct stat stbuf;
+	int bg=0;
 
 	if (strcmp(argv[0],"loadnrun")==0) {
 		argv++;
+		argc--;
+	}
+
+	if (!strcmp(argv[argc-1],"&")) {
+		bg=1;
 		argc--;
 	}
 
@@ -549,7 +555,10 @@ static int loadnrun_fnc(int argc, char **argv, struct Env *env) {
 	npid=my_fork();
 
 	if (npid) {
-		msleep(5000);
+		int status;
+		if (!bg) {
+			wait(&status);
+		}
 	} else {
 		char *newenviron[] = { NULL };
 		execve(argv[0], &argv[0], newenviron);

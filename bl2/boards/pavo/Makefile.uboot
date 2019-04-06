@@ -52,6 +52,10 @@ uroot.img: usr.bin
 	cp obj/usr/fb/fb uroot/fb
 	cp -r $(TOP)/usr/files/* uroot/.
 	mkyaffs2image 1 uroot rootf.img
+
+image:
+	mkyaffs2image 1 uroot rootf.img
+
 	
 #tmp/fot3: tmp/fot2
 #	dd if=tmp/fot2 of=tmp/fot3 ibs=4096 count=1

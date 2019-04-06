@@ -10,6 +10,10 @@ volatile unsigned int switch_flag=0;
 volatile unsigned int hwr_ulr=0;
 
 
+/* The address space struct is located on the page of the first
+ * task for a context. Tasks created in the same adderess space, refers to
+ * this task.
+ */
 struct task *create_user_context(void) {
 	struct task *t=(struct task *)get_page();
 	unsigned long int *t_pgd=(unsigned long int *)get_page();

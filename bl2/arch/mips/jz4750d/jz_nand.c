@@ -94,9 +94,9 @@ static int page_size	= 2048;
 static int oob_size	= 64;
 static int ecc_count	= 4;
 static int row_cycle	= 3;
-static int page_per_block = 64;
+static int page_per_block = 128;
 static int bad_block_pos = 0;
-static int block_size	= 131072;
+static int block_size	= 262144;
 
 static unsigned char oob_buf[128] = {0};
 
@@ -326,7 +326,7 @@ static int nand_read_page(int page_addr,
 }
 
 #ifndef CFG_NAND_BADBLOCK_PAGE
-#define CFG_NAND_BADBLOCK_PAGE 63 /* NAND bad block was marked at this page in a block, starting from 0 */
+#define CFG_NAND_BADBLOCK_PAGE 127 /* NAND bad block was marked at this page in a block, starting from 0 */
 #endif
 
 

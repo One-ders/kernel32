@@ -13,6 +13,7 @@ unsigned yaffs_trace_mask =
 
 #if 0
         YAFFS_TRACE_SCAN |
+        YAFFS_TRACE_CHECKPOINT |
         YAFFS_TRACE_GC |
         YAFFS_TRACE_ERASE |
         YAFFS_TRACE_ERROR |
@@ -347,7 +348,8 @@ int mount_nand(char *nand_dev_name) {
 	param->total_bytes_per_chunk=nand_cfg.page_size;
 	param->spare_bytes_per_chunk=nand_cfg.oob_size;
 	param->chunks_per_block=nand_cfg.pages_per_block;
-	param->n_reserved_blocks=2;
+//	param->n_reserved_blocks=2;
+	param->n_reserved_blocks=5;
 	param->start_block=0;
 	param->end_block=nand_cfg.n_blocks-1;
 	param->is_yaffs2=1;

@@ -21,6 +21,14 @@ struct yaffs_checkpt_chunk_hdr {
 	u32 xor;
 } ;
 
+typedef struct {
+    int structType;
+    u32 magic;
+    u32 version;
+    u32 head;
+} yaffs_CheckpointValidity;
+
+
 
 static int apply_chunk_offset(struct yaffs_dev *dev, int chunk)
 {
@@ -73,6 +81,26 @@ static int yaffs2_checkpt_check_chunk_hdr(struct yaffs_dev *dev)
 		hdr.sum == dev->checkpt_sum &&
 		hdr.xor == dev->checkpt_xor;
 }
+
+static int yaffs2_old_version(struct yaffs_dev *dev, int head)
+{
+	yaffs_CheckpointValidity cp;
+	int ok;
+
+	memcpy(&cp, dev->checkpt_buffer, sizeof(cp));
+
+	ok = (cp.structType == sizeof(cp)) &&
+		(cp.magic == YAFFS_MAGIC) &&
+		(cp.version == YAFFS_CHECKPOINT_VERSION2) &&
+		(cp.head == ((head) ? 1 : 0));
+
+	if (ok) {
+		dev->checkpt_version=2;
+		return 1;
+	}
+	return 0;
+}
+
 
 static int yaffs2_checkpt_space_ok(struct yaffs_dev *dev)
 {
@@ -384,9 +412,10 @@ int yaffs2_checkpt_rd(struct yaffs_dev *dev, void *data, int n_bytes)
 				dev->checkpt_cur_chunk = 0;
 			}
 
-			/* Bail out if we can't find a checpoint block */
-			if (dev->checkpt_cur_block < 0)
+			/* Bail out if we can't find a checkpoint block */
+			if (dev->checkpt_cur_block < 0) {
 				break;
+			}
 
 			chunk = dev->checkpt_cur_block *
 			    dev->param.chunks_per_block +
@@ -401,16 +430,29 @@ int yaffs2_checkpt_rd(struct yaffs_dev *dev, void *data, int n_bytes)
 						dev->checkpt_buffer,
 						&tags);
 
+			if (dev->checkpt_version!=2) {
 			/* Bail out if the chunk is corrupted. */
 			if (tags.chunk_id != (u32)(dev->checkpt_page_seq + 1) ||
 			    tags.ecc_result > YAFFS_ECC_RESULT_FIXED ||
-			    tags.seq_number != YAFFS_SEQUENCE_CHECKPOINT_DATA)
+			    tags.seq_number != YAFFS_SEQUENCE_CHECKPOINT_DATA) {
 				break;
+			}
+			}
 
 			/* Bail out if it is not a checkpoint chunk. */
-			if(!yaffs2_checkpt_check_chunk_hdr(dev))
-				break;
+			if((dev->checkpt_version!=2) &&
+				(!yaffs2_checkpt_check_chunk_hdr(dev))) {
+			        dev->checkpt_byte_offs = 0;
+				if (yaffs2_old_version(dev,1)){
+					;
+				} else {
+					break;
+				}
+			}
 
+			if (dev->checkpt_version==2) {
+			        dev->checkpt_byte_offs = 0;
+			}
 			dev->checkpt_page_seq++;
 			dev->checkpt_cur_chunk++;
 

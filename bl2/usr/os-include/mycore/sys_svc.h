@@ -24,4 +24,5 @@
 #define SVC_BRK         SVC_SBRK+1
 #define SVC_FORK        SVC_BRK+1
 #define SVC_EXIT	SVC_FORK+1
+#define SVC_WAIT	SVC_EXIT+1
 

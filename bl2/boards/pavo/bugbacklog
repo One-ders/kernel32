@@ -1,0 +1,25 @@
+
++++++++++++++++++++++++++++++++++++++++++++
+
+--->ps
+uptime: 0:00:58.420, current tic: 5842
+task(  5@80047000)    sys_mon:000, sp=0x80048000, pc=0x00000000, prio=3, state=r, atics=0
+task(  4@80045000)    fb_test:001, sp=0x80045e40, pc=0x00000000, prio=1, state=t, atics=0
+task(  4@80045000)    fb_test:001, sp=0x80045e40, pc=0x00000000, prio=1, state=t, atics=0
+task(  1@80058000)    sys_mon:001, sp=0x80058dd8, pc=0x00000000, prio=3, state=w, atics=0
+task(256@800377b0)  init_main:000, sp=0x83ffdf6c, pc=0x00000000, prio=3, state=w, atics=5841
+
+--->kill sys_mon:001User: Segmentation violation
+invalid access from 0x8001440c, address 0x00000004, sp 0x80047e18, current=sys_mon:000
+
+================
+
+   run multiple threads that uses frame buffer. Then kill owning process,
+   make shure it is not current.
+
+  Crashdump points into framebuffer/lcd driver
+
+0x8001440c is in fb_control (fbmem.c:141).
+
+
++++++++++++++++++++++++++++++++++++++++++++++++

@@ -118,6 +118,7 @@ int svc_reboot(unsigned int cookie);
 unsigned int svc_gettic(void);
 void *svc_sbrk(long int incr);
 int svc_brk(void *nbrk);
+int svc_wait(int *wstatus);
 
 
 __attribute__ ((noinline)) int svc_create_task(struct task_create_args *ta) {
@@ -259,6 +260,13 @@ __attribute__ ((noinline)) void svc_exit(int st) {
 	svc(SVC_EXIT);
 }
 
+__attribute__ ((noinline)) int svc_wait(int *wstatus) {
+	register int rc asm("v0");
+	svc(SVC_WAIT);
+	return rc;
+}
+
+
 
 
 
@@ -372,4 +380,8 @@ int my_fork(void) {
 
 void exit(int st) {
 	svc_exit(st);
+}
+
+int wait(int *status) {
+	svc_wait(status);
 }

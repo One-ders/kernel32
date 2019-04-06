@@ -12,7 +12,7 @@
 #define CFG_NAND_PAGE_SIZE      2048
 #define CFG_NAND_ROW_CYCLE      3     
 #define CFG_NAND_BLOCK_SIZE     (256 << 10)     /* NAND chip block size         */
-#define CFG_NAND_BADBLOCK_PAGE  63              /* NAND bad block was marked at this page in a block, starting from 0 */
+#define CFG_NAND_BADBLOCK_PAGE  127             /* NAND bad block was marked at this page in a block, starting from 0 */
 #define CFG_NAND_BCH_BIT        4               /* Specify the hardware BCH algorithm for 4750 (4|8) */
 #define CFG_NAND_ECC_POS        24              /* Ecc offset position in oob area, its default value is 3 if it isn't defined. */
 #define CFG_NAND_IS_SHARE       1               /* Just for other boot mode(e.g. SD boot), it can be auto-detected by NAND boot */

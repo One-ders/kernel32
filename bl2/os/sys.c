@@ -42,6 +42,8 @@ void sys_thread_exit(int status);
 int sys_getdents64(unsigned int fd,
                         void *dirp,
                         unsigned int count);
+static int block_task_t(struct task *t);
+static int unblock_task_t(struct task *t);
 
 struct iovec {
 	void *iov_base;
@@ -138,6 +140,7 @@ void SysTick_Handler(void) {
 			if (prio>MAX_PRIO) prio=MAX_PRIO;
 			ASSERT(t->state!=TASK_STATE_RUNNING);
 			cpu_flags=disable_interrupts();
+#if 0
 			if (t->state==TASK_STATE_DEAD) {
 				t->next=0;
 				b->next=0;
@@ -151,6 +154,7 @@ void SysTick_Handler(void) {
 				dealloc_task_id(t->id);
 				put_page(t);
 			} else {
+#endif
 				t->state=TASK_STATE_READY;
 				t->next=0;
 				b->next=0;
@@ -170,7 +174,9 @@ void SysTick_Handler(void) {
 				restore_cpu_flags(cpu_flags);
 				DEBUGP(DSYS_SCHED,DLEV_INFO,"timer_wakeup: readying %s\n", t->name);
 				b=bnext;
+#if 0
 			}
+#endif
 		}
 		tqp->tq_out_first=tqp->tq_out_last=0;
 	}
@@ -184,6 +190,18 @@ void SysTick_Handler(void) {
 		return;
 	}
 	SET_TMARK(current);
+
+	if (task_cemetery) {
+		struct task *t;
+		for(t=task_cemetery;t;t=t->next) {
+			sys_printf("found task: %s in cemetry\n", t->name);
+			if (t->sp!=0) {
+				task_cemetery=t->next;
+			} else {
+				sys_printf("task still not swiched out\n");
+			}
+		}
+	}
 	return;
 }
 
@@ -432,6 +450,12 @@ static int fork(unsigned long int *svc_sp) {
 	t->next2=troot;
 	troot=t;
 
+	/* setup parent relation */
+	t->asp->parent=current->asp;
+	/* update currents child list */
+	t->asp->next=current->asp->child;
+	current->asp->child=t->asp;
+
 	if(!ready[prio]) {
 		ready[prio]=t;
 	} else {
@@ -445,6 +469,77 @@ static int fork(unsigned long int *svc_sp) {
 	return 0;
 }
 
+static int delete_thread(struct task *t) {
+	int rc;
+	unsigned long int cpu_flags=disable_interrupts();
+	if (t->blocker.wakeup_tic) {
+		sys_timer_remove(&t->blocker);
+	}
+
+	rc=block_task_t(t);
+	if (!rc) {
+		sys_printf("removed %s, from ready queue\n",t->name);
+	}
+	t->state=TASK_STATE_DEAD;
+	close_drivers(t);
+	sys_printf("removing task %s\n",t->name);
+	t->asp=0;
+
+	t->next=task_cemetery;
+	task_cemetery=t;
+	restore_cpu_flags(cpu_flags);
+	return 0;
+}
+
+/* address space: similar to unix process
+ * task: similar to unix thread.
+ */
+static int process_terminated(struct address_space *asp) {
+	struct address_space *child=asp->child;
+	struct address_space *pchild=asp->parent->child;
+	struct address_space **ppchild=&asp->parent->child;
+	struct task *t;
+
+	/* remove ourself from parents child list */
+        /* and add our children to parents child list */
+	while(pchild) {
+		if (pchild==asp) {
+			*ppchild=pchild->next;
+		} else {
+			ppchild=&pchild->next;
+		}
+		pchild=pchild->next;
+	}
+
+	*ppchild=asp->child;
+
+	/* go through child list, make children point to our
+	 * parent, in order to link our self out.
+	 */
+
+	while(child) {
+		child->parent=asp->parent;
+		child=child->next;
+	}
+
+	// wakeup any threads in parent process that blocked on this
+	t=troot;
+	while(t) {
+		if (t->asp==asp->parent) {
+			if (t->state==TASK_STATE_WAIT) {
+				t->state=TASK_STATE_READY;
+				{
+				struct task *b=ready[MAX_PRIO];
+				t->next=b;
+				ready[MAX_PRIO]=t;
+				unblock_task_t(t);
+				}
+			}
+		}
+		t=t->next2;
+	}
+}
+
 static int kill_proc(unsigned long int *svc_sp) {
 	char *name=(char *)get_svc_arg(svc_sp,0);
 	struct task *t=lookup_task_for_name(name);
@@ -453,6 +548,7 @@ static int kill_proc(unsigned long int *svc_sp) {
 	struct address_space as;
 	struct address_space *asp;
 	int    killself=0;
+	unsigned long int cpu_flags;
 
 	DEBUGP(DSYS_SCHED,DLEV_INFO,"kill proc task: %s\n", t->name);
 
@@ -461,50 +557,79 @@ static int kill_proc(unsigned long int *svc_sp) {
 		return 0;
 	}
 
-	asp=t->asp;
-	as=*asp;
+	asp=t->asp; /* get the address space pointer */
 
+	if (!asp->parent) {
+		sys_printf("cant kill top process\n");
+		set_svc_ret(svc_sp,-1);
+		return 0;
+	}
+
+// Doing extreeme interrupts disable, needs to be addressed later.
+	cpu_flags=disable_interrupts();
 	while(t1) {
 		struct task *tnext=t1->next2;
 		if (t1->asp==asp) {
-			if (t1->state==TASK_STATE_TIMER) {
-				close_drivers(t1);
-				*tprev=t1->next2;
-				t1->state=TASK_STATE_DEAD;
+			struct address_space *a=(struct address_space *)(t1+1);
+			if (a==asp) {
+				sys_printf("defering delete of main process leader task\n");
 			} else {
-				tprev=&t1->next2;
+				if (t1==current) {
+					killself=1;
+					sys_printf("kill self 1\n");
+				}
+				delete_thread(t1);
+				*tprev=t1->next2;
+				t1->next2=0;
 			}
 		} else {
 			tprev=&t1->next2;
 		}
 		t1=tnext;
 	}
+	restore_cpu_flags(cpu_flags);
+
+	/* restart scan, now there shall only be the proces leader left */
 	t1=troot;
+	tprev=&troot;
+
+	cpu_flags=disable_interrupts();
 	while(t1) {
 		struct task *tnext=t1->next2;
 		if (t1->asp==asp) {
-			if (t1->state==TASK_STATE_DEAD) {
-				;
-			} else if (t1==current) {
-				killself=1;
-				sys_printf("kill self\n");
+			struct address_space *a=(struct address_space *)(t1+1);
+			if (a==asp) {
+				sys_printf("delete of main process leader task\n");
+				if (t1==current) {
+					killself=1;
+					sys_printf("kill self 2\n");
+				}
+				delete_thread(t1);
+				*tprev=t1->next2;
+				t1->next2=0;
+				sys_printf("maybe destroy as, %x\n",a->pgd);
+				if (a->pgd) {  // destroy asp if not already done
+					process_terminated(a);
+					free_asp_pages(a);
+					put_page(a->pgd);
+					a->pgd=0;
+					dealloc_as_id(a->id);
+				}
 			} else {
-				t1->state=TASK_STATE_DEAD;
-				close_drivers(t1);
-				sys_printf("found %s\n",t1->name);
-				dealloc_task_id(t1->id);
-				put_page(t1);
+				sys_printf("a task struct without asp, error error\n");
 			}
+		} else {
+			tprev=&t1->next2;
 		}
 		t1=tnext;
 	}
-//	free_asp_pages(&as);
-	if (killself) {
-		unsigned int tout=100;
-		sys_sleepon(&current->blocker,&tout);
-	}
+	restore_cpu_flags(cpu_flags);
 
-	switch_on_return();
+	if (killself) {
+		current->sp=0;  // zero out old stack ptr, the switch will save current sp, so we can monitor
+			   // when it is out.
+		switch_on_return();
+	}
 	return 0;
 }
 
@@ -554,6 +679,41 @@ static int block_task(unsigned long int *svc_sp) {
 	return 0;
 }
 
+static int block_task_t(struct task *t) {
+	if (!t) {
+		return -1;
+	}
+	if (t==current) {
+		SET_PRIO(t,t->prio_flags|0x8);
+		DEBUGP(DSYS_SCHED,DLEV_INFO,"blocking current task: %s\n",current->name);
+		switch_on_return();
+		return 0;
+	} else {
+		struct task *p=ready[GET_PRIO(t)];
+		struct task * volatile *p_prev=&ready[GET_PRIO(t)];
+		SET_PRIO(t,t->prio_flags|0x8);
+		while(p) {
+			if (p==t) {
+				(*p_prev)=p->next;
+				p->next=0;
+				if (!ready[MAX_PRIO]){
+					ready[MAX_PRIO]=p;
+				} else {
+					ready_last[MAX_PRIO]->next=p;
+				}
+				ready_last[MAX_PRIO]=p;
+				break;
+			}
+			p_prev=&p->next;
+			p=p->next;
+		}
+		DEBUGP(DSYS_SCHED,DLEV_INFO,"blocking task: %s, current %s\n",t->name,current->name);
+		return 0;
+	}
+	return -1;
+}
+
+
 static int unblock_task(unsigned long int *svc_sp) {
 	char *name=(char *)get_svc_arg(svc_sp,0);
 	struct task *b=ready[MAX_PRIO];
@@ -596,6 +756,44 @@ set_ready:
 	set_svc_ret(svc_sp,0);
 	return 0;
 }
+
+static int unblock_task_t(struct task *t) {
+	struct task *b=ready[MAX_PRIO];
+	struct task * volatile *b_prev=&ready[MAX_PRIO];
+	int prio;
+	if (!t) {
+		return -1;
+	}
+	prio=t->prio_flags&0xf;
+	if (prio>MAX_PRIO) prio=MAX_PRIO;
+	if (prio<MAX_PRIO) {
+		return -1;
+	}
+
+	while(b) {
+		if (b==t) {
+			(*b_prev)=b->next;
+			goto set_ready;
+		}
+		b_prev=&b->next;
+		b=b->next;
+	}
+	return -1;
+
+set_ready:
+	DEBUGP(DSYS_SCHED,DLEV_INFO,"unblocking task: %s, current %s\n",t->name,current->name);
+	t->next=0;
+	SET_PRIO(t,t->prio_flags&3);
+	if(ready[GET_PRIO(t)]) {
+		ready_last[GET_PRIO(t)]->next=t;
+	} else {
+		ready[GET_PRIO(t)]=t;
+	}
+	ready_last[GET_PRIO(t)]=t;
+
+	return 0;
+}
+
 
 static int setprio_task(unsigned long int *svc_sp) {
 	char *name=(char *)get_svc_arg(svc_sp,0);
@@ -653,6 +851,14 @@ check_resched:
 		DEBUGP(DSYS_SCHED,DLEV_INFO,"setprio task: name %s prio=%d, current %s, reschedule\n",t->name,t->prio_flags,current->name);
 		switch_on_return();
 	}
+	set_svc_ret(svc_sp,0);
+	return 0;
+}
+
+static int wait(unsigned long int *svc_sp) {
+	char *name=(char *)get_svc_arg(svc_sp,0);
+	block_task_t(current);
+	current->state=TASK_STATE_WAIT;
 	set_svc_ret(svc_sp,0);
 	return 0;
 }
@@ -1185,6 +1391,19 @@ static int lnx_nsleep(unsigned long int *svc_sp) {
 	return 0;
 }
 
+static int lnx_wait(unsigned long int *svc_sp) {
+	int *wstatus=
+	  (int *)get_svc_arg(svc_sp,0);
+	if (current->state!=TASK_STATE_RUNNING) return 0;
+	DEBUGP(DSYS_SCHED,DLEV_INFO,"wait for child task: %s\n", current->name);
+	block_task_t(current);
+	current->state=TASK_STATE_WAIT;
+	set_svc_ret(svc_sp,0);
+	set_svc_lret(svc_sp,0);
+	return 0;
+}
+
+
 static int lnx_mmap2(unsigned long int *svc_sp) {
 	unsigned long int addr=(unsigned long int)get_svc_arg(svc_sp,0);
 	unsigned long int length=(unsigned long int)get_svc_arg(svc_sp,1);
@@ -1370,7 +1589,12 @@ void *handle_syscall(unsigned long int *svc_sp) {
 		case SVC_EXIT: {
 			int status=(int)get_svc_arg(svc_sp,0);
 			sys_thread_exit(status);
+			current->sp=0;  // mark it so we can see when switcher has moved it out
 			switch_on_return();
+			return 0;
+		}
+		case SVC_WAIT: {
+			wait(svc_sp);
 			return 0;
 		}
 		case 0x0fa3: {  // Linux read
@@ -1395,6 +1619,10 @@ void *handle_syscall(unsigned long int *svc_sp) {
 		}
 		case 0x0fd6: {  // Linux ioctl
 			lnx_ioctl(svc_sp);
+			return 0;
+		}
+		case 0x1012: { // Linux wait
+			lnx_wait(svc_sp);
 			return 0;
 		}
 		case 0x1032: {	// Linux writev
@@ -1429,7 +1657,6 @@ void *handle_syscall(unsigned long int *svc_sp) {
 	}
 	return 0;
 }
-
 
 void *sys_sleep(unsigned int ms) {
 	current->blocker.driver=0;
@@ -1537,6 +1764,12 @@ void *sys_sleepon(struct blocker *so, unsigned int *tout) {
 }
 
 // Call with interrupts off
+// a blocker list is typically used by a common resource, like a device driver for
+// a serial interface. Many processes may access the driver, if the driver can not perform
+// a requested service, because of waiting for some external state, the process will be put to
+// sleep. Each thread has a blocker object. The driver will ave a blocker_list, where it put
+// the blocker of each blocked thread.
+//
 void *sys_sleepon_update_list(struct blocker *b, struct blocker_list *bl_ptr) {
 	void *rc=0;
 	struct blocker **pprev;
@@ -1545,7 +1778,7 @@ void *sys_sleepon_update_list(struct blocker *b, struct blocker_list *bl_ptr) {
 	if (current->state!=TASK_STATE_RUNNING) {
 		return 0;
 	}
-//	cpu_flags=disable_interrupts();
+
 	if (!bl_ptr) goto out;
 	if (bl_ptr->is_ready()) goto out;
 	b->next2=0;
@@ -1560,7 +1793,6 @@ void *sys_sleepon_update_list(struct blocker *b, struct blocker_list *bl_ptr) {
 	 * mask out the first level device, otherwise a wake
 	 * up will try to wake up wrong thread */
 	b->ev|=0x80;
-//	restore_cpu_flags(cpu_flags);
 	rc=sys_sleepon(b,0);
 	if (!rc) { 
 		/* return 0, means no sleep */
@@ -1584,9 +1816,7 @@ void *sys_sleepon_update_list(struct blocker *b, struct blocker_list *bl_ptr) {
 			sys_printf("sleep_list: failed, blocker not found\n");
 		}
 	}
-	return rc;
 out:
-//	restore_cpu_flags(cpu_flags);
 	return rc;
 }
 
@@ -1686,7 +1916,13 @@ void sys_thread_exit(int status) {
 	struct task **prevp;
 	struct task *i;
 	int nt=0;
+	unsigned long int cpu_flags;
 
+// For now, disable interrupts during this job,
+// on jz4750d hw, we get timesliced otherwise.
+// which means 2 sys_tics, ~20mS!!!
+// Or uart runs synch.... Look into later
+	cpu_flags=disable_interrupts();
 	current->state=TASK_STATE_DEAD;
 
 	prevp=&troot;
@@ -1717,6 +1953,8 @@ void sys_thread_exit(int status) {
 		i=i->next;
 	}
 
+	current->next=0;
+
 	if (current->blocker.wakeup_tic) {
 		sys_timer_remove(&current->blocker);
 		sys_printf("task %s, blocked on timer\n", current->name);
@@ -1729,6 +1967,7 @@ void sys_thread_exit(int status) {
 	nt=decr_address_space_users(current->asp);
 
 	if(!nt) {
+		process_terminated(current->asp);
 		close_drivers(current);
 		free_asp_pages(current->asp);
 		put_page(current->asp->pgd);
@@ -1736,8 +1975,9 @@ void sys_thread_exit(int status) {
 		dealloc_as_id(current->asp->id);
 	}
 
-	current->next2=task_cemetery;
+	current->next=task_cemetery;
 	task_cemetery=current;
+	restore_cpu_flags(cpu_flags);
 }
 
 /***********************************************************/
@@ -2032,6 +2272,11 @@ void start_sys(void) {
 	setup_return_stack(t,(void *)stackp,(unsigned long int)usr_init,0, targs, environ);
 
 	disable_interrupts();
+
+	t->asp->next=current->asp->child;
+	current->asp->child=t->asp;
+	t->asp->parent=current->asp;
+
 	t->next2=troot;
 	troot=t;
 

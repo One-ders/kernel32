@@ -139,6 +139,9 @@ struct address_space {
 	unsigned long int mmap_vaddr;
 #endif
 	int		ref;
+	struct address_space	*parent;
+	struct address_space	*next;
+	struct address_space	*child;
 };
 
 
@@ -163,12 +166,13 @@ struct task {
 
 
 
-#define TASK_STATE_IDLE         0
-#define TASK_STATE_RUNNING      1
-#define TASK_STATE_READY        2
-#define TASK_STATE_TIMER        3
-#define TASK_STATE_IO           4
-#define TASK_STATE_DEAD         6
+#define TASK_STATE_IDLE		0
+#define TASK_STATE_RUNNING	1
+#define TASK_STATE_READY	2
+#define TASK_STATE_TIMER	3
+#define TASK_STATE_IO		4
+#define TASK_STATE_WAIT		5
+#define TASK_STATE_DEAD		6
 
 #define MAX_PRIO                4
 #define GET_PRIO(a)             ((a)->prio_flags&0x3)

@@ -284,11 +284,20 @@ static int yaffs2_rd_checkpt_validity_marker(struct yaffs_dev *dev, int head)
 	ok = (yaffs2_checkpt_rd(dev, &cp, sizeof(cp)) == sizeof(cp));
 	yaffs2_do_endian_validity_marker(dev, &cp);
 
-	if (ok)
-		ok = (cp.struct_type == sizeof(cp)) &&
-		    (cp.magic == YAFFS_MAGIC) &&
-		    (cp.version == YAFFS_CHECKPOINT_VERSION) &&
-		    (cp.head == ((head) ? 1 : 0));
+	if (ok) {
+		if (dev->checkpt_version==2) {
+			ok = (cp.struct_type == sizeof(cp)) &&
+			    (cp.magic == YAFFS_MAGIC) &&
+			    (cp.version == YAFFS_CHECKPOINT_VERSION2) &&
+			    (cp.head == ((head) ? 1 : 0));
+		} else {
+			ok = (cp.struct_type == sizeof(cp)) &&
+			    (cp.magic == YAFFS_MAGIC) &&
+			    (cp.version == YAFFS_CHECKPOINT_VERSION) &&
+			    (cp.head == ((head) ? 1 : 0));
+		}
+	}
+
 	return ok ? 1 : 0;
 }
 
@@ -396,9 +405,20 @@ static int yaffs2_rd_checkpt_dev(struct yaffs_dev *dev)
 	    (dev->internal_end_block - dev->internal_start_block + 1);
 	int ok;
 
-	ok = (yaffs2_checkpt_rd(dev, &cp, sizeof(cp)) == sizeof(cp));
-	if (!ok)
+	if (dev->checkpt_version==2) {
+		struct yaffs_checkpt_dev_v2 cp2;
+		ok = (yaffs2_checkpt_rd(dev, &cp2, sizeof(cp2)) == sizeof(cp2));
+		memcpy(&cp,&cp2,sizeof(cp));
+		if (cp2.struct_type==sizeof(cp2)) {
+			cp.struct_type=sizeof(cp);
+		}
+	} else {
+		ok = (yaffs2_checkpt_rd(dev, &cp, sizeof(cp)) == sizeof(cp));
+	}
+
+	if (!ok) {
 		return 0;
+	}
 	yaffs2_do_endian_checkpt_dev(dev, &cp);
 
 	if (cp.struct_type != sizeof(cp))
@@ -754,8 +774,50 @@ static int yaffs2_rd_checkpt_objs(struct yaffs_dev *dev)
 
 
 	while (ok && !done) {
-		ok = (yaffs2_checkpt_rd(dev, &cp, sizeof(cp)) == sizeof(cp));
-		yaffs2_do_endian_checkpt_obj (dev, &cp);
+		if (dev->checkpt_version==2) {
+			struct yaffs_checkpt_obj_v2 cp2;
+			ok= (yaffs2_checkpt_rd(dev, &cp2, sizeof(cp2)) == sizeof(cp2));
+			if (ok) {
+				memset(&cp,0,sizeof(cp));
+				if (cp2.struct_type==sizeof(cp2)) {
+					cp.struct_type=sizeof(cp);
+				} else {
+					ok=0;
+					break;
+				}
+				cp.obj_id=cp2.obj_id;
+				cp.parent_id=cp2.parent_id;
+				cp.hdr_chunk=cp2.chunkId;
+
+				cp.bit_field=cp2.variantType;
+				if (cp2.deleted) {
+					cp.bit_field|=(1<<3);
+				}
+				if (cp2.softDeleted) {
+					cp.bit_field|=(1<<4);
+				}
+				if (cp2.unlinked) {
+					cp.bit_field|=(1<<5);
+				}
+				if (cp2.fake) {
+					cp.bit_field|=(1<<6);
+				}
+				if (cp2.renameAllowed) {
+					cp.bit_field|=(1<<7);
+				}
+				if (cp2.unlinkAllowed) {
+					cp.bit_field|=(1<<8);
+				}
+
+				cp.bit_field|=(cp2.serial<<9);
+
+				cp.n_data_chunks=cp2.n_data_chunks;
+				cp.size_or_equiv_obj=cp2.size_or_equiv_obj;
+			}
+		} else {
+			ok = (yaffs2_checkpt_rd(dev, &cp, sizeof(cp)) == sizeof(cp));
+			yaffs2_do_endian_checkpt_obj (dev, &cp);
+		}
 
 		if (cp.struct_type != sizeof(cp)) {
 			yaffs_trace(YAFFS_TRACE_CHECKPOINT,
@@ -873,8 +935,9 @@ static int yaffs2_wr_checkpt_data(struct yaffs_dev *dev)
 		ok = yaffs2_wr_checkpt_validity_marker(dev, 0);
 	}
 
-	if (ok)
+	if (ok && (dev->checkpt_version!=2))
 		ok = yaffs2_wr_checkpt_sum(dev);
+
 
 	if (!yaffs_checkpt_close(dev))
 		ok = 0;
@@ -900,6 +963,7 @@ static int yaffs2_rd_checkpt_data(struct yaffs_dev *dev)
 		ok = 0;
 	}
 
+	dev->checkpt_version=0;
 	if (ok)
 		ok = yaffs2_checkpt_open(dev, 0); /* open for read */
 
@@ -924,7 +988,7 @@ static int yaffs2_rd_checkpt_data(struct yaffs_dev *dev)
 		ok = yaffs2_rd_checkpt_validity_marker(dev, 0);
 	}
 
-	if (ok) {
+	if (ok && (dev->checkpt_version!=2)) {
 		ok = yaffs2_rd_checkpt_sum(dev);
 		yaffs_trace(YAFFS_TRACE_CHECKPOINT,
 			"read checkpoint checksum %d", ok);

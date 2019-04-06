@@ -804,13 +804,14 @@ struct yaffs_dev {
 	u32 cache_hits;
 	u32 tags_used;
 	u32 summary_used;
+	int checkpt_version;
 
 };
 
 /*
  * Checkpointing definitions.
  */
-
+#define YAFFS_CHECKPOINT_VERSION2       2
 #define YAFFS_CHECKPOINT_VERSION	8
 
 /* yaffs_checkpt_obj holds the definition of an object as dumped
@@ -838,6 +839,26 @@ struct yaffs_checkpt_obj {
 	Y_LOFF_T size_or_equiv_obj;
 };
 
+struct yaffs_checkpt_obj_v2 {
+        int	struct_type;
+        u32	obj_id;
+        u32	parent_id;
+        int	chunkId;
+
+	enum yaffs_obj_type variantType:3;
+	u8	deleted:1;
+	u8	softDeleted:1;
+	u8	unlinked:1;
+	u8	fake:1;
+	u8	renameAllowed:1;
+	u8	unlinkAllowed:1;
+	u8	serial;
+
+        int 	n_data_chunks;
+        u32	size_or_equiv_obj;
+};
+
+
 /* The CheckpointDevice structure holds the device information that changes
  *at runtime and must be preserved over unmount/mount cycles.
  */
@@ -857,6 +878,24 @@ struct yaffs_checkpt_dev {
 				 * allocating block */
 
 };
+
+struct yaffs_checkpt_dev_v2 {
+        int struct_type;
+        int n_erased_blocks;
+        int alloc_block;    /* Current block being allocated off */
+        u32 alloc_page;
+        int n_free_chunks;
+
+        int n_deleted_files;              /* Count of files awaiting deletion;*/
+        int n_unlinked_files;             /* Count of unlinked files. */
+        int n_bg_deletions; 	       /* Count of background deletions. */
+
+        /* yaffs2 runtime stuff */
+        unsigned seq_number;        /* Sequence number of currently allocating block */
+        unsigned oldestDirtySequence;
+
+};
+
 
 struct yaffs_checkpt_validity {
 	int struct_type;
