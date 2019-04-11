@@ -4,6 +4,13 @@
 
 #define CONFIG_JZ4750D_KMP510
 #define CONFIG_JZ4750D_KMP510_LCD
+#define CONFIG_SOC_JZ4750D
+
+#define CONFIG_FB_JZ4750_LCD
+//#define CONFIG_FB_JZ4750_LCD_USE_2LAYER_FRAMEBUFFER
+#define CONFIG_FB_JZ4750_TVE
+#define CONFIG_IPU_JZ4750
+
 
 /*-----------------------------------------------------------------------
  * NAND FLASH configuration

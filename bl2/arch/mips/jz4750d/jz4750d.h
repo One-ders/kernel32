@@ -131,6 +131,7 @@ static inline u32 jz_readl(u32 address)
 #define	UDC_BASE	0xB3040000
 #define	LCD_BASE	0xB3050000
 #define	SLCD_BASE	0xB3050000
+#define TVE_BASE	0xB3050100
 #define	CIM_BASE	0xB3060000
 #define	BCH_BASE        0xB30D0000
 #define	ETH_BASE	0xB3100000
@@ -320,9 +321,8 @@ static inline u32 jz_readl(u32 address)
 #define CPM_I2SCDR_I2SDIV_MASK	(0x1ff << CPM_I2SCDR_I2SDIV_BIT)
 
 /* LCD Pixel Clock Divider Register */
-#define CPM_LPCDR_LSCS	        31 /* TV encoder Source Pixel Clock Selection */
-#define CPM_LPCDR_LPCS	        30 /* LCD Panel pix clock Selection */
-#define CPM_LPCDR_LTCS	        29 /* LCD TV Encoder or Panel pix clock Selection */
+#define CPM_LPCDR_LSCS	        (1<<31) /* TV encoder Source Pixel Clock Selection */
+#define CPM_LPCDR_LTCS	        (1<<30) /* LCD TV Encoder or Panel pix clock Selection */
 #define CPM_LPCDR_PIXDIV_BIT	0
 #define CPM_LPCDR_PIXDIV_MASK	(0x7ff << CPM_LPCDR_PIXDIV_BIT)
 
@@ -686,7 +686,6 @@ static inline u32 jz_readl(u32 address)
 
 
 
-#if 0
 /*************************************************************************
  * WDT (WatchDog Timer)
  *************************************************************************/
@@ -714,7 +713,6 @@ static inline u32 jz_readl(u32 address)
 #define WDT_TCSR_PCK_EN		(1 << 0)
 
 #define WDT_TCER_TCEN		(1 << 0)
-#endif
 
 
 /*************************************************************************
@@ -2181,6 +2179,8 @@ static inline u32 jz_readl(u32 address)
 #define LCD_ALPHA	(LCD_BASE + 0x118) /* LCD ALPHA Register */
 #define LCD_IPUR	(LCD_BASE + 0x11C) /* LCD IPU Restart Register */
 
+#define LCD_RGBC	(LCD_BASE + 0x90)  /* RGB Controll Register */
+
 #define LCD_VAT		(LCD_BASE + 0x0c) /* Virtual Area Setting Register */
 #define LCD_DAH		(LCD_BASE + 0x10) /* Display Area Horizontal Start/End Point */
 #define LCD_DAV		(LCD_BASE + 0x14) /* Display Area Vertical Start/End Point */
@@ -2189,7 +2189,6 @@ static inline u32 jz_readl(u32 address)
 #define LCD_XYP1	(LCD_BASE + 0x124) /* Foreground 1 XY Position Register */
 #define LCD_SIZE0	(LCD_BASE + 0x128) /* Foreground 0 Size Register */
 #define LCD_SIZE1	(LCD_BASE + 0x12C) /* Foreground 1 Size Register */
-#define LCD_RGBC	(LCD_BASE + 0x90) /* RGB Controll Register */
 
 #define LCD_VSYNC	(LCD_BASE + 0x04) /* Vertical Synchronize Register */
 #define LCD_HSYNC	(LCD_BASE + 0x08) /* Horizontal Synchronize Register */
@@ -3304,10 +3303,11 @@ do {						\
 #define __gpio_as_lcd_18bit()			\
 do {						\
 	REG_GPIO_PXFUNS(3) = 0x003fffff;	\
-	REG_GPIO_PXTRGC(3) = 0x003fffff;	\
 	REG_GPIO_PXSELC(3) = 0x003fffff;	\
 	REG_GPIO_PXPES(3) = 0x003fffff;		\
 } while (0)
+
+//	REG_GPIO_PXTRGC(3) = 0x003fffff;
 
 /*
  * LCD_R0~LCD_R7, LCD_G0~LCD_G7, LCD_B0~LCD_B7,
@@ -4080,7 +4080,6 @@ static inline void __cpm_select_msc_clk(int n, int sd)
 #define __ost_set_data(v)		( REG_TCU_OSTDR = (v) )
 #define __ost_get_data()		( REG_TCU_OSTDR )
 
-#if 0
 /***************************************************************************
  * WDT
  ***************************************************************************/
@@ -4108,7 +4107,6 @@ static inline void __cpm_select_msc_clk(int n, int sd)
 	(REG_WDT_TCSR = (REG_WDT_TCSR & ~WDT_TCSR_PRESCALE_MASK) | WDT_TCSR_PRESCALE256)
 #define __wdt_select_clk_div1024() \
 	(REG_WDT_TCSR = (REG_WDT_TCSR & ~WDT_TCSR_PRESCALE_MASK) | WDT_TCSR_PRESCALE1024)
-#endif
 
 
 /***************************************************************************
@@ -5085,8 +5083,8 @@ do {						\
 /***************************************************************************
  * LCD
  ***************************************************************************/
-#define __lcd_as_smart_lcd() 		( REG_LCD_CFG |= (1<<LCD_CFG_LCDPIN_BIT) )
-#define __lcd_as_general_lcd() 		( REG_LCD_CFG &= ~(1<<LCD_CFG_LCDPIN_BIT) )
+#define __lcd_as_smart_lcd()            ( REG_LCD_CFG |= ( LCD_CFG_LCDPIN_SLCD | LCD_CFG_MODE_SLCD))
+#define __lcd_as_general_lcd()          ( REG_LCD_CFG &= ~( LCD_CFG_LCDPIN_SLCD | LCD_CFG_MODE_SLCD))
 
 #define __lcd_set_dis()			( REG_LCD_CTRL |= LCD_CTRL_DIS )
 #define __lcd_clr_dis()			( REG_LCD_CTRL &= ~LCD_CTRL_DIS )
@@ -5161,9 +5159,6 @@ do {						\
 #define __lcd_clr_sof()			( REG_LCD_STATE &= ~LCD_STATE_SOF )
 #define __lcd_clr_eof()			( REG_LCD_STATE &= ~LCD_STATE_EOF )
 
-#define __lcd_panel_white()		( REG_LCD_CFG |= LCD_CFG_WHITE )
-#define __lcd_panel_black()		( REG_LCD_CFG &= ~LCD_CFG_WHITE )
-
 /* n=1,2,4,8 for single mono-STN 
  * n=4,8 for dual mono-STN
  */
@@ -5180,19 +5175,6 @@ do {						\
 	REG_LCD_CFG |= (m);			\
 } while(0)
 
-/* n = 0-255 */
-#define __lcd_disable_ac_bias()		( REG_LCD_IO = 0xff )
-#define __lcd_set_ac_bias(n) 			\
-do {						\
-	REG_LCD_IO &= ~LCD_IO_ACB_MASK;		\
-	REG_LCD_IO |= ((n) << LCD_IO_ACB_BIT);	\
-} while(0)
-
-#define __lcd_io_set_dir()		( REG_LCD_IO |= LCD_IO_DIR )
-#define __lcd_io_clr_dir()		( REG_LCD_IO &= ~LCD_IO_DIR )
-
-#define __lcd_io_set_dep()		( REG_LCD_IO |= LCD_IO_DEP )
-#define __lcd_io_clr_dep()		( REG_LCD_IO &= ~LCD_IO_DEP )
 
 #define __lcd_io_set_vsp()		( REG_LCD_IO |= LCD_IO_VSP )
 #define __lcd_io_clr_vsp()		( REG_LCD_IO &= ~LCD_IO_VSP )

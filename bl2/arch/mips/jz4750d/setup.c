@@ -12,6 +12,55 @@
 
 jz_clocks_t jz_clocks;
 
+/*
+ * Clock Generation Module
+ */
+#define TO_MHZ(x) (x/1000000),(x%1000000)/10000
+#define TO_KHZ(x) (x/1000),(x%1000)/10
+
+
+
+int cgm_dump_data(void) {
+	int len = 0;
+	unsigned int cppcr = REG_CPM_CPPCR;  /* PLL Control Register */
+	unsigned int cpccr = REG_CPM_CPCCR;  /* Clock Control Register */
+	unsigned int div[] = {1, 2, 3, 4, 6, 8, 12, 16, 24, 32};
+	unsigned int od[4] = {1, 2, 2, 4};
+
+	sys_printf("CPPCR          : 0x%08x\n", cppcr);
+	sys_printf("CPCCR          : 0x%08x\n", cpccr);
+	sys_printf("PLL            : %s\n",
+			(cppcr & CPM_CPPCR_PLLEN) ? "ON" : "OFF");
+	sys_printf("m:n:o          : %d:%d:%d\n",
+		__cpm_get_pllm() + 2,
+		__cpm_get_plln() + 2,
+		od[__cpm_get_pllod()]);
+	sys_printf("C:H:M:P        : %d:%d:%d:%d\n",
+			div[__cpm_get_cdiv()],
+			div[__cpm_get_hdiv()],
+			div[__cpm_get_mdiv()],
+			div[__cpm_get_pdiv()]);
+	sys_printf("PLL Freq        : %3d.%02d MHz\n", TO_MHZ(__cpm_get_pllout()));
+	sys_printf("CCLK            : %3d.%02d MHz\n", TO_MHZ(__cpm_get_cclk()));
+	sys_printf("HCLK            : %3d.%02d MHz\n", TO_MHZ(__cpm_get_hclk()));
+	sys_printf("MCLK            : %3d.%02d MHz\n", TO_MHZ(__cpm_get_mclk()));
+	sys_printf("PCLK            : %3d.%02d MHz\n", TO_MHZ(__cpm_get_pclk()));
+	sys_printf("H1CLK           : %3d.%02d MHz\n", TO_MHZ(__cpm_get_h1clk()));
+	sys_printf("PIXCLK          : %3d.%02d KHz\n", TO_KHZ(__cpm_get_pixclk()));
+	sys_printf("I2SCLK          : %3d.%02d MHz\n", TO_MHZ(__cpm_get_i2sclk()));
+	sys_printf("USBCLK          : %3d.%02d MHz\n", TO_MHZ(__cpm_get_usbclk()));
+	sys_printf("MSC0CLK         : %3d.%02d MHz\n", TO_MHZ(__cpm_get_mscclk(0)));
+	sys_printf("MSC1CLK         : %3d.%02d MHz\n", TO_MHZ(__cpm_get_mscclk(1)));
+	sys_printf("EXTALCLK0       : %3d.%02d MHz\n", TO_MHZ(__cpm_get_extalclk0()));
+	sys_printf("EXTALCLK(by CPM): %3d.%02d MHz\n", TO_MHZ(__cpm_get_extalclk()));
+	sys_printf("RTCCLK          : %3d.%02d MHz\n", TO_MHZ(__cpm_get_rtcclk()));
+
+	sys_printf("pixdiv:	%d\n", __cpm_get_pixdiv());
+
+        return 0;
+}
+
+
 static void sysclocks_setup(void) {
 #ifndef CONFIG_MIPS_JZ_EMURUS /* FPGA */
 	jz_clocks.cclk = __cpm_get_cclk();
@@ -46,6 +95,9 @@ static void sysclocks_setup(void) {
 		(jz_clocks.hclk + 500000) / 1000000,
 		(jz_clocks.pclk + 500000) / 1000000,
 		(jz_clocks.mclk + 500000) / 1000000);
+
+//	cgm_dump_data();
+
 }
 
 static void soc_cpm_setup(void) {
@@ -79,7 +131,7 @@ static void soc_dmac_setup(void) {
 	__dmac_enable_module(1);
 }
 
-static void jz_soc_setup(void) {
+void jz_soc_setup(void) {
 	soc_cpm_setup();
 	soc_harb_setup();
 	soc_emc_setup();

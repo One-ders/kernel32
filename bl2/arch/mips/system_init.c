@@ -38,15 +38,10 @@ void build_free_page_list(void);
 
 void init_sys_arch(void) {
 	build_free_page_list();
+	probe_pcache();
 }
 
 void init_irq(void) {
-}
-
-void board_reboot(void) {
-	struct driver *drv_wdg=driver_lookup("wdg");
-	if (!drv_wdg) return;
-	drv_wdg->ops->open(drv_wdg->instance,0,0);
 }
 
 void *sys_sbrk(struct task *t, long int incr) {

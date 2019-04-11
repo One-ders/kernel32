@@ -1,4 +1,8 @@
 
+// Prepare for removal
+//
+#if 0
+
 #define WDT_TDR_MASK	0xffff
 
 #define WDT_TCER_TCEN	1
@@ -29,3 +33,4 @@ struct WDT {
 	unsigned short int	__pad4;
 	unsigned short int	tcsr;
 };
+#endif

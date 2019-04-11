@@ -2,6 +2,14 @@
 #include <io.h>
 #include <devices.h>
 
+
+void board_reboot(void) {
+        struct driver *drv_wdg=driver_lookup("wdg");
+        if (!drv_wdg) return;
+        drv_wdg->ops->open(drv_wdg->instance,0,0);
+}
+
+
 /*****************************  Watch dog driver ***************************/
 
 static struct device_handle my_dh;

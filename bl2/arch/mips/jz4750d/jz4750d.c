@@ -1,6 +1,7 @@
 #include <config.h>
 //#include <jz4750d.h>
 #include <devices.h>
+#include "jz4750_clocks.h"
 
 typedef struct  global_data {
 //        bd_t            *bd;
@@ -34,42 +35,72 @@ typedef struct  global_data {
 
 
 
-inline int get_cpu_speed(void)
-{
-        unsigned int speed, cfg;
-
-        /* set gpio as input??? */
-        cfg = (REG_GPIO_PXPIN(2) >> 11) & 0x7; /* read GPC11,GPC12,GPC13 */
-        switch (cfg) {
-        case 0:
-                speed = 336000000;
-                break;
-        case 1:
-                speed = 392000000;
-                break;
-        case 2:
-                speed = 400000000;
-                break;
-        case 3:
-                speed = 180000000;
-                break;
-        case 4:
-                speed = 410000000;
-                break;
-        default:
-                speed = 420000000; /* default speed */
-                break;
-        }
-
-        return speed;
-}
-
 /* PLL output clock = EXTAL * NF / (NR * NO)
  *
  * NF = FD + 2, NR = RD + 2
  * NO = 1 (if OD = 0), NO = 2 (if OD = 1 or 2), NO = 4 (if OD = 3)
  */
-static int hs = 6;
+
+#define MHZ (1000 * 1000)
+
+static inline unsigned int 
+pll_calc_m_n_od(unsigned int speed, unsigned int xtal) {
+	const int pll_m_max = 0x1ff;
+	const int pll_n_max = 0x1f;
+
+	int od[] = {1, 2, -1, 4};
+
+	unsigned int plcr_m_n_od = 0;
+	unsigned int distance;
+	unsigned int tmp, raw;
+
+	int i, j, k;
+	int m, n;
+
+	distance = 0xFFFFFFFF;
+
+	for (i = 0; i < sizeof (od) / sizeof(int); i++) {
+		/* Limit: 100MHZ <= CLK_OUT * OD <= 500MHZ */
+		if (od[i] == -1
+			|| (speed * od[i]) < (100 * MHZ)
+			|| (speed * od[i]) > (500 * MHZ)) {
+                        continue;
+		}
+
+		for (k = 0; k <= pll_n_max; k++) {
+			n = k + 2;
+
+			/* Limit: 1MHZ <= XIN/N <= 15MHZ */
+			if ((xtal / n) < (1 * MHZ) || (xtal / n) > (15 * MHZ)){
+				continue;
+			}
+
+			for (j = 0; j <= pll_m_max; j++) {
+				m = j + 2;
+
+				raw = xtal * m / n;
+				tmp = raw / od[i];
+
+				tmp = (tmp > speed) ? (tmp - speed) : (speed - tmp);
+
+				if (tmp < distance) {
+					distance = tmp;
+
+					plcr_m_n_od = (j << CPM_CPPCR_PLLM_BIT)
+						| (k << CPM_CPPCR_PLLN_BIT)
+						| (i << CPM_CPPCR_PLLOD_BIT);
+
+					if (!distance)  /* Match. */
+						return plcr_m_n_od;
+				}
+			}
+		}
+	}
+
+	return plcr_m_n_od;
+}
+
+static int hs = 3;
 void pll_init(void) {
         register unsigned int cfcr, plcr1;
         int n2FR[33] = { 
@@ -77,8 +108,8 @@ void pll_init(void) {
                 7, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0,
                 9
         };
-        int div[5] = {1, hs, hs, hs, hs}; /* divisors of I:S:P:L:M */
-        int nf, pllout2;
+        int div[5] = {1, hs, hs, hs, 2}; /* divisors of I:S:P:L:M */
+//        int div[5] = {1, hs, hs, hs, hs}; /* divisors of I:S:P:L:M */
 
         cfcr =  CPM_CPCCR_PCS |
                 (n2FR[div[0]] << CPM_CPCCR_CDIV_BIT) |
@@ -92,20 +123,15 @@ void pll_init(void) {
         else
                 cfcr &= ~CPM_CPCCR_ECS;
 
-        pllout2 = (cfcr & CPM_CPCCR_PCS) ? get_cpu_speed() : (get_cpu_speed() / 2);
-
-        nf = get_cpu_speed()  / 1000000;
-
-//      nf = get_cpu_speed() * 2 / CFG_EXTAL;
-        plcr1 = ((nf - 2) << CPM_CPPCR_PLLM_BIT) | /* FD */
-                (22 << CPM_CPPCR_PLLN_BIT) |    /* RD=0, NR=2 */
-                (0 << CPM_CPPCR_PLLOD_BIT) |    /* OD=0, NO=1 */
-                (0x20 << CPM_CPPCR_PLLST_BIT) | /* PLL stable time */
-                CPM_CPPCR_PLLEN;                /* enable PLL */
+	plcr1 = pll_calc_m_n_od(CFG_CPU_SPEED, CFG_EXTAL);
+	plcr1 |= (0x20 << CPM_CPPCR_PLLST_BIT) | /* PLL stable time */
+		CPM_CPPCR_PLLEN;                /* enable PLL */
 
         /* init PLL */
         REG_CPM_CPCCR = cfcr;
         REG_CPM_CPPCR = plcr1;
+
+	__cpm_set_pixdiv(58);
 }
 
 

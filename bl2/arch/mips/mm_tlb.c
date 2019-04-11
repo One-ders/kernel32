@@ -127,6 +127,14 @@ unsigned int read_c0_epc(void) {
         return ret;
 }
 
+unsigned int read_c0_prid(void) {
+        unsigned int ret=0;
+        __asm__ __volatile__("mfc0\t%z0, $15,0\n\t"
+                : "=r" (ret));
+        return ret;
+}
+
+
 unsigned int read_c0_config1(void) {
         unsigned int ret=0;
         __asm__ __volatile__("mfc0\t%z0, $16,1\n\t"

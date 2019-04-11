@@ -149,7 +149,7 @@ void uboot_start(void *bsp_funcs) {
 		"mtc0	$t0,$13\n\t"
 		:::"t0","t1");
 
-        sdram_init();
+	sdram_init();
 	pll_init();
 
 //	init_usart_drv();
