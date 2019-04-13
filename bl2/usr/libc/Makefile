@@ -19,7 +19,10 @@ $(TOP)/usr/include: $(TOP)/usr/libc/musl/configure
 	patch -p 0 -d $(TOP)/usr/libc < musl_002.patch
 
 $(TOP)/usr/libc/musl/configure:
-	(cd $(TOP)/usr/libc; git clone git://git.musl-libc.org/musl)
+	(cd $(TOP)/usr/libc;\
+         git clone git://git.musl-libc.org/musl;\
+         cd musl;\
+         git checkout tags/v1.1.22 )
 
 clean:
 	rm -rf musl

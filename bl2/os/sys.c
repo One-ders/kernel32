@@ -1222,7 +1222,7 @@ static int lnx_open(unsigned long int *svc_sp) {
 
 	fd=sys_open(path,flags,mode);
 	if (fd<0) {
-		set_svc_ret(svc_sp, yaffsfs_GetLastError());
+		set_svc_ret(svc_sp, -yaffsfs_GetLastError());
 		set_svc_lret(svc_sp,-1);
 	} else {
 		set_svc_ret(svc_sp,fd+3);
@@ -1241,7 +1241,7 @@ static int lnx_read(unsigned long int *svc_sp) {
 	}
 
 	if (rc<0) {
-		set_svc_ret(svc_sp, yaffsfs_GetLastError());
+		set_svc_ret(svc_sp, -yaffsfs_GetLastError());
 		set_svc_lret(svc_sp,-1);
 	} else {
 		set_svc_ret(svc_sp,rc);
@@ -1415,7 +1415,7 @@ static int lnx_mmap2(unsigned long int *svc_sp) {
 	sys_printf("mmap: addr %x, len %x, prot %x, flags %x, fd %x, pgoffset %x\n",
 			addr, length, prot, flags, fd, pgoffset);
 
-	set_svc_ret(svc_sp,-8);
+	set_svc_ret(svc_sp, 8);
 	set_svc_lret(svc_sp,-1);
 
 	return 0;
@@ -1428,13 +1428,31 @@ static int lnx_stat(unsigned long int *svc_sp) {
 
 	rc=sys_stat(path,stbuf);
 	if (rc<0) {
-		set_svc_ret(svc_sp, yaffsfs_GetLastError());
+		set_svc_ret(svc_sp, -yaffsfs_GetLastError());
+		set_svc_lret(svc_sp,-1);
 	} else {
 		set_svc_ret(svc_sp,rc);
+		set_svc_lret(svc_sp,0);
 	}
-	set_svc_lret(svc_sp,0);
 	return 0;
 }
+
+static int lnx_lstat(unsigned long int *svc_sp) {
+	char *path=(char *)get_svc_arg(svc_sp,0);
+	struct stat *stbuf=(struct stat *)get_svc_arg(svc_sp,1);
+	int rc;
+
+	rc=sys_lstat(path,stbuf);
+	if (rc<0) {
+		set_svc_ret(svc_sp, -yaffsfs_GetLastError());
+		set_svc_lret(svc_sp,-1);
+	} else {
+		set_svc_ret(svc_sp,rc);
+		set_svc_lret(svc_sp,0);
+	}
+	return 0;
+}
+
 
 static int lnx_dirent64(unsigned long int *svc_sp) {
 	int fd=(int)get_svc_arg(svc_sp,0);
@@ -1442,11 +1460,7 @@ static int lnx_dirent64(unsigned long int *svc_sp) {
 	int count=(int)get_svc_arg(svc_sp,2);
 	int rc=sys_getdents64(fd-3,dirp64,count);
 	set_svc_ret(svc_sp,rc);
-	if (rc<0) {
-		set_svc_lret(svc_sp,-1);
-	} else {
-		set_svc_lret(svc_sp,0);
-	}
+	set_svc_lret(svc_sp,0);
 	return 0;
 }
 
@@ -1641,6 +1655,10 @@ void *handle_syscall(unsigned long int *svc_sp) {
 			lnx_stat(svc_sp);
 			return 0;
 		}
+		case 0x1076: { // Linux stat
+			lnx_lstat(svc_sp);
+			return 0;
+		}
 		case 0x107b: { // Linux dirent64
 			lnx_dirent64(svc_sp);
 			return 0;
@@ -1650,6 +1668,7 @@ void *handle_syscall(unsigned long int *svc_sp) {
 			return 0;
 		}
 		default:
+			io_setpolled(1);
 			sys_printf("%s: bad syscall %x\n",current->name,svc_number);
 			set_svc_ret(svc_sp,-1);
 			while(1);

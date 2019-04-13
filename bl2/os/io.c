@@ -593,9 +593,34 @@ int sys_stat(char *path, struct stat *stbuf) {
 	return rc;
 }
 
+int sys_lstat(char *path, struct stat *stbuf) {
+	struct yaffs_stat ystbuf;
+	int rc=yaffs_lstat(path,&ystbuf);
+
+	if (rc<0) {
+		return rc;
+	}
+
+	stbuf->st_dev	= ystbuf.st_dev;
+	stbuf->st_ino	= ystbuf.st_ino;
+	stbuf->st_mode	= ystbuf.st_mode;
+	stbuf->st_nlink	= ystbuf.st_nlink;
+	stbuf->st_uid	= ystbuf.st_uid;
+	stbuf->st_gid	= ystbuf.st_gid;
+	stbuf->st_rdev	= ystbuf.st_rdev;
+	stbuf->st_size	= ystbuf.st_size;
+	stbuf->st_blksize=ystbuf.st_blksize;
+	stbuf->st_blocks= ystbuf.st_blocks;
+
+	return rc;
+}
+
+
 int sys_fcntl(int fd, int cmd, unsigned long arg1, unsigned long arg2) {
-	sys_printf("fcntl called: fd=%d, cmd=%x, arg1=%x,arg2=%x\n",
+	if (cmd!=F_SETFD) {
+		sys_printf("fcntl called: fd=%d, cmd=%x, arg1=%x,arg2=%x\n",
 			fd, cmd, arg1, arg2);
+	}
 	return 0;
 }
 

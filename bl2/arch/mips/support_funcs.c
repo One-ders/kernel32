@@ -106,13 +106,15 @@ int setup_return_stack(struct task *t, void *stackp_v,
 	args_storage=(char *)v_stack;
 
 	v_stack-=((nr_args+1)*sizeof(unsigned long int)); // argument pointers
+
+	v_stack=v_stack&(~7);	// stack aligned at 8, missaligned long longs give ugly printouts
 	argv_new=(char **)v_stack;
 
 	curr_pgd=t->asp->pgd;  /* repoint page table directory while loading */
 	copy_arguments(argv_new, argv, args_storage, nr_args);
 	argv_new[nr_args]=0;
 	curr_pgd=current->asp->pgd;
-	
+
 	*(--stackp)=0;		// hi
 	*(--stackp)=0;		// lo
 

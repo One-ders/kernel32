@@ -107,7 +107,7 @@ void *get_pages(unsigned int order) {
 	DEBUGP(DSYS_MEM,DLEV_INFO,"have_slots %d, start_slot %d, need %d, have %d\n",
 			have_slots, start_slot, num, 32*have_slots);
 
-	if (!have_slots) return 0;
+	if (have_slots!=need_slots) return 0;
 	last_slot=start_slot+have_slots-1;
 	for(i=start_slot;i<last_slot;i++) {
 		free_page_map[i]=0;

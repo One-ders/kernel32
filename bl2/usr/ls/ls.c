@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <stdio.h>
+#include <string.h>
 
 
 static int gettype(mode_t mode) {
@@ -40,6 +41,9 @@ static char *getperms(mode_t mode, char *buf) {
 				case 2:
 					buf[8-i]='r';
 					break;
+				default:
+					buf[8-i]='-';
+					break;
 			}
 		} else {
 			buf[8-i]='-';
@@ -56,17 +60,22 @@ int main(int argc, char **argv) {
 	char *t;
 	struct dirent *dirent;
 	char  pbuf[10];
+	char  pstr[256];
+	int   ix;
 
 	if (argc==2) {
 		path=argv[1];
 	}
 
 	dirp=opendir(path);
-	if(!dirp) return 0;
+	if(!dirp) {
+		fprintf(stderr,"\ncould not open %s\n",path);
+		return 0;
+	}
 
 	while((dirent=readdir(dirp))) {
-		struct stat sb;
 		int rc;
+		struct stat sb;
 
 #if 0
 		switch(dirent->d_type) {
@@ -96,12 +105,20 @@ int main(int argc, char **argv) {
 				break;
 		}
 #endif
-		rc=stat(dirent->d_name, &sb);
+		strncpy(pstr,path,256);
+		ix=strlen(path);
+		if (pstr[ix-1]!='/') {
+			pstr[ix]='/';
+			ix++;
+		}
+
+		strncpy(&pstr[ix],dirent->d_name,256-ix);
+		rc=lstat(pstr, &sb);
 		if (rc<0) {
-			printf("failed to to stat\n");
+			printf("failed to to stat:%s:\n",dirent->d_name);
 		} else {
 			printf("%c%s %8d %8d %16lld %s\n",
-				gettype(sb.st_mode), getperms(sb.st_mode,pbuf),
+				(char)gettype(sb.st_mode), getperms(sb.st_mode,pbuf),
 				sb.st_uid, sb.st_gid, sb.st_size,
 				dirent->d_name);
 #if 0
