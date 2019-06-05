@@ -134,15 +134,12 @@ unsigned int read_c0_prid(void) {
         return ret;
 }
 
-
 unsigned int read_c0_config1(void) {
         unsigned int ret=0;
         __asm__ __volatile__("mfc0\t%z0, $16,1\n\t"
                 : "=r" (ret));
         return ret;
 }
-
-
 
 int get_sh_page() {
         int ix=current_sh_index;
@@ -151,7 +148,9 @@ int get_sh_page() {
                 current_sh_index=0;
                 memset(sh_p_base,0,4096);
         }
+
         if (current_sh_index+1>511) {
+		sys_printf("out of storage for shared pages\n");
                 return -1;
         }
         current_sh_index++;
@@ -215,7 +214,7 @@ unsigned long int get_pte_from_shared(unsigned long int pte_spfn) {
         struct sh_page *shp=&sh_p_base[(pte_spfn&0x7fffffff)>>6];
         int pte_flags=pte_spfn&0x3f;
         DEBUGP(DSYS_MEM,DLEV_INFO,"pte_from_shared: spfn %x, pte %x\n", pte_spfn, shp->pte_pfn|pte_flags);
-        return shp->pte_pfn|pte_flags;
+        return (shp->pte_pfn|pte_flags)&P_RMASK;
 }
 
 unsigned long int dealloc_pte_page(unsigned int pte) {
@@ -227,6 +226,8 @@ unsigned long int dealloc_pte_page(unsigned int pte) {
 			put_page((void *)paddr);
 			del_shared_pte(pte);
 		}
+	} else if (pte & P_MAP) {
+		paddr=(0x80000000|(((pte&P_RMASK)>>6)<<12));
 	} else {
 		paddr=(0x80000000|((pte>>6)<<12));
 		put_page((void *)paddr);
@@ -260,7 +261,7 @@ void handle_TLB1(void *sp) {   // a write to a non dirty pte (write protected
 	if (!pt) {
 		io_setpolled(1);
 
-	asm("tlbp");
+		asm("tlbp");
 		sys_printf(">>>>TLB1: handle_tlb_miss: tlb_index %x, tlb_hi %x\n",
                         read_c0_index(), read_c0_hi());
 		sys_printf("TLB1: curr_pgd at %x\n",curr_pgd);
@@ -286,7 +287,7 @@ void handle_TLB1(void *sp) {   // a write to a non dirty pte (write protected
 		pte0=pt[pt_eindex];
 		pte1=pt[pt_eindex+1];
 		io_setpolled(1);
-	asm("tlbp");
+		asm("tlbp");
 		DEBUGP(DSYS_MEM,DLEV_INFO,"TLB1: tlb_miss for %x\n", badvaddr);
 		DEBUGP(DSYS_MEM, DLEV_INFO, "low pt_ix %x\n", pt_eindex);
 		DEBUGP(DSYS_MEM, DLEV_INFO, "got tlb miss for valid pte %x, index %x\n", pte,read_c0_index());
@@ -328,13 +329,13 @@ void handle_TLB1(void *sp) {   // a write to a non dirty pte (write protected
 		if (pte0&P_SHARED) {
 			set_c0_lo0(get_pte_from_shared(pte0));
 		} else {
-			set_c0_lo0(pte0);
+			set_c0_lo0(pte0&P_RMASK);
 		}
 
 		if (pte1&P_SHARED) {
 			set_c0_lo1(get_pte_from_shared(pte1));
 		} else {
-			set_c0_lo1(pte1);
+			set_c0_lo1(pte1&P_RMASK);
 		}
 	} else {
 		sys_printf("page is not shared\n");
@@ -514,13 +515,13 @@ void handle_TLBL(void *sp) {
         if (pte0&P_SHARED) {
                 set_c0_lo0(get_pte_from_shared(pte0));
         } else {
-                set_c0_lo0(pte0);
+                set_c0_lo0(pte0&P_RMASK);
         }
 
         if (pte1&P_SHARED) {
                 set_c0_lo1(get_pte_from_shared(pte1));
         } else {
-                set_c0_lo1(pte1);
+                set_c0_lo1(pte1&P_RMASK);
         }
 
 	asm("tlbp");
@@ -604,13 +605,13 @@ void handle_TLBS(void *sp) { // write to mem
         if (pte0&P_SHARED) {
                 set_c0_lo0(get_pte_from_shared(pte0));
         } else {
-                set_c0_lo0(pte0);
+                set_c0_lo0(pte0&P_RMASK);
         }
 
         if (pte1&P_SHARED) {
                 set_c0_lo1(get_pte_from_shared(pte1));
         } else {
-                set_c0_lo1(pte1);
+                set_c0_lo1(pte1&P_RMASK);
         }
 
 	asm("tlbp");
@@ -639,7 +640,7 @@ int mapmem(struct task *t, unsigned long int vaddr, unsigned long int paddr, uns
                 return -1;
         }
         
-        pte=pt[pt_index]=(paddr>>6)|attr|P_VALID;
+        pte=pt[pt_index]=(paddr>>6)|attr|P_VALID|P_MAP;
         
         return 0;
 }
@@ -677,9 +678,11 @@ int unmapmem(struct task *t, unsigned long int vaddr) {
 static void flush_tlb_page(unsigned int vaddr, unsigned int pid) {
         int index;
 	int cpu_flags;
+	unsigned long int saved_hi;
         DEBUGP(DSYS_MEM,DLEV_INFO,"flush_tlb: %x, pid %d\n", vaddr, pid);
 
 	cpu_flags=disable_interrupts();
+	saved_hi=read_c0_hi();
         set_c0_hi((vaddr&0xffffe000)|pid);
         asm("tlbp");
         index=read_c0_index();
@@ -699,7 +702,7 @@ static void flush_tlb_page(unsigned int vaddr, unsigned int pid) {
         asm("tlbwi");
 
 out:
-        set_asid(current->id);
+        set_asid(saved_hi);
 	restore_cpu_flags(cpu_flags);
 }
 

@@ -32,8 +32,8 @@
  */
 #include <stdarg.h>
 
-#include "sys.h"
 #include "io.h"
+#include "sys.h"
 #include "string.h"
 
 static struct driver *iodrv;
@@ -566,6 +566,11 @@ void init_io(void) {
 }
 
 #include "yaffsfs.h"
+
+int sys_open(const char *pathname, int flags, unsigned int mode) {
+	int rc=yaffs_open(pathname,flags,mode);
+	return rc;
+}
 
 int sys_read(int fd, void *buf, unsigned long  size) {
 	return yaffs_read(fd,buf,size);

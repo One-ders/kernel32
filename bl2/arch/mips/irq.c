@@ -2,6 +2,7 @@
 #include <frame.h>
 #include <irq.h>
 #include <devices.h>
+#include <io.h>
 #include <sys.h>
 
 unsigned int read_c0_count(void);

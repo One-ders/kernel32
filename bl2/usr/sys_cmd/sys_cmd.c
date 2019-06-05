@@ -554,7 +554,10 @@ static int loadnrun_fnc(int argc, char **argv, struct Env *env) {
 
 	npid=my_fork();
 
-	if (npid) {
+	if (npid==-1) {
+		printf("fork failed\n");
+		return -1;
+	} else if (npid) {
 		int status;
 		if (!bg) {
 			wait(&status);
@@ -745,6 +748,7 @@ void main(void *dum) {
 					dprintf(1,"%s returned %d\n",argv[0],rc);
 				}
 			} else {
+				dprintf(1,"\n");
 				rc=loadnrun_fnc(argc,argv,&env);
 			}
 		}

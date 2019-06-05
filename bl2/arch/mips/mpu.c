@@ -1,5 +1,5 @@
-#include <sys.h>
 #include <io.h>
+#include <sys.h>
 
 int init_memory_protection(void) {
 	return 0;

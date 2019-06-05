@@ -1,8 +1,8 @@
 
 #ifndef IPL
 
-#include "sys.h"
 #include "io.h"
+#include "sys.h"
 #include "irq.h"
 #include "frame.h"
 

@@ -1,5 +1,6 @@
 
 #include <types.h>
+#include <io.h>
 #include <sys.h>
 #include <string.h>
 

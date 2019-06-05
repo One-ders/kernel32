@@ -32,8 +32,6 @@
  */
 
 /*  for select */
-typedef unsigned int fd_set;
-
 #define FD_SET(a,b)	((*(b))|=(1<<a))
 #define FD_CLR(a,b)	((*(b))&=~(1<<a))
 #define FD_ISSET(a,b)	((*(b))&(1<<a))
@@ -162,6 +160,32 @@ typedef unsigned int fd_set;
 #define ELOOP   40
 #endif
 
+/************************************************************/
+
+#ifndef WINSIZE
+#define WINSIZE
+struct winsize {
+	unsigned short ws_row;
+	unsigned short ws_col;
+	unsigned short ws_xpixel;
+	unsigned short ws_ypixel;
+};
+#endif
+
+
+#define _IOC(a,b,c,d) ( ((a)<<29) | ((b)<<8) | (c) | ((d)<<16) )
+#define _IOC_NONE  1U
+#define _IOC_READ  2U
+#define _IOC_WRITE 4U
+
+#define _IO(a,b) _IOC(_IOC_NONE,(a),(b),0)
+#define _IOW(a,b,c) _IOC(_IOC_WRITE,(a),(b),sizeof(c))
+#define _IOR(a,b,c) _IOC(_IOC_READ,(a),(b),sizeof(c))
+#define _IOWR(a,b,c) _IOC(_IOC_READ|_IOC_WRITE,(a),(b),sizeof(c))
+
+#define TIOCSWINSZ      _IOW('t', 103, struct winsize)
+#define TIOCGWINSZ      _IOR('t', 104, struct winsize)
+
 
 
 void init_io(void);
@@ -174,10 +198,11 @@ int sys_sprintf(char *buf, const char *format, ...);
 unsigned long int strtoul(char *str, char **endp, int base);
 
 #define sys_lseek(a,b,c) yaffs_lseek(a,b,c)
-#define sys_open yaffs_open
 
 struct stat;
+int sys_open(const char *path, int flags, unsigned int mode);
 int sys_stat(char *path, struct stat *);
+int sys_lstat(char *path, struct stat *);
 int sys_fcntl(int fd, int cmd, unsigned long int p1, unsigned long int p2);
 int sys_close(int fd);
 int sys_read(int fd, void *buf, unsigned long int count);

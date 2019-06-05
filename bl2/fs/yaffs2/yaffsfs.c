@@ -146,7 +146,7 @@ static void yaffsfs_InitHandles(void)
 		yaffsfs_handle[i].fdId = -1;
 }
 
-static struct yaffsfs_Handle *yaffsfs_HandleToPointer(int h)
+struct yaffsfs_Handle *yaffsfs_HandleToPointer(int h)
 {
 	if (h >= 0 && h < YAFFSFS_N_HANDLES)
 		return &yaffsfs_handle[h];

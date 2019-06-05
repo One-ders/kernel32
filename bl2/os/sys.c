@@ -140,43 +140,25 @@ void SysTick_Handler(void) {
 			if (prio>MAX_PRIO) prio=MAX_PRIO;
 			ASSERT(t->state!=TASK_STATE_RUNNING);
 			cpu_flags=disable_interrupts();
-#if 0
-			if (t->state==TASK_STATE_DEAD) {
-				t->next=0;
-				b->next=0;
-				DEBUGP(DSYS_TIMER,DLEV_INFO,"\ntimer delete of dead process task = %s, page=%x\n",t->name,t);
-			        b=bnext;
-				restore_cpu_flags(cpu_flags);
-				free_asp_pages(t->asp);
-				put_page(t->asp->pgd);
-				t->asp->pgd=0;
-				dealloc_as_id(t->asp->id);
-				dealloc_task_id(t->id);
-				put_page(t);
-			} else {
-#endif
-				t->state=TASK_STATE_READY;
-				t->next=0;
-				b->next=0;
-				if (b->next2) {
-					sys_printf("systick: blocker have next2 link %x\n", b->next2);
-				}
-				if(prio<p) p=prio;
-				if (!ready[prio]) {
-					ready[prio]=t;
-				} else {
-					ready_last[prio]->next=t;
-				}
-				ready_last[prio]=t;
-				if (p<GET_PRIO(current)) {
-					switch_on_return();
-				}
-				restore_cpu_flags(cpu_flags);
-				DEBUGP(DSYS_SCHED,DLEV_INFO,"timer_wakeup: readying %s\n", t->name);
-				b=bnext;
-#if 0
+			t->state=TASK_STATE_READY;
+			t->next=0;
+			b->next=0;
+			if (b->next2) {
+				sys_printf("systick: blocker have next2 link %x\n", b->next2);
 			}
-#endif
+			if(prio<p) p=prio;
+			if (!ready[prio]) {
+				ready[prio]=t;
+			} else {
+				ready_last[prio]->next=t;
+			}
+			ready_last[prio]=t;
+			if (p<GET_PRIO(current)) {
+				switch_on_return();
+			}
+			restore_cpu_flags(cpu_flags);
+			DEBUGP(DSYS_SCHED,DLEV_INFO,"timer_wakeup: readying %s\n", t->name);
+			b=bnext;
 		}
 		tqp->tq_out_first=tqp->tq_out_last=0;
 	}
@@ -236,6 +218,7 @@ static struct driver console = {
 
 struct driver *drv_root=&console;
 
+#if 0
 #define FDTAB_SIZE 16
 
 struct user_fd fd_tab[FDTAB_SIZE] = {{&console,0,},
@@ -256,12 +239,30 @@ int get_user_fd(struct driver *d, struct device_handle *dh) {
 	}
 	return -1;
 }
+#endif
+
+struct user_fd fd_con = {&console,0,};
+
+int get_user_fd(struct address_space *asp, struct driver *d, struct device_handle *dh) {
+	int i;
+	for(i=1;i<FDTAB_SIZE;i++) {
+		if (!asp->fd_tab[i].driver) {
+			asp->fd_tab[i].driver=d;
+			asp->fd_tab[i].dev_handle=dh;
+
+			asp->fd_tab[i].next=current->fd_list;
+			asp->fd_list=&asp->fd_tab[i];
+			return i;
+		}
+	}
+	return -1;
+}
 
 
 int close_drivers(struct task *t) {
-	struct user_fd *fdl=t->fd_list;
+	struct user_fd *fdl=t->asp->fd_list;
 
-	t->fd_list=0;
+	t->asp->fd_list=0;
 	while(fdl) {
 		struct user_fd *fdlnext=fdl->next;
 		fdl->driver->ops->close(fdl->dev_handle);
@@ -273,8 +274,8 @@ int close_drivers(struct task *t) {
 }
 
 int detach_driver_fd(struct user_fd *fd) {
-	struct user_fd *fdl=current->fd_list;
-	struct user_fd **fdprev=&current->fd_list;
+	struct user_fd *fdl=current->asp->fd_list;
+	struct user_fd **fdprev=&current->asp->fd_list;
 
 	while(fdl) {
 		if (fdl==fd) {
@@ -336,6 +337,7 @@ out:
 void *alloc_kheap(struct task *t, unsigned int size) {
 	unsigned long int a=t->kheap;
 	if (a+size>(((unsigned long int)t)+2048)) {
+		sys_printf("allocating outside kheap\n");
 		return 0;
 	}
 	t->kheap=a+size;
@@ -421,6 +423,7 @@ static int fork(unsigned long int *svc_sp) {
 	unsigned long int *stackp;
 	int prio=GET_PRIO(current);
 	unsigned long int cpu_flags;
+	int rc;
 
 	t=create_user_context();
 	if (!t) {
@@ -428,11 +431,20 @@ static int fork(unsigned long int *svc_sp) {
 		return 0;
 	}
 	t->asp->brk=current->asp->brk;
-	share_process_pages(t,current);
+	rc=share_process_pages(t,current);
+	if (rc<0) {
+		delete_user_context(t);
+		set_svc_ret(svc_sp,-1);
+		return 0;
+	}
 
 	stackp=(void *)(((unsigned long int)t)+4096);
 	t->estack=(void *)(((unsigned long int)t)+2048);
 	t->prio_flags=current->prio_flags;
+
+	t->asp->fd_tab[0]=current->asp->fd_tab[0];
+	t->asp->fd_tab[1]=current->asp->fd_tab[1];
+	t->asp->fd_tab[2]=current->asp->fd_tab[2];
 
 	cpu_flags=disable_interrupts();
 	estack=t->estack;
@@ -878,7 +890,7 @@ static int io_open(unsigned long int *svc_sp) {
 		sys_printf("SVC_IO_OPEN: return -1 no drv:\n");
 		return 0;
 	}
-	ufd=get_user_fd(((struct driver *)0xffffffff),0);
+	ufd=get_user_fd(current->asp,((struct driver *)0xffffffff),0);
 	if (ufd<0) {
 		set_svc_ret(svc_sp,-1);
 //		sys_printf("SVC_IO_OPEN: return -1 get user\n");
@@ -886,15 +898,15 @@ static int io_open(unsigned long int *svc_sp) {
 	}
 	dh=drv->ops->open(drv->instance,sys_drv_wakeup,current);
 	if (!dh) {
-		detach_driver_fd(&fd_tab[ufd]);
+		detach_driver_fd(&current->asp->fd_tab[ufd]);
 		set_svc_ret(svc_sp,-1);
 		sys_printf("SVC_IO_OPEN: return -1 drv open\n");
 		return 0;
 	}
 	dh->user_data1=ufd;
-	fd_tab[ufd].driver=drv;
-	fd_tab[ufd].dev_handle=dh;
-	fd_tab[ufd].flags=0;
+	current->asp->fd_tab[ufd].driver=drv;
+	current->asp->fd_tab[ufd].dev_handle=dh;
+	current->asp->fd_tab[ufd].flags=0;
 	set_svc_ret(svc_sp,ufd);
 	return 0;
 }
@@ -902,7 +914,7 @@ static int io_open(unsigned long int *svc_sp) {
 static int io_read(unsigned long int *svc_sp) {
 	int fd=(int)get_svc_arg(svc_sp,0);
 	int rc;
-	struct user_fd *fdd=&fd_tab[fd];
+	struct user_fd *fdd=&current->asp->fd_tab[fd];
 	struct driver *driver=fdd->driver;
 	struct device_handle *dh=fdd->dev_handle;
 	if (!driver) {
@@ -928,7 +940,7 @@ static int io_read(unsigned long int *svc_sp) {
 
 static int io_write(unsigned long int *svc_sp) {
 	int fd=(int)get_svc_arg(svc_sp,0);
-	struct user_fd *fdd=&fd_tab[fd];
+	struct user_fd *fdd=&current->asp->fd_tab[fd];
 	struct driver *driver=fdd->driver;
 	struct device_handle *dh=fdd->dev_handle;
 	int rc=0;
@@ -974,7 +986,7 @@ again:
 
 static int io_control(unsigned long int *svc_sp) {
 	int	fd	=(int)get_svc_arg(svc_sp,0);
-	struct	user_fd		*fdd=&fd_tab[fd];
+	struct	user_fd		*fdd=&current->asp->fd_tab[fd];
 	struct	driver		*driver=fdd->driver;
 	struct	device_handle	*dh=fdd->dev_handle;
 	int	ufd;
@@ -989,7 +1001,7 @@ static int io_control(unsigned long int *svc_sp) {
 		struct dyn_open_args doargs;
 
 		doargs.name=(char *)get_svc_arg(svc_sp,2);
-		ufd=get_user_fd(((struct driver *)0xffffffff),0);
+		ufd=get_user_fd(current->asp,((struct driver *)0xffffffff),0);
 		if (ufd<0) {
 			set_svc_ret(svc_sp,-1);
 			return 0;
@@ -997,14 +1009,14 @@ static int io_control(unsigned long int *svc_sp) {
 
 		rc=driver->ops->control(dh,DYNOPEN,(void *)&doargs,get_svc_arg(svc_sp,3));
 		if (rc<0) {
-			detach_driver_fd(&fd_tab[ufd]);
+			detach_driver_fd(&current->asp->fd_tab[ufd]);
 			set_svc_ret(svc_sp,-1);
 			return 0;
 		}
 		doargs.dh->user_data1=ufd;
-		fd_tab[ufd].driver=driver;
-		fd_tab[ufd].dev_handle=doargs.dh;
-		fd_tab[ufd].flags=0;
+		current->asp->fd_tab[ufd].driver=driver;
+		current->asp->fd_tab[ufd].dev_handle=doargs.dh;
+		current->asp->fd_tab[ufd].flags=0;
 		set_svc_ret(svc_sp,ufd);
 		return 0;
 	}
@@ -1021,8 +1033,8 @@ static int io_control(unsigned long int *svc_sp) {
 
 static int io_lseek(unsigned long int *svc_sp) {
 	int fd=(int)get_svc_arg(svc_sp,0);
-	struct driver *driver=fd_tab[fd].driver;
-	struct device_handle *dh=fd_tab[fd].dev_handle;
+	struct driver *driver=current->asp->fd_tab[fd].driver;
+	struct device_handle *dh=current->asp->fd_tab[fd].dev_handle;
 	int rc;
 	if (!driver) {
 		set_svc_ret(svc_sp,-1);
@@ -1056,8 +1068,8 @@ static int io_select(unsigned long int *svc_sp) {
 	current->sel_data_valid=1;
 	for(i=0;i<nfds;i++) {
 		if (wfds&(1<<i)) {
-			struct driver *driver=fd_tab[i].driver;
-			struct device_handle *dh=fd_tab[i].dev_handle;
+			struct driver *driver=current->asp->fd_tab[i].driver;
+			struct device_handle *dh=current->asp->fd_tab[i].dev_handle;
 			if (driver) {
 				if (driver->ops->control(dh,IO_POLL,(void *)EV_WRITE,0)) {
 					*sel_args->wfds=(1<<i);
@@ -1073,8 +1085,8 @@ static int io_select(unsigned long int *svc_sp) {
 
 	for(i=0;i<nfds;i++) {
 		if (rfds&(1<<i)) {
-			struct driver *driver=fd_tab[i].driver;
-			struct device_handle *dh=fd_tab[i].dev_handle;
+			struct driver *driver=current->asp->fd_tab[i].driver;
+			struct device_handle *dh=current->asp->fd_tab[i].dev_handle;
 			if (driver) {
 				if (driver->ops->control(dh,IO_POLL,(void *)EV_READ,0)) {
 					*sel_args->rfds=(1<<i);
@@ -1090,8 +1102,8 @@ static int io_select(unsigned long int *svc_sp) {
 
 	for(i=0;i<nfds;i++) {
 		if (stfds&(1<<i)) {
-			struct driver *driver=fd_tab[i].driver;
-			struct device_handle *dh=fd_tab[i].dev_handle;
+			struct driver *driver=current->asp->fd_tab[i].driver;
+			struct device_handle *dh=current->asp->fd_tab[i].dev_handle;
 			if (driver) {
 				if (driver->ops->control(dh,IO_POLL,(void *)EV_STATE,0)) {
 					*sel_args->stfds=(1<<i);
@@ -1122,15 +1134,15 @@ static int io_select(unsigned long int *svc_sp) {
 
 static int io_close(unsigned long int *svc_sp) {
 	int fd=(int)get_svc_arg(svc_sp,0);
-	struct driver *driver=fd_tab[fd].driver;
-	struct device_handle *dh=fd_tab[fd].dev_handle;
+	struct driver *driver=current->asp->fd_tab[fd].driver;
+	struct device_handle *dh=current->asp->fd_tab[fd].dev_handle;
 	int rc;
 	if (!driver) {
 		set_svc_ret(svc_sp,-1);
 		return 0;
 	}
 
-	detach_driver_fd(&fd_tab[fd]);
+	detach_driver_fd(&current->asp->fd_tab[fd]);
 
 	rc=driver->ops->close(dh);
 	set_svc_ret(svc_sp,rc);
@@ -1144,8 +1156,8 @@ static int io_mmap(unsigned long int *svc_sp) {
 	int flags=(int)get_svc_arg(svc_sp,3);
 	int fd=(int)get_svc_arg(svc_sp,4);
 	long int offset=(long int)get_svc_arg(svc_sp,5);
-	struct driver *driver=fd_tab[fd].driver;
-	struct device_handle *dh=fd_tab[fd].dev_handle;
+	struct driver *driver=current->asp->fd_tab[fd].driver;
+	struct device_handle *dh=current->asp->fd_tab[fd].dev_handle;
 	unsigned long int paddr;
 	unsigned long int vaddr;
 	unsigned long int start_vaddr;
@@ -1214,6 +1226,21 @@ static int set_debug_level(unsigned long int *svc_sp) {
 
 /* Linux syscall emulation, for musl */
 
+extern struct driver yaffsfs_drv;
+
+struct yaffsfs_Handle {
+	short int fdId;
+	short int useCount;
+};
+
+static int ufd2yaffs(int ufd) {
+	struct driver *driver=current->asp->fd_tab[ufd].driver;
+	struct device_handle *dh=current->asp->fd_tab[ufd].dev_handle;
+	struct yaffsfs_Handle *yf=(struct yaffsfs_Handle *)dh;
+
+	return yf->fdId;
+}
+
 static int lnx_open(unsigned long int *svc_sp) {
 	char *path=(char *)get_svc_arg(svc_sp,0);
 	int  flags=(int)get_svc_arg(svc_sp,1);
@@ -1225,7 +1252,9 @@ static int lnx_open(unsigned long int *svc_sp) {
 		set_svc_ret(svc_sp, -yaffsfs_GetLastError());
 		set_svc_lret(svc_sp,-1);
 	} else {
-		set_svc_ret(svc_sp,fd+3);
+		void *dh=yaffsfs_HandleToPointer(fd);
+		int ufd=get_user_fd(current->asp,&yaffsfs_drv,dh);
+		set_svc_ret(svc_sp,ufd);
 		set_svc_lret(svc_sp,0);
 	}
 	return 0;
@@ -1237,7 +1266,7 @@ static int lnx_read(unsigned long int *svc_sp) {
 	size_t count=get_svc_arg(svc_sp,2);
 	int rc=0;
 	if (fd>2) {
-		rc=sys_read(fd-3,buf,count);
+		rc=sys_read(ufd2yaffs(fd),buf,count);
 	}
 
 	if (rc<0) {
@@ -1253,7 +1282,7 @@ static int lnx_read(unsigned long int *svc_sp) {
 
 static int lnx_close(unsigned long int *svc_sp) {
 	int fd=(int)get_svc_arg(svc_sp,0);
-	int rc=sys_close(fd-3);
+	int rc=sys_close(ufd2yaffs(fd));
 	set_svc_ret(svc_sp,rc);
 	set_svc_lret(svc_sp,0);
 	return 0;
@@ -1283,6 +1312,11 @@ static int lnx_execve(unsigned long int *svc_sp) {
 		sys_printf("must kill self\n");
 	}
 
+#if 0
+	current->kheap=((unsigned char *)current)+(sizeof(struct task)+sizeof(struct address_space));
+	current->name=alloc_kheap(current,strlen(argv[0])+5);
+	sys_sprintf(current->name,"%s:%03d",argv[0],current->asp->id);
+#endif
 	setup_return_stack(current, (void *)(((unsigned long int)svc_sp)+148), 0x40000, 0, nargv, envp);
 
 	return 0;
@@ -1311,7 +1345,9 @@ static int lnx_brk(unsigned long int *svc_sp) {
 static int lnx_ioctl(unsigned long int *svc_sp) {
 	int fd=(int)get_svc_arg(svc_sp,0);
 	int cmd=(int)get_svc_arg(svc_sp,1);
-	sys_printf("ioctl: got cmd %x\n", cmd);
+	if (cmd!=TIOCGWINSZ) {
+		sys_printf("ioctl: got cmd %x\n", cmd);
+	}
 	set_svc_lret(svc_sp,-1);
 	return 0;
 }
@@ -1320,7 +1356,7 @@ static int lnx_writev(unsigned long int *svc_sp) {
 	int fd=(int)get_svc_arg(svc_sp,0);
 	struct iovec	*msg_iov=(void *)get_svc_arg(svc_sp,1);
 	size_t		msg_iovlen=get_svc_arg(svc_sp,2);
-	struct user_fd *fdd=&fd_tab[fd];
+	struct user_fd *fdd=&current->asp->fd_tab[fd];
 	struct driver *driver=fdd->driver;
 	struct device_handle *dh=fdd->dev_handle;
 	int rc=0;
@@ -1458,7 +1494,7 @@ static int lnx_dirent64(unsigned long int *svc_sp) {
 	int fd=(int)get_svc_arg(svc_sp,0);
 	void *dirp64=(void *)get_svc_arg(svc_sp,1);
 	int count=(int)get_svc_arg(svc_sp,2);
-	int rc=sys_getdents64(fd-3,dirp64,count);
+	int rc=sys_getdents64(ufd2yaffs(fd),dirp64,count);
 	set_svc_ret(svc_sp,rc);
 	set_svc_lret(svc_sp,0);
 	return 0;
@@ -1470,7 +1506,7 @@ static int lnx_fcntl(unsigned long int *svc_sp) {
 	unsigned long int p1=(unsigned long int)get_svc_arg(svc_sp,2);
 	unsigned long int p2=(unsigned long int)get_svc_arg(svc_sp,3);
 	int rc;
-	rc=sys_fcntl(fd-3,cmd,p1,p2);
+	rc=sys_fcntl(ufd2yaffs(fd),cmd,p1,p2);
 	set_svc_ret(svc_sp,rc);
 	set_svc_lret(svc_sp,0);
 	return 0;
@@ -2291,6 +2327,10 @@ void start_sys(void) {
 	setup_return_stack(t,(void *)stackp,(unsigned long int)usr_init,0, targs, environ);
 
 	disable_interrupts();
+
+	t->asp->fd_tab[0]=fd_con;
+	t->asp->fd_tab[1]=fd_con;
+	t->asp->fd_tab[2]=fd_con;
 
 	t->asp->next=current->asp->child;
 	current->asp->child=t->asp;

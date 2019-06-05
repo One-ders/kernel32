@@ -1,4 +1,5 @@
 
+#include <io.h>
 #include <sys.h>
 #include "yaffs_guts.h"
 #include "yaffs_osglue.h"

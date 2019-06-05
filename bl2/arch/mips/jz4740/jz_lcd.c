@@ -30,6 +30,7 @@
  *
  * @(#)lcd_drv.c
  */
+#include "io.h"
 #include "sys.h"
 #include "irq.h"
 #include "jz_lcd.h"

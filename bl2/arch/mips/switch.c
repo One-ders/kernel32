@@ -35,6 +35,7 @@ struct task *create_user_context(void) {
 	asp->id=allocate_as_id();
 	asp->mmap_vaddr=0x10000000;
 	if (asp->id<0)  {
+		dealloc_task_id(t->id);
 		put_page(t_pgd);
 		put_page(t);
 		return 0;
@@ -42,6 +43,14 @@ struct task *create_user_context(void) {
 //	set_asid(asp->id);
 	asp->pgd=t_pgd;
 	return t;
+}
+
+void delete_user_context(struct task *t) {
+	struct address_space *asp=t->asp;
+	dealloc_as_id(asp->id);
+	dealloc_task_id(t->id);
+	put_page(asp->pgd);
+	put_page(t);
 }
 
 int incr_address_space_users(struct address_space *asp) {

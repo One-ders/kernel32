@@ -32,7 +32,7 @@
  */
 
 #include <mm.h>
-#include "io.h"
+//#include "io.h"
 #include "sys_arch.h"
 #include <config.h>
 #include <types.h>
@@ -75,6 +75,9 @@ extern struct task *troot;
 extern struct task * volatile current;
 
 extern struct driver *drv_root;
+
+/*  for select */
+typedef unsigned int fd_set;
 
 struct user_fd {
         struct driver *driver;
@@ -130,6 +133,8 @@ struct bitmap *_bm_name = &_bm_name##bub;
 int bitmap_alloc_first_free(struct bitmap *bm);
 void bitmap_dealloc(struct bitmap *bm, int id);
 
+#define FDTAB_SIZE 100
+
 struct address_space {
 #ifdef MMU
 	// an array of 1024 page tables
@@ -142,6 +147,8 @@ struct address_space {
 	struct address_space	*parent;
 	struct address_space	*next;
 	struct address_space	*child;
+	struct user_fd		*fd_list;
+	struct user_fd		fd_tab[FDTAB_SIZE];
 };
 
 
@@ -212,6 +219,7 @@ int map_next_stack_page(unsigned long int new_addr, unsigned long int old_addr);
 int unmap_tmp_stack_page(void);
 int activate_memory_protection(void);
 struct task *create_user_context(void);
+void delete_user_context(struct task *);
 int share_process_pages(struct task *to, struct task *from);
 int load_init(struct task *);
 int load_binary(char *npath);
@@ -364,7 +372,9 @@ struct task_create_args {
 };
 
 int allocate_task_id(struct task *t);
+void dealloc_task_id(int);
 int allocate_as_id(void);
+void dealloc_as_id(int);
 void *alloc_kheap(struct task *t, unsigned int size);
 int incr_address_space_users(struct address_space *asp);
 int decr_address_space_users(struct address_space *asp);

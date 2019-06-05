@@ -1,6 +1,5 @@
 
 #include <sys.h>
-#include <io.h>
 #include <fb.h>
 #include <string.h>
 #include <malloc.h>

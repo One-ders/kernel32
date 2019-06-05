@@ -414,7 +414,14 @@ static struct device_handle *yaffsfs_open(void *inst, DRV_CBH cb, void *dum) {
 	return 0;
 }
 
-static int yaffsfs_close(struct device_handle *hd) {
+struct yaffsfs_Handle {
+	short int fdId;
+	short int useCount;
+};
+
+static int yaffsfs_close(struct device_handle *dh) {
+	struct yaffsfs_Handle *yh=(struct yaffsfs_Handle *)dh;
+	yaffs_close(yh->fdId);
 	return 0;
 }
 
@@ -438,7 +445,7 @@ static struct driver_ops yaffsfs_ops = {
 	yaffsfs_start,
 };
 
-static struct driver yaffsfs_drv = {
+struct driver yaffsfs_drv = {
 	"yaffsfs",
 	0,
 	&yaffsfs_ops,
