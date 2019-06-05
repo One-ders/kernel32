@@ -1,1 +1,0 @@
-/home/anders/mips/qemu-jz/mycore/project/bl2/boards/kmp510/../../arch/mips/system_init.c
