@@ -1,9 +1,12 @@
 
-DRIVERS:=hr_timer
-DRIVERS+=stddrv
-DRIVERS+=usb_drv
-DRIVERS+=usb_serial_drv
-DRIVERS+=usr_drv
+DRIVERS:=hr_timer.o
+DRIVERS+=stddrv.o
+DRIVERS+=usb_core_drv.o
+DRIVERS+=usb_serial_drv.o
+DRIVERS+=usr_drv.o
+
+DTARGETS=$(DRIVERS:.o=)
+DOBJS=$(patsubst %, $(OBJ)/drv_obj/%, $(DRIVERS))
 
 BOARD=MB997C
 TOP:=$(shell pwd)/../..
@@ -28,31 +31,22 @@ LDFLAGS_USR=-g -r $(OBJ)/usr/lib/usrlib.o
 
 all: myCore
 
-myCore: os version stm32f407 stm32 stddrv hr_timer usb_core usb_serial usr.drv.o usr.bin.o
+myCore: os version stm32f407 stm32 $(DTARGETS) usr.bin.o
 	$(CC) $(LDFLAGS) -o $@ $(OBJ)/os/init_sect.o \
 				$(OBJ)/version.c \
 				$(OBJ)/os/os.o \
 				$(OBJ)/arch/stm32/stm32f407/stm32f407.o \
 				$(OBJ)/arch/stm32/stm32.o \
-				$(OBJ)/stddrv/stddrv.o \
-				$(OBJ)/arch/stm32/stm32f407/hr_timer/hr_timer.o \
-				$(OBJ)/arch/stm32/usb/usb_drv.o \
-				$(OBJ)/drivers/usb_serial/usb_serial_drv.o \
-				$(OBJ)/usr/usr.drv.o \
+				$(DOBJS) \
 				$(OBJ)/os/end_sect.o \
 				$(OBJ)/usr/usr.bin.o
 
-#myCore: os version stm32f407 stm32 stddrv hr_timer usr.bin.o
-#	$(CC) $(LDFLAGS) -o $@ $(OBJ)/os/init_sect.o \
-#				$(OBJ)/version.c \
-#				$(OBJ)/os/os.o \
-#				$(OBJ)/arch/stm32/stm32f407/stm32f407.o \
-#				$(OBJ)/arch/stm32/stm32.o \
-#				$(OBJ)/stddrv/stddrv.o \
-#				$(OBJ)/arch/stm32/stm32f407/hr_timer/hr_timer.o \
-#				$(OBJ)/os/end_sect.o \
-#				$(OBJ)/usr/usr.bin.o
-#
+
+#				$(OBJ)/stddrv/stddrv.o 
+#				$(OBJ)/arch/stm32/usb/usb_drv.o 
+#				$(OBJ)/drivers/usb_serial/usb_serial_drv.o 
+#				$(OBJ)/usr/usr.drv.o 
+#				$(OBJ)/arch/stm32/stm32f407/hr_timer/hr_timer.o 
 
 version:
 	echo "const char *ver=\"$(BOARD)-$(GIT_VERSION)\";" > $(OBJ)/version.c
@@ -113,8 +107,10 @@ $(OBJ)/cec_a1_ctrl: $(TOP)/cec_a1_ctrl
 	lndir $< $@
 
 
-usr.drv.o: $(OBJ)/cec_a1_ctrl/cec_a1_ctrl.o
+usr_drv: $(OBJ)/cec_a1_ctrl/cec_a1_ctrl.o
 	$(LD) -r -o $(OBJ)/usr/usr.drv.o $(OBJ)/cec_a1_ctrl/cec_a1_drivers.o
+	mkdir -p $(OBJ)/drv_obj
+	cp $(OBJ)/usr/usr.drv.o  $(OBJ)/drv_obj/$@.o
 
 #cec_a1_ctrl: $(OBJ)/cec_a1_ctrl
 #	CFLAGS="$(CFLAGS_USR)" CFLAGS_DRV="$(CFLAGS)" \
@@ -129,6 +125,8 @@ usr.drv.o: $(OBJ)/cec_a1_ctrl/cec_a1_ctrl.o
 
 stddrv: $(OBJ)/stddrv
 	CFLAGS="$(CFLAGS)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
+	mkdir -p $(OBJ)/drv_obj
+	cp  $(OBJ)/stddrv/stddrv.o $(OBJ)/drv_obj/$@.o
 
 $(OBJ)/stddrv: $(TOP)/stddrv
 	mkdir -p $@
@@ -141,8 +139,10 @@ $(OBJ)/os: $(TOP)/os
 	mkdir -p $@
 	lndir $< $@
 
-usb_serial: $(OBJ)/drivers/usb_serial
+usb_serial_drv: $(OBJ)/drivers/usb_serial
 	CFLAGS="$(CFLAGS)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
+	mkdir -p $(OBJ)/drv_obj
+	cp $(OBJ)/drivers/usb_serial/usb_serial_drv.o  $(OBJ)/drv_obj/$@.o
 
 $(OBJ)/drivers/usb_serial: $(TOP)/drivers/usb_serial
 	mkdir -p $@
@@ -162,8 +162,10 @@ $(OBJ)/arch/stm32: $(TOP)/arch/stm32
 	mkdir -p $@
 	lndir $< $@
 
-usb_core: $(OBJ)/arch/stm32/usb
+usb_core_drv: $(OBJ)/arch/stm32/usb
 	CFLAGS="$(CFLAGS)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
+	mkdir -p $(OBJ)/drv_obj
+	cp  $(OBJ)/arch/stm32/usb/usb_drv.o $(OBJ)/drv_obj/$@.o
 
 $(OBJ)/arch/stm32/usb: $(TOP)/arch/stm32/usb
 	mkdir -p $@
@@ -180,6 +182,8 @@ $(OBJ)/arch/stm32/stm32f407: $(TOP)/arch/stm32/stm32f407
 	lndir $< $@
 
 hr_timer: stm32f407 hr_timer_build
+	mkdir -p $(OBJ)/drv_obj
+	cp  $(OBJ)/arch/stm32/stm32f407/hr_timer/hr_timer.o $(OBJ)/drv_obj/$@.o
 
 hr_timer_build: $(OBJ)/arch/stm32/stm32f407/hr_timer
 	CFLAGS="$(CFLAGS)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
