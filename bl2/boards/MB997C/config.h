@@ -37,5 +37,6 @@
 #define CEC_PIN         GPIO_PIN(PC,4);
 
 /* Sony A1 */
-#define A1_PIN          GPIO_PIN(PB,0);
+// previous use of PB0 changed, because of burned gpio pin
+#define A1_PIN          GPIO_PIN(PC,5);
 

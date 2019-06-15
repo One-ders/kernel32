@@ -435,6 +435,7 @@ int a1_send(unsigned char *buf, int len) {
 
 int a1_init_a1(void) {
 	fd_a1=io_open(A1_DRV0);
+	if (fd_a1<0) return -1;
 	io_control(fd_a1,F_SETFL,(void *)O_NONBLOCK,0);
 	register_event(fd_a1,EV_READ,handle_a1_data,0);
 	register_timer(3000, handle_timeout, 0);

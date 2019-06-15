@@ -401,6 +401,11 @@ void *handle_syscall(unsigned long int *svc_sp) {
 		}
 		case SVC_IO_READ: {
 			int fd=(int)get_svc_arg(svc_sp,0);
+			if (fd<0) {
+				set_svc_ret(svc_sp,-1);
+				return 0;
+			}
+			{
 			int rc;
 			struct user_fd *fdd=&fd_tab[fd];
 			struct driver *driver=fdd->driver;
@@ -424,9 +429,15 @@ void *handle_syscall(unsigned long int *svc_sp) {
 			}
 			set_svc_ret(svc_sp,rc);
 			return 0;
+			}
 		}
 		case SVC_IO_WRITE: {
 			int fd=(int)get_svc_arg(svc_sp,0);
+			if (fd<0) {
+				set_svc_ret(svc_sp,-1);
+				return 0;
+			}
+			{
 			struct user_fd *fdd=&fd_tab[fd];
 			struct driver *driver=fdd->driver;
 			struct device_handle *dh=fdd->dev_handle;
@@ -469,9 +480,15 @@ again:
 			}
 			set_svc_ret(svc_sp,done);
 			return 0;
+			}
 		}
 		case SVC_IO_CONTROL: {
 			int	fd	=(int)get_svc_arg(svc_sp,0);
+			if (fd<0) {
+				set_svc_ret(svc_sp,-1);
+				return 0;
+			}
+			{
 			struct	user_fd		*fdd=&fd_tab[fd];
 			struct	driver		*driver=fdd->driver;
 			struct	device_handle	*dh=fdd->dev_handle;
@@ -514,9 +531,15 @@ again:
 			rc=driver->ops->control(dh,get_svc_arg(svc_sp,1),(void *)get_svc_arg(svc_sp,2),get_svc_arg(svc_sp,3));
 			set_svc_ret(svc_sp,rc);
 			return 0;
+			}
 		}
 		case SVC_IO_LSEEK: {
 			int fd=(int)get_svc_arg(svc_sp,0);
+			if (fd<0) {
+				set_svc_ret(svc_sp,-1);
+				return 0;
+			}
+			{
 			struct driver *driver=fd_tab[fd].driver;
 			struct device_handle *dh=fd_tab[fd].dev_handle;
 			int rc;
@@ -527,9 +550,15 @@ again:
 			rc=driver->ops->control(dh,IO_LSEEK,(void *)get_svc_arg(svc_sp,1),get_svc_arg(svc_sp,2));
 			set_svc_ret(svc_sp,rc);
 			return 0;
+			}
 		}
 		case SVC_IO_CLOSE: {
 			int fd=(int)get_svc_arg(svc_sp,0);
+			if (fd<0) {
+				set_svc_ret(svc_sp,-1);
+				return 0;
+			}
+			{
 			struct driver *driver=fd_tab[fd].driver;
 			struct device_handle *dh=fd_tab[fd].dev_handle;
 			int rc;
@@ -543,6 +572,7 @@ again:
 			rc=driver->ops->close(dh);
 			set_svc_ret(svc_sp,rc);
 			return 0;
+			}
 		}
 		case SVC_IO_SELECT: {
 			struct sel_args *sel_args=(struct sel_args *)get_svc_arg(svc_sp,0);
