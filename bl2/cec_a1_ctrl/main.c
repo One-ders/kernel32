@@ -31,6 +31,7 @@
  * @(#)main.c
  */
 
+#include <config.h>
 #include "sys.h"
 #include "sys_env.h"
 #include "io.h"
@@ -52,7 +53,9 @@ static int set_fnc(int argc, char **argv, struct Env *env);
 static int get_fnc(int argc, char **argv, struct Env *env);
 static int scan_fnc(int argc, char **argv, struct Env *env);
 static int wake_fnc(int argc, char **argv, struct Env *env);
+#ifdef WITH_SONY_A1
 static int send_a1_fnc(int argc, char **argv, struct Env *env);
+#endif
 
 static struct cmd cmds[] = {
 	{"help", generic_help_fnc},
@@ -61,7 +64,9 @@ static struct cmd cmds[] = {
 	{"get", get_fnc},
 	{"scan",scan_fnc},
 	{"wake",wake_fnc},
+#ifdef WITH_SONY_A1
 	{"send_a1",send_a1_fnc},
+#endif
 	{0,0}
 };
 
@@ -176,6 +181,7 @@ static int wake_fnc(int argc, char **argv, struct Env *env) {
 /* Note the commands are run from the sys_mon task, so dont use
  * task specific data like filedescriptors
  */
+#ifdef WITH_SONY_A1
 static int send_a1_fnc(int argc, char **argv, struct Env *env) {
         int myfd=io_open(A1_DRV0);
         unsigned char buf[argc];
@@ -191,6 +197,7 @@ static int send_a1_fnc(int argc, char **argv, struct Env *env) {
         io_close(myfd);
         return 0;
 }
+#endif
 
 #endif
 
@@ -198,7 +205,9 @@ extern int init_pulse_eight(void);
 
 void cec_gw(void *dum) {
 
+#ifdef WITH_SONY_A1
 	a1_init_a1();
+#endif
 	cec_init_cec();
 	init_pulse_eight();
 

@@ -1,5 +1,4 @@
 /* $CecA1GW: , v1.1 2014/04/07 21:44:00 anders Exp $ */
-
 /*
  * Copyright (c) 2014, Anders Franzen.
  * All rights reserved.
@@ -30,6 +29,7 @@
  *
  * @(#)a1.c
  */
+#include <config.h>
 #include <string.h>
 #include "sys.h"
 #include "io.h"
@@ -38,6 +38,8 @@
 #include "cec.h"
 
 #include "asynchio.h"
+
+#ifdef WITH_SONY_A1
 
 static int fd_a1;
 int a1_send(unsigned char *buf, int len);
@@ -137,7 +139,7 @@ static int handle_cec_data(unsigned char *buf, int size) {
 			cec_send_vendor_id(A1_LINK,(5<<4)|0xf,0x080046);
 			break;
 		case CEC_OPCODE_GIVE_DEVICE_POWER_STATUS:
-			cec_send_power_status(A1_LINK,(5<<4)|fromAddr, 
+			cec_send_power_status(A1_LINK,(5<<4)|fromAddr,
 				power_state?0:1);
 			break;
 		case CEC_OPCODE_USER_CONTROL_PRESSED:
@@ -442,3 +444,4 @@ int a1_init_a1(void) {
 	handle_timeout(0,0,0);
 	return fd_a1;
 }
+#endif

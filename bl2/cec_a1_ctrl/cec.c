@@ -31,6 +31,7 @@
  * @(#)cec.c
  */
 
+#include <config.h>
 #include "sys.h"
 #include "io.h"
 #include "cec_drv.h"
@@ -169,11 +170,13 @@ int cec_send_abort(int itf, unsigned int cec_addr,
 
 
 int cec_send(int itf, unsigned char *buf, int len) {
+#ifdef WITH_SONY_A1
 	if (itf==USB_BUS) {
 		if ((len>1)&&(buf[1]==0x36)) {
 			a1_power_off();
 		}
 	}
+#endif
 	return distribute_msg(itf,buf,len);
 }
 
@@ -200,9 +203,10 @@ static int handle_cec_data(int fd,int ev, void *dum) {
                 if (__builtin_memcmp(cec_rbuf,sonyOn,sizeof(sonyOn))==0) {
                         /* wakeup  set top box */
 			wakeup_usb_dev();
-
+#ifdef WITH_SONY_A1
 			/* Start amp */
 			a1_power_on();
+#endif
                 }
         }
 

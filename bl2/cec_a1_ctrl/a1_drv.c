@@ -1,5 +1,4 @@
 /* $CecA1GW: , v1.1 2014/04/07 21:44:00 anders Exp $ */
-
 /*
  * Copyright (c) 2014, Anders Franzen.
  * All rights reserved.
@@ -32,6 +31,7 @@
  */
 #include <sys.h>
 #include <io.h>
+#ifdef WITH_SONY_A1
 #include <led_drv.h>
 #include <hr_timer.h>
 #include <gpio_drv.h>
@@ -648,3 +648,5 @@ void init_a1(void) {
 }
 
 INIT_FUNC(init_a1);
+
+#endif

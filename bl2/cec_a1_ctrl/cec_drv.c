@@ -160,7 +160,7 @@ static unsigned int cec_rx_ix;
 static unsigned int cec_promisc;
 static int prev_pin_stat=-1;
 
-/* A Cec device claims the bus by sinking the wire for 3700 mS */
+/* A Cec device claims the bus by sinking the wire for 3700 uS */
 static int start_r_sync(int pstate) {
 	int uSec=3500;
 	if (pstate) {
