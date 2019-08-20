@@ -38,6 +38,8 @@
 #include <procps.h>
 #include <devls.h>
 
+#include <bdm_itf.h>
+
 struct dents {
 	char name[32];
 };
@@ -65,7 +67,7 @@ static int get_procdata(int fd, char *name, struct Env *env) {
 		fprintf(env->io_fd, "could not open proc data\n");
 		return -1;
 	}
-	
+
 	rc=io_read(fd2,&pd,sizeof(pd));
 	if(rc>0) {
 		fprintf(env->io_fd, "task(%3d@%x) %12s, sp=0x%08x, pc=0x%08x, prio=%x, state=%c, atics=%d\n",
@@ -85,9 +87,9 @@ static int ps_fnc(int argc, char **argv, struct Env *env) {
 		fprintf(env->io_fd,"could not open ps driver\n");
 		return -1;
 	}
-	
+
 	rc=io_control(fd,READDIR,dents,10);
-	
+
 	if (rc<0) {
 		fprintf(env->io_fd,"directory error\n");
 		return 0;
@@ -111,7 +113,7 @@ static int get_devdata(int fd, char *name, struct Env *env) {
 		fprintf(env->io_fd, "could not open dev data\n");
 		return -1;
 	}
-	
+
 	rc=io_read(fd2,&dd,sizeof(dd));
 	if(rc>0) {
 		int i;
@@ -280,7 +282,7 @@ static int debug_fnc(int argc, char **argv, struct Env *env) {
 	}
 	set_debug_level(dbglev);
 	return 0;
-} 
+}
 
 static int block_fnc(int argc, char **argv, struct Env *env) {
 	int rc;
@@ -321,6 +323,36 @@ static int reboot_fnc(int argc, char **argv, struct Env *env) {
 	return 0;
 }
 
+static int bdm_fnc(int argc, char **argv, struct Env *env) {
+	int fd=io_open("bdm_itf");
+	int rc=0;
+	int ok=0;
+
+	if (fd<0) {
+		fprintf(env->io_fd,"could not open dev bdm_itf\n");
+		return -1;
+	}
+
+	if (argc>1) {
+		if (strcmp(argv[1],"sync")==0) {
+			ok=1;
+			rc=io_control(fd,BDM_ITF_SYNC,0,0);
+		} else if (strcmp(argv[1], "ct")==0) {
+			ok=1;
+			rc=io_control(fd,BDM_ITF_CLOCKTEST,0,0);
+		}
+
+	}
+
+	io_close(fd);
+
+	if (!ok) {
+		fprintf(env->io_fd,"bad argument %s\n", argv[1]);
+		return -1;
+	}
+	return 0;
+}
+
 #if 0
 extern int fb_test(void *);
 
@@ -340,6 +372,7 @@ static struct cmd cmd_root[] = {
 		{"setprio",setprio_fnc},
 		{"reboot",reboot_fnc},
 		{"kmem",kmem_fnc},
+		{"bdm", bdm_fnc},
 //		{"testprog",testprog},
 		{0,0}
 };
@@ -372,7 +405,7 @@ void main(void *dum) {
 #ifdef TEST_USB_SERIAL
 		thread_create(main,"usb_serial0",12,1,"sys_mon:usb");
 #else
-		init_cec_a1();
+//		init_cec_a1();
 #endif
 	}
 
@@ -399,7 +432,7 @@ void main(void *dum) {
 				int rc;
 //				fprintf(fd,":iofd is %d\n",env.io_fd);
 				fprintf(fd,"\n");
-				rc=cmd->fnc(argc,argv,&env); 
+				rc=cmd->fnc(argc,argv,&env);
 				if (rc<0) {
 					fprintf(fd,"%s returned %d\n",argv[0],rc);
 				}

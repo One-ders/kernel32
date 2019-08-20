@@ -4,3 +4,4 @@ define reset
 end
 
 target remote :1234
+symbol-file myCore

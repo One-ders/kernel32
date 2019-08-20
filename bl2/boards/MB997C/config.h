@@ -33,10 +33,20 @@
 #define LED_RED		4
 #define LED_BLUE	8
 
+
+#if 0
 /* Cec */
-#define CEC_PIN         GPIO_PIN(PC,4);
+#define CEC_PIN         GPIO_PIN(PC,4)
 
 /* Sony A1 */
 // previous use of PB0 changed, because of burned gpio pin
-#define A1_PIN          GPIO_PIN(PC,5);
+#define A1_PIN          GPIO_PIN(PC,5)
+#endif
+
+/* Timer 1 Ch1 & Ch 2, AF1 */
+#define TIM1_CH1_PIN	GPIO_PIN(PE,9)
+#define TIM1_CH2_PIN	GPIO_PIN(PE,11)
+
+/* Timer 8 ch1, AF3 */
+#define TIM8_CH1_PIN	GPIO_PIN(PC,6)
 
