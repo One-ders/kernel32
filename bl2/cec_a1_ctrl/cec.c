@@ -202,6 +202,7 @@ static int handle_cec_data(int fd,int ev, void *dum) {
                 unsigned char sonyOn[]={0x0f,0xa0,0x08,0x00,0x46,0x00,0x04};
                 if (__builtin_memcmp(cec_rbuf,sonyOn,sizeof(sonyOn))==0) {
                         /* wakeup  set top box */
+			log("%t wakeup system from Sony on\n");
 			wakeup_usb_dev();
 #ifdef WITH_SONY_A1
 			/* Start amp */
@@ -216,9 +217,11 @@ static int handle_cec_data(int fd,int ev, void *dum) {
 //			unsigned int old_pa=(cec_rbuf[2]<<8)|cec_rbuf[3];
 			unsigned int new_pa=(cec_rbuf[4]<<8)|cec_rbuf[5];
 			if (new_pa==0x1000) {
+				log("%t wakeup system from Route change\n");
 				wakeup_usb_dev();
 			}
 		} else if (cec_rbuf[1]==CEC_OPCODE_SET_MENU_LANGUAGE) {
+			log("%t wakeup system from set menu language\n");
 			wakeup_usb_dev();
 		}
 	}

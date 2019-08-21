@@ -53,6 +53,7 @@ static int set_fnc(int argc, char **argv, struct Env *env);
 static int get_fnc(int argc, char **argv, struct Env *env);
 static int scan_fnc(int argc, char **argv, struct Env *env);
 static int wake_fnc(int argc, char **argv, struct Env *env);
+static int print_log_fnc(int argc, char **argv, struct Env *env);
 #ifdef WITH_SONY_A1
 static int send_a1_fnc(int argc, char **argv, struct Env *env);
 #endif
@@ -64,6 +65,7 @@ static struct cmd cmds[] = {
 	{"get", get_fnc},
 	{"scan",scan_fnc},
 	{"wake",wake_fnc},
+	{"log", print_log_fnc},
 #ifdef WITH_SONY_A1
 	{"send_a1",send_a1_fnc},
 #endif
@@ -177,6 +179,62 @@ static int wake_fnc(int argc, char **argv, struct Env *env) {
 	wakeup_usb_dev();
 	return 0;
 }
+
+#define I(a) (a&(4096-1))
+#define BP(a) (&logbuf[I(a)])
+
+static char logbuf[4096];
+static int log_start_ix=0;
+static int log_end_ix=0;
+
+static int print_log_fnc(int argc, char **argv, struct Env *env) {
+	while(log_end_ix>log_start_ix) {
+		int len=strlen(BP(log_start_ix));
+		if ((len+I(log_start_ix))>4096) {
+			int len_p1=4096-I(log_start_ix);
+			int len_p2=strlen(BP(0));
+			io_write(env->io_fd,BP(log_start_ix),len_p1);
+			log_start_ix+=len_p1;
+			io_write(env->io_fd,BP(0),len_p2);
+			log_start_ix+=len_p2+1;
+		} else {
+			io_write(env->io_fd,BP(log_start_ix),len);
+			log_start_ix+=len+1;
+		}
+	}
+	return 0;
+}
+
+int log(const char *fmt, ...) {
+	char sbuf[256];
+	va_list arg;
+	int size;
+	int nend;
+
+	va_start(arg,fmt);
+	size=vsprintf(sbuf,fmt,arg);
+	va_end(arg);
+
+	sbuf[size]=0;
+	size++;
+
+	nend=(log_end_ix)+size;
+	if ((nend-log_start_ix)>4096) {
+		log_start_ix+=((nend-log_start_ix)-4096);
+	}
+	if (I(nend) < I(log_end_ix)) {
+		int len_p1=4096-I(log_end_ix);
+		int len_p2=I(nend);
+		memcpy(BP(log_end_ix),sbuf,len_p1);
+		memcpy(BP(0),&sbuf[len_p1],len_p2);
+		log_end_ix=nend;
+	} else {
+		memcpy(BP(log_end_ix),sbuf,size);
+		log_end_ix+=size;
+	}
+	return size;
+}
+
 
 /* Note the commands are run from the sys_mon task, so dont use
  * task specific data like filedescriptors

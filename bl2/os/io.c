@@ -106,7 +106,7 @@ char *itoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_nu
 	int i=0;
 	int j;
 	int to;
-	char p_char=prepend_zero?'0':' ';	
+	char p_char=prepend_zero?'0':' ';
 	char p_neg=0;
 
 	if (val&0x80000000) {
@@ -141,7 +141,7 @@ char *itoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_nu
 		buf[0]='-';
 	}
 	buf[i+to]=0;
-	
+
 	return buf;
 }
 
@@ -174,7 +174,7 @@ char *xtoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_nu
 	__builtin_memmove(&buf[to],buf,i);
 	__builtin_memset(buf,p_char,to);
 	buf[i+to]=0;
-	
+
 	return buf;
 }
 
@@ -310,7 +310,7 @@ int sys_printf(const char *fmt, ...) {
 		io_setpolled(1);
 	}
 #endif
-	
+
 	va_start(ap,fmt);
 	while(1) {
 		char *cppos;
@@ -377,6 +377,7 @@ int sys_printf(const char *fmt, ...) {
 				case 't': {
 					char *s=ts_format(tq_tic,numericbuf, 16);
 					io_add_str(s);
+					break;
 				}
 				default: {
 					io_add_c('%');
@@ -385,7 +386,7 @@ int sys_printf(const char *fmt, ...) {
 			}
 		}
 		ppos+=i;
-		
+
 	}
 	va_end(ap);
 #if 0

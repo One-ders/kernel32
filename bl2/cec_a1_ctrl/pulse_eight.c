@@ -417,6 +417,7 @@ static int pe_data_in(unsigned char *buf, int len) {
 	}
 #if DEBUG
 	if (cec_debug) {
+		log("%t got data on cec:\n");
 		printf("got data on cec: %x",buf[0]);
 		for(i=1;i<len;i++) {
 			printf(", %02x",buf[i]);
@@ -429,6 +430,7 @@ static int pe_data_in(unsigned char *buf, int len) {
 	sbuf[2]=buf[0];
 	rc=io_write(fd,(char *)sbuf,sizeof(sbuf));
 	if (rc!=sizeof(sbuf)) {
+		log("%t wakeup system from io_write error\n");
 		wakeup_usb_dev();
 		DPRINTF("pe_data_in: failed to write data on usb bus, rc=%d\n", rc);
 		return 0;

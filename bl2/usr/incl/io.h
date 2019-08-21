@@ -31,7 +31,11 @@
  * @(#)io.h
  */
 
+#include <stdarg.h>
+
 int fprintf(int fd, const char *format, ...);
+int sprintf(char *str, const char *format, ...);
+int vsprintf(char *str, const char *format, va_list ap);
 #define printf(b...) fprintf(0,b)
 
 int readline_r(int fd, char *prompt, char *buf, int buf_size);
