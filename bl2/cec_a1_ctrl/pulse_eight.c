@@ -417,12 +417,14 @@ static int pe_data_in(unsigned char *buf, int len) {
 	}
 #if DEBUG
 	if (cec_debug) {
-		log("%t got data on cec:\n");
+		log("%t got data on cec: %x",buf[0]);
 		printf("got data on cec: %x",buf[0]);
 		for(i=1;i<len;i++) {
 			printf(", %02x",buf[i]);
+			log(", %02x",buf[i]);
 		}
 		printf(" ---> USB\n");
+		log(" ---> USB\n");
 	}
 #endif
 

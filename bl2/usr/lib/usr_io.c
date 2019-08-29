@@ -210,6 +210,7 @@ int sprintf(char *sbuf, const char *fmt, ...) {
 		}
 	}
 	va_end(ap);
+	*p=0;
 	return p-sbuf;
 }
 
@@ -285,6 +286,7 @@ int vsprintf(char *sbuf, const char *fmt, va_list ap) {
 			p++;
 		}
 	}
+	*p=0;
 	return p-sbuf;
 }
 

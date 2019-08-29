@@ -59,11 +59,14 @@ static int ack_mask;
 int cec_dump_data(int itf, char *pretext, unsigned char *buf, int len) {
         int i;
 	char *itf_str=(itf==CEC_BUS)?"CEC_BUS":(itf==A1_LINK)?"A1_LINK":"USB_BUS";
-        DPRINTF("from %s, %s: %x",itf_str,pretext, buf[0]);
+        DPRINTF("%t from %s, %s: %x",itf_str,pretext, buf[0]);
+	log("%t from %s, %s: %x",itf_str,pretext, buf[0]);
         for(i=1;i<len;i++) {
                 DPRINTF(", %02x",buf[i]);
+		log(", %02x",buf[i]);
         }
         DPRINTF("\n");
+	log("\n");
         return 0;
 }
 #endif
@@ -188,6 +191,17 @@ int cec_bus_send(unsigned char *buf, int len) {
 	return rc;
 }
 
+static unsigned char sonyOn[]={0x0f,0xa0,0x08,0x00,0x46,0x00,0x04};
+static unsigned char onkyo_started[]={0x5f,0x72,0x01};
+static unsigned char tv_active[]    ={0x04,0x90,0x00};
+static unsigned char tv_standby[]   ={0x04,0x90,0x01};
+static unsigned char tv_activating[]={0x04,0x90,0x02};
+static unsigned char tv_state[]     ={0x40,0x8f};
+static unsigned char onkyo_standby[]={0x45,0x36};
+static unsigned char go_standby[]={0x4f,0x36};
+static unsigned int throw_data=0;
+static unsigned char sbuf[24];
+static unsigned int s_rc;
 
 static int handle_cec_data(int fd,int ev, void *dum) {
 	int rc;
@@ -199,7 +213,6 @@ static int handle_cec_data(int fd,int ev, void *dum) {
 	}
 
 	if (rc==9) {
-                unsigned char sonyOn[]={0x0f,0xa0,0x08,0x00,0x46,0x00,0x04};
                 if (__builtin_memcmp(cec_rbuf,sonyOn,sizeof(sonyOn))==0) {
                         /* wakeup  set top box */
 			log("%t wakeup system from Sony on\n");
@@ -210,6 +223,58 @@ static int handle_cec_data(int fd,int ev, void *dum) {
 #endif
                 }
         }
+
+
+	if (rc==3) {
+		int rrc;
+		if (memcmp(cec_rbuf,onkyo_started,sizeof(onkyo_started))==0) {
+			log("%t got onkyo start code\n");
+			// ask tv about state
+			log("%t ask tv for state\n");
+			rrc=cec_bus_send(tv_state,sizeof(tv_state));
+			DPRINTF("%t bus_send returned %d\n", rrc)
+			memcpy(sbuf,cec_rbuf,24);
+			s_rc=rc;
+			throw_data=1;
+			return 0;
+		}
+
+		if (memcmp(cec_rbuf,tv_standby,sizeof(tv_standby))==0) {
+			log("%t tv is standby\n");
+			cec_bus_send(onkyo_standby,sizeof(onkyo_standby));
+			throw_data=1;
+			return 0;
+		}
+
+		if (memcmp(cec_rbuf,tv_active,sizeof(tv_active))==0) {
+			log("%t tv is active\n");
+			throw_data=0;
+			if (s_rc>0) {
+				memcpy(cec_rbuf,sbuf,24);
+				rc=s_rc;
+				s_rc=0;
+			} else return 0;
+		}
+
+		if (memcmp(cec_rbuf,tv_activating,sizeof(tv_activating))==0) {
+			log("%t tv is activating\n");
+			throw_data=0;
+			if (s_rc>0) {
+				memcpy(cec_rbuf,sbuf,24);
+				rc=s_rc;
+				s_rc=0;
+			} else return 0;
+		}
+	}
+
+	if (throw_data) {
+		int rrc;
+		log("%t ask tv for state\n");
+		rrc=cec_bus_send(tv_state,sizeof(tv_state));
+		memcpy(sbuf,cec_rbuf,24);
+		s_rc=rc;
+		return 0;
+	}
 
 	to=cec_rbuf[0]&0xf;
 	if (to==0xf) { // Broadcast

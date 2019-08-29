@@ -54,6 +54,7 @@ static int get_fnc(int argc, char **argv, struct Env *env);
 static int scan_fnc(int argc, char **argv, struct Env *env);
 static int wake_fnc(int argc, char **argv, struct Env *env);
 static int print_log_fnc(int argc, char **argv, struct Env *env);
+static int send_cec_fnc(int argc, char **argv, struct Env *env);
 #ifdef WITH_SONY_A1
 static int send_a1_fnc(int argc, char **argv, struct Env *env);
 #endif
@@ -66,6 +67,7 @@ static struct cmd cmds[] = {
 	{"scan",scan_fnc},
 	{"wake",wake_fnc},
 	{"log", print_log_fnc},
+	{"send_cec",send_cec_fnc},
 #ifdef WITH_SONY_A1
 	{"send_a1",send_a1_fnc},
 #endif
@@ -188,18 +190,19 @@ static int log_start_ix=0;
 static int log_end_ix=0;
 
 static int print_log_fnc(int argc, char **argv, struct Env *env) {
-	while(log_end_ix>log_start_ix) {
-		int len=strlen(BP(log_start_ix));
-		if ((len+I(log_start_ix))>4096) {
-			int len_p1=4096-I(log_start_ix);
+	int six=log_start_ix;
+	while(log_end_ix>six) {
+		int len=strlen(BP(six));
+		if ((len+I(six))>4096) {
+			int len_p1=4096-I(six);
 			int len_p2=strlen(BP(0));
-			io_write(env->io_fd,BP(log_start_ix),len_p1);
-			log_start_ix+=len_p1;
+			io_write(env->io_fd,BP(six),len_p1);
+			six+=len_p1;
 			io_write(env->io_fd,BP(0),len_p2);
-			log_start_ix+=len_p2+1;
+			six+=len_p2+1;
 		} else {
-			io_write(env->io_fd,BP(log_start_ix),len);
-			log_start_ix+=len+1;
+			io_write(env->io_fd,BP(six),len);
+			six+=len+1;
 		}
 	}
 	return 0;
@@ -239,6 +242,27 @@ int log(const char *fmt, ...) {
 /* Note the commands are run from the sys_mon task, so dont use
  * task specific data like filedescriptors
  */
+static int send_cec_fnc(int argc, char **argv, struct Env *env) {
+        int myfd=io_open(CEC_DRV);
+        unsigned char buf[argc];
+        int i;
+        int rc;
+
+	if (myfd<0) {
+		printf("could not CEC_DRV\n");
+		return 0;
+	}
+
+        for (i=1;i<argc;i++) {
+                unsigned int val=strtoul(argv[i],0,16);
+                printf("got byte %x\n",val);
+                buf[i-1]=val;
+        }
+        rc=io_write(myfd,(char *)buf,argc-1);
+        printf("cec: write returned %d\n",rc);
+        io_close(myfd);
+        return 0;
+}
 #ifdef WITH_SONY_A1
 static int send_a1_fnc(int argc, char **argv, struct Env *env) {
         int myfd=io_open(A1_DRV0);
