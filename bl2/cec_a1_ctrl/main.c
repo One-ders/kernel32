@@ -247,6 +247,7 @@ static int send_cec_fnc(int argc, char **argv, struct Env *env) {
         unsigned char buf[argc];
         int i;
         int rc;
+	unsigned int am=1<<4;
 
 	if (myfd<0) {
 		printf("could not CEC_DRV\n");
@@ -258,6 +259,7 @@ static int send_cec_fnc(int argc, char **argv, struct Env *env) {
                 printf("got byte %x\n",val);
                 buf[i-1]=val;
         }
+	io_control(myfd,CEC_SET_ACK_MSK,&am,sizeof(am));
         rc=io_write(myfd,(char *)buf,argc-1);
         printf("cec: write returned %d\n",rc);
         io_close(myfd);

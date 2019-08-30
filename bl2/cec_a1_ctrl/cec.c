@@ -230,17 +230,21 @@ static int handle_cec_data(int fd,int ev, void *dum) {
 		if (memcmp(cec_rbuf,onkyo_started,sizeof(onkyo_started))==0) {
 			log("%t got onkyo start code\n");
 			// ask tv about state
+#if 0
 			log("%t ask tv for state\n");
+			ack_mask|=(1<<2);
 			rrc=cec_bus_send(tv_state,sizeof(tv_state));
 			DPRINTF("%t bus_send returned %d\n", rrc)
 			memcpy(sbuf,cec_rbuf,24);
 			s_rc=rc;
+#endif
 			throw_data=1;
-			return 0;
 		}
 
 		if (memcmp(cec_rbuf,tv_standby,sizeof(tv_standby))==0) {
 			log("%t tv is standby\n");
+			ack_mask|=(1<<4);
+			io_control(fd_cec,CEC_SET_ACK_MSK,&ack_mask,sizeof(ack_mask));
 			cec_bus_send(onkyo_standby,sizeof(onkyo_standby));
 			throw_data=1;
 			return 0;
@@ -270,6 +274,8 @@ static int handle_cec_data(int fd,int ev, void *dum) {
 	if (throw_data) {
 		int rrc;
 		log("%t ask tv for state\n");
+		ack_mask|=(1<<4);
+		io_control(fd_cec,CEC_SET_ACK_MSK,&ack_mask,sizeof(ack_mask));
 		rrc=cec_bus_send(tv_state,sizeof(tv_state));
 		memcpy(sbuf,cec_rbuf,24);
 		s_rc=rc;
