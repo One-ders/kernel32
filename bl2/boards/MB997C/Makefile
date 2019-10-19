@@ -19,7 +19,7 @@ export AS:=arm-none-eabi-as
 export CC:=arm-none-eabi-gcc
 export LD:=arm-none-eabi-ld
 export OBJCOPY:=arm-none-eabi-objcopy
- 
+
 CFLAGS=-I. -I$(TOP)/incl -I$(TOP)/boards/$(BOARD) -I$(TOP)/arch/stm32 -I$(TOP)/arch/stm32/incl -g -O2 -DDEBUG -Wall -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi=soft -fno-builtin
 
 CFLAGS_USR:=-I$(TOP)/usr/incl -I$(TOP)/boards/$(BOARD) -I$(GCC_BASE)/lib/gcc/arm-none-eabi/4.8.3/include -g -Os -DDEBUG -fno-builtin -ffreestanding -nostdinc -Wall -mlittle-endian -mthumb -mcpu=cortex-m4 -mthumb-interwork -mfloat-abi=soft -fno-builtin
@@ -42,11 +42,11 @@ myCore: os version stm32f407 stm32 $(DTARGETS) usr.bin.o
 				$(OBJ)/usr/usr.bin.o
 
 
-#				$(OBJ)/stddrv/stddrv.o 
-#				$(OBJ)/arch/stm32/usb/usb_drv.o 
-#				$(OBJ)/drivers/usb_serial/usb_serial_drv.o 
-#				$(OBJ)/usr/usr.drv.o 
-#				$(OBJ)/arch/stm32/stm32f407/hr_timer/hr_timer.o 
+#				$(OBJ)/stddrv/stddrv.o
+#				$(OBJ)/arch/stm32/usb/usb_drv.o
+#				$(OBJ)/drivers/usb_serial/usb_serial_drv.o
+#				$(OBJ)/usr/usr.drv.o
+#				$(OBJ)/arch/stm32/stm32f407/hr_timer/hr_timer.o
 
 version:
 	echo "const char *ver=\"$(BOARD)-$(GIT_VERSION)\";" > $(OBJ)/version.c
@@ -59,7 +59,7 @@ usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/cec_a1_ctrl/cec_a1_ctrl.o
 #usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/usr/blinky/blinky.o $(OBJ)/cec_a1_mon/cec_a1_mon.o
 #	$(LD) -o $(OBJ)/usr/usr.bin.o $(LDFLAGS_USR) $^
 #	$(OBJCOPY) --prefix-symbols=__usr_ $(OBJ)/usr/usr.bin.o
- 
+
 #usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o $(OBJ)/usr/blinky/blinky.o
 #	$(LD) -o $(OBJ)/usr/usr.bin.o $(LDFLAGS_USR) $^
 #	$(OBJCOPY) --prefix-symbols=__usr_ $(OBJ)/usr/usr.bin.o
@@ -120,7 +120,7 @@ usr_drv: $(OBJ)/cec_a1_ctrl/cec_a1_ctrl.o
 #$(OBJ)/cec_a1_ctrl: $(TOP)/cec_a1_ctrl
 #	mkdir -p $@
 #	lndir $< $@
-	
+
 
 
 stddrv: $(OBJ)/stddrv

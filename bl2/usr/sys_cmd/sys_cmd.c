@@ -65,7 +65,7 @@ static int get_procdata(int fd, char *name, struct Env *env) {
 		fprintf(env->io_fd, "could not open proc data\n");
 		return -1;
 	}
-	
+
 	rc=io_read(fd2,&pd,sizeof(pd));
 	if(rc>0) {
 		fprintf(env->io_fd, "task(%3d@%x) %12s, sp=0x%08x, pc=0x%08x, prio=%x, state=%c, atics=%d\n",
@@ -85,9 +85,9 @@ static int ps_fnc(int argc, char **argv, struct Env *env) {
 		fprintf(env->io_fd,"could not open ps driver\n");
 		return -1;
 	}
-	
+
 	rc=io_control(fd,READDIR,dents,10);
-	
+
 	if (rc<0) {
 		fprintf(env->io_fd,"directory error\n");
 		return 0;
@@ -111,7 +111,7 @@ static int get_devdata(int fd, char *name, struct Env *env) {
 		fprintf(env->io_fd, "could not open dev data\n");
 		return -1;
 	}
-	
+
 	rc=io_read(fd2,&dd,sizeof(dd));
 	if(rc>0) {
 		int i;
@@ -280,7 +280,7 @@ static int debug_fnc(int argc, char **argv, struct Env *env) {
 	}
 	set_debug_level(dbglev);
 	return 0;
-} 
+}
 
 static int block_fnc(int argc, char **argv, struct Env *env) {
 	int rc;
@@ -399,7 +399,7 @@ void main(void *dum) {
 				int rc;
 //				fprintf(fd,":iofd is %d\n",env.io_fd);
 				fprintf(fd,"\n");
-				rc=cmd->fnc(argc,argv,&env); 
+				rc=cmd->fnc(argc,argv,&env);
 				if (rc<0) {
 					fprintf(fd,"%s returned %d\n",argv[0],rc);
 				}

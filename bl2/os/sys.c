@@ -286,7 +286,7 @@ void *handle_syscall(unsigned long int *svc_sp) {
 		case SVC_CREATE_TASK: {
 			struct task_create_args *tca=
 				(struct task_create_args *)get_svc_arg(svc_sp,0);
-			struct task *t=(struct task *)get_page();	
+			struct task *t=(struct task *)get_page();
 			unsigned char *estack=((unsigned char *)t)+2048;
 			unsigned long int *stackp=(unsigned long int *)(estack+2048);
 			unsigned char *uval=tca->val;
@@ -499,7 +499,7 @@ again:
 				set_svc_ret(svc_sp,-1);
 				return 0;
 			}
-		
+
 			if (get_svc_arg(svc_sp,1)==DYNOPEN) {
 				struct dyn_open_args doargs;
 
@@ -726,7 +726,7 @@ again:
 						}
 						ready_last[MAX_PRIO]=p;
 						break;
-					} 
+					}
 					p_prev=&p->next;
 					p=p->next;
 				}
@@ -818,7 +818,7 @@ set_ready:
 						}
 						ready_last[prio]=p;
 						goto check_resched;
-					} 
+					}
 					p_prev=&p->next;
 					p=p->next;
 				}
@@ -1012,7 +1012,7 @@ void *sys_sleepon_update_list(struct blocker *b, struct blocker_list *bl_ptr) {
 	b->ev|=0x80;
 	restore_cpu_flags(cpu_flags);
 	rc=sys_sleepon(b,0);
-	if (!rc) { 
+	if (!rc) {
 		/* return 0, means no sleep */
 		/* link out the blocker */
 		pprev=&bl_ptr->first;
@@ -1096,7 +1096,7 @@ void *sys_wakeup(struct blocker *so) {
 	}
 	ready_last[prio]=n;
 	restore_cpu_flags(cpu_flags);
-	
+
 	if (prio<GET_PRIO(current)) {
 		DEBUGP(DLEV_SCHED,"wakeup(immed readying) %x current task: %s, readying %s\n",so,current->name,n->name);
 		switch_on_return();
@@ -1141,7 +1141,7 @@ int driver_publish(struct driver *drv) {
 	struct driver *p=drv_root;
 	while(p&&p!=drv) p=p->next;
 	if (!p) {
-		drv->next=drv_root;	
+		drv->next=drv_root;
 		drv_root=drv;
 	}
 
@@ -1199,7 +1199,7 @@ int driver_start() {
 int driver_unpublish(struct driver *drv) {
 	struct driver *tmp=drv_root;
 	struct driver **prevNext=&drv_root;
-	
+
 	while(tmp) {
 		if (__builtin_strcmp(drv->name,tmp->name)==0) {
 			*prevNext=tmp->next;
@@ -1343,21 +1343,15 @@ extern int switch_flag;
 extern void *usr_init;
 
 void start_sys(void) {
-	
+
 	unsigned long int stackp;
-#ifdef MMU
-	struct task *t=create_user_context();
-	sys_printf("enter start_sys: got task ptr %x\n", t);
-	load_init(t);
-#else
-	struct task *t=(struct task *)get_page();	
+	struct task *t=(struct task *)get_page();
 	memset(t,0,sizeof(struct task));
 	if (allocate_task_id(t)<0) {
 		sys_printf("proc table full\n");
 		put_page(t);
 		while(1);
 	}
-#endif
 
 	t->name="sys_mon";
 	t->state=TASK_STATE_READY;

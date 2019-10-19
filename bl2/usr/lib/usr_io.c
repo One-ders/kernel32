@@ -351,7 +351,7 @@ int readline_r(int fd, char *prompt, char *buf, int buf_size) {
 	int tmp_h_ix=h_ix;
 	int state=STATE_C_NORMAL;
 
-	fprintf(fd,prompt,strlen(prompt));
+	fprintf(fd,prompt);
 
 	while (1) {
 		int ch=0;
