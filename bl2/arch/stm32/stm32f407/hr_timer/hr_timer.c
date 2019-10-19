@@ -76,16 +76,16 @@ struct timer_user {
 
 #define TIMERS	8
 
-static unsigned int current_hr_tic;
-static unsigned int tic_step;
-static int in_irq;
+static volatile unsigned int current_hr_tic;
+static volatile unsigned int tic_step;
+static volatile int in_irq;
 
 static struct timer_user tu[TIMERS];
 static struct timer_user *tout;
 
 extern unsigned int sys_irqs;
 
-int get_user(struct timer_user **ttu) {
+static int get_user(struct timer_user **ttu) {
 	int i;
 	for(i=0;i<TIMERS;i++) {
 		if (!tu[i].inuse) {

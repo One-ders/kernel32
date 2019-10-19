@@ -377,6 +377,7 @@ int sys_printf(const char *fmt, ...) {
 				case 't': {
 					char *s=ts_format(tq_tic,numericbuf, 16);
 					io_add_str(s);
+					break;
 				}
 				default: {
 					io_add_c('%');

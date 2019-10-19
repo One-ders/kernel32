@@ -36,11 +36,15 @@ void *memset(void *s, int c, size_t n) {
 
 int memcmp(const void *s1, const void *s2, size_t n) {
 	int i;
+	const unsigned char *c1=(const unsigned char *)s1;
+	const unsigned char *c2=(const unsigned char *)s2;
 	for(i=0;i<n;i++) {
-		if ((*((int *)s1))!=(*((int *)s2))) break;
-		s1++;s2++;
+		if ((*c1)!=(*c2)) goto miss;
+		c1++;c2++;
 	}
-	return (*((int *)s1)-*((int *)s2));
+	return 0;
+miss:
+	return (*c1-*c2);
 }
 
 
@@ -64,7 +68,7 @@ char *strcpy(char *d, const char *s) {
 	do {
 		*d=*s;
 		d++;
-	} while(*s++); 
+	} while(*s++);
 	return d;
 }
 
@@ -96,7 +100,7 @@ char *itoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_nu
 	int i=0;
 	int j;
 	int to;
-	char p_char=prepend_zero?'0':' ';	
+	char p_char=prepend_zero?'0':' ';
 	char p_neg=0;
 
 	if (val&0x80000000) {
@@ -131,7 +135,7 @@ char *itoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_nu
 		buf[0]='-';
 	}
 	buf[i+to]=0;
-	
+
 	return buf;
 }
 
@@ -164,7 +168,7 @@ char *xtoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_nu
 	__builtin_memmove(&buf[to],buf,i);
 	__builtin_memset(buf,p_char,to);
 	buf[i+to]=0;
-	
+
 	return buf;
 }
 

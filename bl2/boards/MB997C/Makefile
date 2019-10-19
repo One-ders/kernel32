@@ -3,6 +3,7 @@ DRIVERS:=bdm_itf.o
 DRIVERS+=stddrv.o
 DRIVERS+=usb_core_drv.o
 DRIVERS+=usb_serial_drv.o
+#DRIVERS+=hr_timer.o
 #DRIVERS+=usr_drv.o
 
 DTARGETS=$(DRIVERS:.o=)
@@ -40,13 +41,6 @@ myCore: os version stm32f407 stm32 $(DTARGETS) usr.bin.o
 				$(DOBJS) \
 				$(OBJ)/os/end_sect.o \
 				$(OBJ)/usr/usr.bin.o
-
-
-#				$(OBJ)/stddrv/stddrv.o
-#				$(OBJ)/arch/stm32/usb/usb_drv.o
-#				$(OBJ)/drivers/usb_serial/usb_serial_drv.o
-#				$(OBJ)/usr/usr.drv.o
-#				$(OBJ)/arch/stm32/stm32f407/hr_timer/hr_timer.o
 
 version:
 	echo "const char *ver=\"$(BOARD)-$(GIT_VERSION)\";" > $(OBJ)/version.c

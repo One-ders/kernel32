@@ -340,6 +340,9 @@ static int bdm_fnc(int argc, char **argv, struct Env *env) {
 		} else if (strcmp(argv[1], "ct")==0) {
 			ok=1;
 			rc=io_control(fd,BDM_ITF_CLOCKTEST,0,0);
+		} else if (strcmp(argv[1], "ct2")==0) {
+			ok=1;
+			rc=io_control(fd,BDM_ITF_CLOCKTEST2,0,0);
 		}
 
 	}
@@ -373,7 +376,6 @@ static struct cmd cmd_root[] = {
 		{"reboot",reboot_fnc},
 		{"kmem",kmem_fnc},
 		{"bdm", bdm_fnc},
-//		{"testprog",testprog},
 		{0,0}
 };
 

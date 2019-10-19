@@ -76,7 +76,7 @@ int fprintf(int fd, const char *fmt, ...) {
 	int i=0;
 	va_list ap;
 	char numericbuf[16];
-	
+
 	va_start(ap,fmt);
 	while(1) {
 		int c=fmt[i++];
@@ -129,7 +129,7 @@ int fprintf(int fd, const char *fmt, ...) {
 		} else {
 			io_write(fd,(char *)&c,1);
 		}
-		
+
 	}
 	va_end(ap);
 	return 0;
@@ -210,6 +210,7 @@ int sprintf(char *sbuf, const char *fmt, ...) {
 		}
 	}
 	va_end(ap);
+	*p=0;
 	return p-sbuf;
 }
 
@@ -273,7 +274,7 @@ int readline_r(int fd, char *prompt, char *buf, int buf_size) {
 	int tmp_h_ix=h_ix;
 	int state=STATE_C_NORMAL;
 
-	fprintf(fd,prompt,strlen(prompt));
+	fprintf(fd,prompt);
 
 	while (1) {
 		int ch=0;

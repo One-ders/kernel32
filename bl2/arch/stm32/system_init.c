@@ -102,7 +102,7 @@ void system_init(void) {
 
 	RCC->CFGR = 0;
 
-	RCC->CR &= 
+	RCC->CR &=
 		~(RCC_CR_HSEON |
 		 RCC_CR_CSSON |
 		 RCC_CR_PLLON);
@@ -129,7 +129,7 @@ void system_init(void) {
 		HSE_status=RCC->CR&RCC_CR_HSERDY;
 		startup_cnt++;
 	} while ((!HSE_status) && (startup_cnt!=HSE_STARTUP_TIMEOUT));
-	
+
 	if (RCC->CR&RCC_CR_HSERDY) {
 		HSE_status=1;
 	} else {

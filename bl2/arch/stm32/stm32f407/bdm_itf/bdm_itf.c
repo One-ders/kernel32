@@ -35,6 +35,7 @@
 #include <gpio_drv.h>
 #include <sys.h>
 #include <io.h>
+#include <hr_timer.h>
 
 #include "bdm_itf.h"
 
@@ -228,7 +229,54 @@ static int bdm_itf_ct(struct bdm_itf_user *u, int arg) {
 	return 1;
 }
 
+static struct device_handle *hr_timer_dh;
+static struct driver *hr_timer_drv;
 
+static volatile int hr_running=0;
+static int uSec=10000;
+static volatile int tout=0;
+static int last_tval=0;
+
+static int hr_timeout(struct device_handle *dh, int ev, void *dum) {
+	tout+=1;
+	if (hr_running) {
+		hr_timer_drv->ops->control(hr_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
+	}
+	return 0;
+}
+
+static int bdm_itf_ct2(struct bdm_itf_user *u, int arg) {
+
+        unsigned long int cpu_flags;
+	hr_timer_drv=driver_lookup(HR_TIMER);
+	if (!hr_timer_drv) return -1;
+
+	hr_timer_dh=hr_timer_drv->ops->open(hr_timer_drv->instance,hr_timeout,0);
+	if (!hr_timer_dh) {
+		hr_timer_drv=0;
+		return -1;
+	}
+
+	cpu_flags=save_cpu_flags();
+	enable_interrupts();
+	tout=0;
+	hr_running=1;
+	hr_timer_drv->ops->control(hr_timer_dh, HR_TIMER_SET, &uSec, sizeof(uSec));
+
+	while (tout<1000) {
+		if (tout!=last_tval) {
+			last_tval=tout;
+			if (!(tout%100)) {
+				sys_printf("%t: 1 second\n");
+			}
+		}
+	}
+	hr_running=0;
+	restore_cpu_flags(cpu_flags);
+
+	hr_timer_drv->ops->close(hr_timer_dh);
+	return 0;
+}
 
 /**************** Driver API ********************************************/
 
@@ -258,6 +306,9 @@ static int bdm_itf_control(struct device_handle *dh, int cmd, void *arg, int len
 		case BDM_ITF_CLOCKTEST:
 			return bdm_itf_ct(u,*((int *)arg));
 			break;
+		case BDM_ITF_CLOCKTEST2:
+			return bdm_itf_ct2(u,*((int *)arg));
+			break;
 		default:
 			return -1;
 	}
@@ -268,8 +319,8 @@ static int bdm_itf_init(void *inst) {
 
 	RCC->APB2ENR |= (RCC_APB2ENR_TIM1EN|RCC_APB2ENR_TIM8EN);
 	/* APB2 bus clock 84Mhz */
-	TIM1->PSC=0x1a;
-	TIM8->PSC=0x1a;
+	TIM1->PSC=0x5;
+	TIM8->PSC=0x5;
 	TIM1->CNT=0;
 	TIM8->CNT=0;
 	TIM1->CR1 = TIM_CR1_OPM;
