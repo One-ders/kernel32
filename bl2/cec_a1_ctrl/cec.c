@@ -228,7 +228,7 @@ static int handle_cec_data(int fd,int ev, void *dum) {
 	if (rc==4) {
 		if (__builtin_memcmp(cec_rbuf,TVsetStreamPath,sizeof(TVsetStreamPath))==0) {
                         /* wakeup  set top box */
-			log("%t wakeup system from Sony on\n");
+			log("%t wakeup system from Samsung on\n");
 			wakeup_usb_dev();
 		}
 	}
