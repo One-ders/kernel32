@@ -59,11 +59,11 @@ static int ack_mask;
 int cec_dump_data(int itf, char *pretext, unsigned char *buf, int len) {
         int i;
 	char *itf_str=(itf==CEC_BUS)?"CEC_BUS":(itf==A1_LINK)?"A1_LINK":"USB_BUS";
-        DPRINTF("%t from %s, %s: %x",itf_str,pretext, buf[0]);
-	log("%t from %s, %s: %x",itf_str,pretext, buf[0]);
+        DPRINTF("%t from %s, %s: %02x",itf_str,pretext, buf[0]);
+	log("%t from %s, %s: %02x",itf_str,pretext, buf[0]);
         for(i=1;i<len;i++) {
-                DPRINTF(", %02x",buf[i]);
-		log(", %02x",buf[i]);
+                DPRINTF(":%02x",buf[i]);
+		log(":%02x",buf[i]);
         }
         DPRINTF("\n");
 	log("\n");
@@ -193,6 +193,7 @@ int cec_bus_send(unsigned char *buf, int len) {
 
 static unsigned char sonyOn[]={0x0f,0xa0,0x08,0x00,0x46,0x00,0x04};
 static unsigned char onkyo_started[]={0x5f,0x72,0x01};
+static unsigned char TVsetStreamPath[]={0x0f,0x86,0x33,0x00};
 static unsigned char tv_active[]    ={0x04,0x90,0x00};
 static unsigned char tv_standby[]   ={0x04,0x90,0x01};
 static unsigned char tv_activating[]={0x04,0x90,0x02};
@@ -223,6 +224,14 @@ static int handle_cec_data(int fd,int ev, void *dum) {
 #endif
                 }
         }
+
+	if (rc==4) {
+		if (__builtin_memcmp(cec_rbuf,TVsetStreamPath,sizeof(TVsetStreamPath))==0) {
+                        /* wakeup  set top box */
+			log("%t wakeup system from Sony on\n");
+			wakeup_usb_dev();
+		}
+	}
 
 
 	if (rc==3) {

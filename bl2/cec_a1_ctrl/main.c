@@ -182,10 +182,11 @@ static int wake_fnc(int argc, char **argv, struct Env *env) {
 	return 0;
 }
 
-#define I(a) (a&(4096-1))
+#define LOGSIZE (1024*16)
+#define I(a) (a&(LOGSIZE-1))
 #define BP(a) (&logbuf[I(a)])
 
-static char logbuf[4096];
+static char logbuf[LOGSIZE];
 static int log_start_ix=0;
 static int log_end_ix=0;
 
@@ -193,8 +194,8 @@ static int print_log_fnc(int argc, char **argv, struct Env *env) {
 	int six=log_start_ix;
 	while(log_end_ix>six) {
 		int len=strlen(BP(six));
-		if ((len+I(six))>4096) {
-			int len_p1=4096-I(six);
+		if ((len+I(six))>LOGSIZE) {
+			int len_p1=LOGSIZE-I(six);
 			int len_p2=strlen(BP(0));
 			io_write(env->io_fd,BP(six),len_p1);
 			six+=len_p1;
@@ -222,11 +223,11 @@ int log(const char *fmt, ...) {
 	size++;
 
 	nend=(log_end_ix)+size;
-	if ((nend-log_start_ix)>4096) {
-		log_start_ix+=((nend-log_start_ix)-4096);
+	if ((nend-log_start_ix)>LOGSIZE) {
+		log_start_ix+=((nend-log_start_ix)-LOGSIZE);
 	}
 	if (I(nend) < I(log_end_ix)) {
-		int len_p1=4096-I(log_end_ix);
+		int len_p1=LOGSIZE-I(log_end_ix);
 		int len_p2=I(nend);
 		memcpy(BP(log_end_ix),sbuf,len_p1);
 		memcpy(BP(0),&sbuf[len_p1],len_p2);
