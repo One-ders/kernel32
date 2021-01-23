@@ -1849,7 +1849,7 @@ void *sys_sleepon_update_list(struct blocker *b, struct blocker_list *bl_ptr) {
 	 * up will try to wake up wrong thread */
 	b->ev|=0x80;
 	rc=sys_sleepon(b,0);
-	if (!rc) { 
+	if (!rc) {
 		/* return 0, means no sleep */
 		/* link out the blocker */
 		cpu_flags=disable_interrupts();
@@ -1932,7 +1932,7 @@ void *sys_wakeup(struct blocker *so) {
 		ready[prio]=n;
 	}
 	ready_last[prio]=n;
-	
+
 	if (prio<GET_PRIO(current)) {
 		DEBUGP(DSYS_SCHED,DLEV_INFO,"wakeup(immed readying) %x current task: %s, readying %s\n",so,current->name,n->name);
 		switch_on_return();
@@ -2051,24 +2051,27 @@ static int drv_sys_stat=0;
 
 int driver_publish(struct driver *drv) {
 	struct driver *p=drv_root;
+//	sys_printf("driver_publish: %s\n", drv->name);
 	while(p&&p!=drv) p=p->next;
 	if (!p) {
-		drv->next=drv_root;	
+		drv->next=drv_root;
 		drv_root=drv;
 	}
 
-	/* next two blocks are for late registers */
-	if (!(drv->stat&DRV_SYS_STAT_INITED)) {
-		drv->stat|=DRV_SYS_STAT_INITED;
-		if (drv->ops->init) {
-			drv->ops->init(drv->instance);
+	if (drv_sys_stat) {
+		/* next two blocks are for late registers */
+		if (!(drv->stat&DRV_SYS_STAT_INITED)) {
+			drv->stat|=DRV_SYS_STAT_INITED;
+			if (drv->ops->init) {
+				drv->ops->init(drv->instance);
+			}
 		}
-	}
 
-	if (!(drv->stat&DRV_SYS_STAT_STARTED)) {
-		drv->stat|=DRV_SYS_STAT_STARTED;
-		if (drv->ops->start) {
-			drv->ops->start(drv->instance);
+		if (!(drv->stat&DRV_SYS_STAT_STARTED)) {
+			drv->stat|=DRV_SYS_STAT_STARTED;
+			if (drv->ops->start) {
+				drv->ops->start(drv->instance);
+			}
 		}
 	}
 
@@ -2111,7 +2114,7 @@ int driver_start() {
 int driver_unpublish(struct driver *drv) {
 	struct driver *tmp=drv_root;
 	struct driver **prevNext=&drv_root;
-	
+
 	while(tmp) {
 		if (__builtin_strcmp(drv->name,tmp->name)==0) {
 			*prevNext=tmp->next;
@@ -2223,7 +2226,6 @@ void init_sys(void) {
 
 	config_sys_tic(10);
 	for(i=init_func_begin;i<init_func_end;i++) {
-		DEBUGP(DSYS_KERN,DLEV_INFO,"calling %x:%x\n",i,*i);
 		((ifunc)*i)();
 	}
 
@@ -2259,7 +2261,7 @@ int dump_page(unsigned char *buf, int len, char *prefix) {
 		if ((i%16)==0) {
 			sys_printf("%s%08x:", prefix,i);
 		}
-	
+
 		sys_printf(" %02x", buf[i]);
 
 		if ((i+1)%16) {
@@ -2272,7 +2274,7 @@ int dump_page(unsigned char *buf, int len, char *prefix) {
 }
 
 void start_sys(void) {
-	
+
 	unsigned long int stackp;
 	struct task *t;
 	char *targs[]={CFG_CONSOLE_DEV, (char *)0x0};
@@ -2281,7 +2283,7 @@ void start_sys(void) {
 #ifdef MMU
 #if 0
 	struct driver *nand_drv=driver_lookup(CFG_ROOT_FS_DEV);
-	
+
 	if (nand_drv) {
 		struct device_handle *dh;
 		unsigned char buf[4096];
@@ -2297,7 +2299,7 @@ void start_sys(void) {
 		}
 	} else {
 		sys_printf("did not find : driver nand4\n");
-		
+
 	}
 #endif
 

@@ -1,4 +1,6 @@
 
+#define __ASSEMBLY__
+
 #include "config.h"
 #include <regdef.h>
 
@@ -11,7 +13,7 @@ _start:
 	.word JZ4740_BOOT_NAND_CFG
 reset:
 	/* Status register */
-        /* 
+        /*
          * CU0=UM=EXL=IE=0, BEV=ERL=1, IP2~7=1
          */
         li      t0, 0x0040fc04

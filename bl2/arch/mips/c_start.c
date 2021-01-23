@@ -89,7 +89,7 @@ void c_start(void *bsp_funcs) {
 		"xor	$t0,$t1\n\t"
 		"mtc0	$t0,$13\n\t"
 		:::"t0","t1");
-	
+
 //	init_usart_drv();
 //	driver_init();
 //	driver_start();
@@ -112,9 +112,9 @@ void c_start(void *bsp_funcs) {
 	}
 }
 
-#else 
+#else
 
-void uboot_start(void *bsp_funcs) {
+void c_start(void *bsp_funcs) {
 //        nand_load(0x1000, 0x4000,
 //                (unsigned char *)0x80000000);
 

@@ -40,8 +40,11 @@ static struct usart_data usart_data0;
 #define MAX_USERS 4
 //static struct user_data udata[MAX_USERS];
 struct user_data udata[MAX_USERS];
-
+#else
+// ipl code
+#include <config.h>
 #endif
+
 
 #define UART_BASE	UART0_BASE
 
@@ -64,7 +67,7 @@ int serial_init (void) {
 	/* Set both receiver and transmitter in UART mode (not SIR) */
 	*uart_sircr = ~(SIRCR_RSIRE | SIRCR_TSIRE);
 
-	/* Set databits, stopbits and parity. 
+	/* Set databits, stopbits and parity.
                 (8-bit data, 1 stopbit, no parity) */
 	*uart_lcr = UART_LCR_WLEN_8 | UART_LCR_STOP_1;
 
@@ -175,7 +178,7 @@ int uart_irq_handler(int irq_num, void *dum) {
 //			ud->regs->uier&=~UART_IER_TDRIE;
 //               }
         }
-	
+
 	if (uirq&4) {
 		while (ud->regs->ulsr&UART_LSR_DRY) {
 			unsigned char c=ud->regs->urbr;
@@ -264,6 +267,7 @@ static int usart_write(struct user_data *u,
 	for(i=0;i<len;i++) {
 		rc=usart_putc_fnc(u,buf[i]);
 		if (rc<0) return rc;
+		if (buf[i]=='\n') usart_putc_fnc(u,'\r');
 	}
 	return len;
 }
@@ -382,7 +386,7 @@ static int usart_init(void *instance) {
 	ud->regs->ulcr=0x80;
 	ud->regs->udllr=bauddivisor&0xff;
 	ud->regs->udlhr=bauddivisor>>8;
-	
+
 	ud->regs->umcr=0;
 	ud->regs->ulcr=0x03;
 	ud->regs->uier|=(UART_IER_TDRIE | UART_IER_RDRIE);
@@ -390,7 +394,6 @@ static int usart_init(void *instance) {
 //	ud->regs->ufcr=UART_FCR_RFRT|UART_FCR_TFRT|UART_FCR_UME;
 	install_irq_handler(UART0_IRQ, uart_irq_handler, ud);
 	ud->regs->ufcr=UART_FCR_FME|UART_FCR_RFRT|UART_FCR_TFRT|UART_FCR_UME;
-	
 
 	return 0;
 }

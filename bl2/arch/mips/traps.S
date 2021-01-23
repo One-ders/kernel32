@@ -1009,7 +1009,7 @@ ret_from_sys:
 #
 	lw	sp,1*4(v0)      # get stack pointer for new thread
 	addiu	k0,sp,(32*4)+(5*4) # return space for regs
-	sw	k0,1*4(v0)	# update stored stack ptr	
+	sw	k0,1*4(v0)	# update stored stack ptr
 	li	k1,1
 	sw	k1,5*4(v0)	# set currents state to running
 #
@@ -1417,7 +1417,7 @@ _start:
         /* Set up temporary stack.
          */
         la      sp, 0x84000000
-        j	uboot_start
+        j	c_start
         nop
 
 sputs:

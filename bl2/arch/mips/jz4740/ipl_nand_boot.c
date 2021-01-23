@@ -1,6 +1,9 @@
 
 #include <config.h>
+#if 0
 #include "jz_nand.h"
+#endif
+#include "mtd_nand.h"
 
 extern void serial_putc (const char c);
 extern void serial_puts(const char *s);
@@ -189,7 +192,7 @@ static int nand_read_page(int block, int page, unsigned char *dst, unsigned char
 	tmpbuf = databuf;
 
 	for (i = 0; i < ecc_count; i++) {
-		volatile unsigned char *paraddr = 
+		volatile unsigned char *paraddr =
 				(volatile unsigned char *)&(REG_NFPAR0);
 		unsigned int stat;
 
