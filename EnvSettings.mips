@@ -1,1 +1,1 @@
-PATH=/opt/cross/bin:$PATH
+PATH=/opt/cross/bin:/opt/qemu-jz/mipsel-softmmu:/opt/jz_tools/nand_flash:$PATH
