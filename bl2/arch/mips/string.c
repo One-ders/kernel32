@@ -101,7 +101,7 @@ char *strncpy(char *d, const char *s, size_t n) {
 	do {
 		c=*d=*s;
 		d++;s++;n--;
-	} while ((c!=0) & (n));
+	} while ((c!=0)&&(n));
 	return r;
 }
 
