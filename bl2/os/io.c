@@ -42,20 +42,9 @@ static struct device_handle *dh=0;
 typedef int (*P_STR)(const char *);
 typedef int (*P_CHAR)(char );
 
-
-#ifdef MUPS
-
-extern P_STR p_str;
-extern P_CHAR p_char;
-
-void io_push() {
-}
-
-#else
-
-
 extern int serial_init(void);
-extern void serial_putc(const char c); 
+extern void serial_putc(const char c);
+extern void serial_puts(const char *s);
 int dum_p_char(char a);
 static int serinit=0;
 
@@ -102,21 +91,21 @@ void io_push() {
 	iodrv->ops->control(dh, WR_CHAR, (char *)buf, bp);
 }
 
-#endif
-
-
-
 int io_cb_handler(struct device_handle *dh, int ev, void *dum) {
 	return 0;
 }
 
 int io_add_c(const char c) {
-	if (!dh) return p_char(c);
+	if (!dh) {
+		return p_char(c);
+	}
 	return iodrv->ops->control(dh, WR_CHAR, (char *)&c,1);
 }
 
 int io_add_str(const char *str) {
-	if (!dh) return p_str(str);
+	if (!dh) {
+		return p_str(str);
+	}
 	return iodrv->ops->control(dh, WR_CHAR, (char *)str, __builtin_strlen(str));
 }
 
@@ -131,7 +120,7 @@ int io_add_strn(const char *bytes, int len) {
 }
 
 
-int in_print;
+extern unsigned long int in_print;
 int pulled;
 int io_setpolled(int enabled) {
 	if (!dh) return 0;
@@ -149,7 +138,7 @@ char *itoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_nu
 	int i=0;
 	int j;
 	int to;
-	char p_char=prepend_zero?'0':' ';	
+	char p_char=prepend_zero?'0':' ';
 	char p_neg=0;
 
 	if (val&0x80000000) {
@@ -184,7 +173,7 @@ char *itoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_nu
 		buf[0]='-';
 	}
 	buf[i+to]=0;
-	
+
 	return buf;
 }
 
@@ -217,7 +206,7 @@ char *xtoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_nu
 	__builtin_memmove(&buf[to],buf,i);
 	__builtin_memset(buf,p_char,to);
 	buf[i+to]=0;
-	
+
 	return buf;
 }
 
@@ -333,7 +322,6 @@ int parse_fmt(const char *fmt, int *field_width, int *zero_fill) {
 	return i;
 }
 
-
 int sys_printf(const char *fmt, ...) {
 	int i=0;
 	va_list ap;
@@ -353,7 +341,7 @@ int sys_printf(const char *fmt, ...) {
 		io_setpolled(1);
 	}
 #endif
-	
+
 	va_start(ap,fmt);
 	while(1) {
 		char *cppos;
@@ -405,6 +393,9 @@ int sys_printf(const char *fmt, ...) {
 					io_add_c(gruuk);
 					break;
 				}
+				case 'l': {
+					i++;
+				}
 				case 'd': {
 					char *s=itoa(va_arg(ap,unsigned int),numericbuf, 16,
 								prepend_zero, prepend_num);
@@ -428,7 +419,7 @@ int sys_printf(const char *fmt, ...) {
 			}
 		}
 		ppos+=i;
-		
+
 	}
 	va_end(ap);
 #if 0
@@ -551,7 +542,9 @@ int sys_sprintf(char *buf, const char *fmt, ...) {
 
 
 void init_io(void) {
-	if (iodrv) return;
+	if (iodrv) {
+		return;
+	}
 	iodrv=driver_lookup(CFG_CONSOLE_DEV);
 	if (!iodrv) {
 		return;

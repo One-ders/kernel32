@@ -1,7 +1,7 @@
 
 Make sure the container get started with X support
 
-xhost +
+xhost +<br>
 podman run -v /tmp/.X11-unix:/tmp/.X11-unix -it --rm docker.io/nders/mips-env bash
 
 Quick start:
@@ -9,13 +9,13 @@ Quick start:
 2. cd bl2/boards/pavo
 3. make
 4. cd
-5. pavo_nandflash
+5. pavo_nandflash<br>
 #if container started with X support
-6. qemu-system-mipsel -M pavo -mtdblock pavo-nand.bin
+6. qemu-system-mipsel -M pavo -mtdblock pavo-nand.bin -serial stdio<br>
 #else container started without X support
 6. qemu-system-mipsel -M pavo -mtdblock pavo-nand.bin -nographic
 
-
+7. at the prompt type 'fb vorvalp.raw'
 
 
 

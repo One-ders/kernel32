@@ -17,6 +17,9 @@
  * a direct interface.
  */
 
+typedef unsigned char u8;
+typedef unsigned short int u16;
+typedef unsigned int u32;
 
 #ifndef __YAFFSFS_H__
 #define __YAFFSFS_H__
@@ -28,6 +31,7 @@
 #ifndef NAME_MAX
 #define NAME_MAX	256
 #endif
+
 
 #define YAFFS_MAX_FILE_SIZE \
 	( (sizeof(Y_LOFF_T) < 8) ? YAFFS_MAX_FILE_SIZE_32 : (0x800000000LL - 1) )
@@ -300,6 +304,8 @@ int yaffs_n_handles_reldir(struct yaffs_obj *reldir, const YCHAR *path);
 int yaffs_dump_dev_reldir(struct yaffs_obj *reldir, const YCHAR *path);
 int yaffs_n_handles_reldev(struct yaffs_dev *dev, const YCHAR *path);
 int yaffs_dump_dev_reldev(struct yaffs_dev *dev, const YCHAR *path);
+
+struct yaffsfs_Handle *yaffsfs_HandleToPointer(int h);
 
 #ifdef CONFIG_YAFFS_WINCE
 int yaffs_set_wince_times(int fd,

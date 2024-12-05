@@ -51,6 +51,8 @@ struct user_data udata[MAX_USERS];
 void serial_setbrg (void);
 int serial_tstc (void);
 
+unsigned long int in_print;
+
 int serial_init (void) {
 
 	volatile unsigned char *uart_fcr = (volatile unsigned char *)(UART_BASE + OFF_FCR);

@@ -1,0 +1,34 @@
+
+struct EMMC_DEV {
+	unsigned int arg2;
+	unsigned int bsize_cnt;
+	unsigned int arg1;
+	unsigned int cmdtm;
+	unsigned int resp0;
+	unsigned int resp1;
+	unsigned int resp2;
+	unsigned int resp3;
+	unsigned int data;
+	unsigned int status;
+	unsigned int control0;
+	unsigned int control1;
+	unsigned int irq;
+	unsigned int irpt_mask;
+	unsigned int irpt_en;
+	unsigned int control2;
+	unsigned int pad0[4];
+	unsigned int force_irpt;
+	unsigned int pad1[8];
+	unsigned int boot_timeout;
+	unsigned int dbg_sel;
+	unsigned int pad2[2];
+	unsigned int exrdfifo_cfg;
+	unsigned int exrdfifo_en;
+	unsigned int tune_step;
+	unsigned int tune_steps_std;
+	unsigned int tune_steps_ddr;
+	unsigned int pad3[16];
+	unsigned int spi_int_spt;
+	unsigned int pad4[3];
+	unsigned int slotisr_ver;
+};

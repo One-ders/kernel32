@@ -52,6 +52,8 @@ struct user_data udata[MAX_USERS];
 void serial_setbrg (void);
 int serial_tstc (void);
 
+unsigned long int in_print;
+
 int serial_init (void) {
 
 	volatile unsigned char *uart_fcr = (volatile unsigned char *)(UART_BASE + OFF_FCR);
@@ -68,7 +70,7 @@ int serial_init (void) {
 	/* Set both receiver and transmitter in UART mode (not SIR) */
 	*uart_isr = ~(ISR_RCVEIR | ISR_XMITIR);
 
-	/* Set databits, stopbits and parity. 
+	/* Set databits, stopbits and parity.
                 (8-bit data, 1 stopbit, no parity) */
 	*uart_lcr = UART_LCR_WLS_8 | UART_LCR_SBLS_1;
 
@@ -179,7 +181,7 @@ static int uart_irq_handler(int irq_num, void *dum) {
 //			ud->regs->uier&=~UART_IER_TDRIE;
 //               }
         }
-	
+
 	if (uirq&4) {
 		while (ud->regs->ulsr&UART_LSR_DRY) {
 			unsigned char c=ud->regs->urbr;
@@ -394,11 +396,11 @@ static int usart_init(void *instance) {
 	ud->regs->uier|=(UART_IER_TDRIE | UART_IER_RDRIE);
 	ud->regs->ufcr=UART_FCR_FME|UART_FCR_RFRT|UART_FCR_TFRT;
 //	ud->regs->ufcr=UART_FCR_RFRT|UART_FCR_TFRT|UART_FCR_UME;
-	
+
 
 	install_irq_handler(IRQ_UART1, uart_irq_handler, ud);
 	ud->regs->ufcr=UART_FCR_FME|UART_FCR_RFRT|UART_FCR_TFRT|UART_FCR_UME;
-	
+
 //	serial_puts(pbuf);
 
 	return 0;

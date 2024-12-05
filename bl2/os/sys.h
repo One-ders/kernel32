@@ -201,7 +201,6 @@ void *get_pages(unsigned int order);
 void put_page(void *);
 
 /* interface towards arch functions */
-int init_memory_protection(void);
 void init_sys_arch(void);
 int setup_return_stack(struct task *t, void *stackp,
 					unsigned long int fnc,
@@ -212,12 +211,6 @@ int array_size(char **argv);
 int args_size(char **argv);
 int copy_arguments(char **argv_new, char **argv,
                         char *arg_storage, int nr_args);
-int unmap_stack_memory(unsigned long int addr);
-int map_stack_page(unsigned long int addr,unsigned int size);
-int map_tmp_stack_page(unsigned long int addr,unsigned int size);
-int map_next_stack_page(unsigned long int new_addr, unsigned long int old_addr);
-int unmap_tmp_stack_page(void);
-int activate_memory_protection(void);
 struct task *create_user_context(void);
 void delete_user_context(struct task *);
 int share_process_pages(struct task *to, struct task *from);
@@ -429,8 +422,16 @@ void driver_user_put_udata(struct device_handle *root,
 #else
 
 #define ASMLINE(a) #a
+#ifdef _M_X64
+#define INIT_FUNC(fnc) asm(".section	.init_funcs,\"a\",%progbits\n\t");\
+			asm(ASMLINE(.align 2\n\t));\
+			asm(ASMLINE(.extern fnc\n\t));\
+			asm(ASMLINE(.dword fnc\n\t));\
+			asm(".section	.text\n\t")
+#else
 #define INIT_FUNC(fnc) asm(".section	.init_funcs,\"a\",%progbits\n\t");\
 			asm(ASMLINE(.extern fnc\n\t));\
 			asm(ASMLINE(.long fnc\n\t));\
 			asm(".section	.text\n\t")
+#endif
 #endif

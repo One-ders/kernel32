@@ -30,13 +30,16 @@
  *
  * @(#)sys.c
  */
-//#include "stm32/stm32f407.h"
 #include "io.h"
 #include "sys.h"
 
 #include <nand.h>
 
 #include <string.h>
+
+#include <yaffsfs.h>
+
+#define TQ_SIZE 1024
 
 void sys_thread_exit(int status);
 int sys_getdents64(unsigned int fd,
@@ -106,7 +109,7 @@ struct task *lookup_task_for_name(char *task_name) {
 struct tq {
 	struct blocker *tq_out_first;
 	struct blocker *tq_out_last;
-} tq[1024];
+} tq[TQ_SIZE];
 
 volatile unsigned int tq_tic;
 
@@ -117,8 +120,7 @@ void SysTick_Handler(void) {
 	current->active_tics++;
 	sys_irqs++;
 	tq_tic++;
-	tqp=&tq[tq_tic%1024];
-
+	tqp=&tq[tq_tic%TQ_SIZE];
 
 #if DEBUG
 	if ((trace_sys&DSYS_TIMER)&&(trace_lev>DLEV_INFO)) {
@@ -370,10 +372,7 @@ static int create_task(unsigned long int *svc_sp) {
 		return 0;
 	}
 
-	map_tmp_stack_page((unsigned long int)estack,10);
-
 	if (tca->prio>MAX_PRIO) {
-		unmap_tmp_stack_page();
 		set_svc_ret(svc_sp,-1);
 		return 0;
 	}
@@ -404,7 +403,6 @@ static int create_task(unsigned long int *svc_sp) {
 		ready_last[tca->prio]->next=t;
 	}
 	ready_last[tca->prio]=t;
-	unmap_tmp_stack_page();
 
 	if (tca->prio<GET_PRIO(current)) {
 		DEBUGP(DSYS_SCHED,DLEV_INFO,"Create task: %s, switch out %s\n", t->name, current->name);
@@ -912,11 +910,18 @@ static int io_open(unsigned long int *svc_sp) {
 }
 
 static int io_read(unsigned long int *svc_sp) {
-	int fd=(int)get_svc_arg(svc_sp,0);
 	int rc;
-	struct user_fd *fdd=&current->asp->fd_tab[fd];
-	struct driver *driver=fdd->driver;
-	struct device_handle *dh=fdd->dev_handle;
+	struct user_fd *fdd;
+	struct driver *driver;
+	struct device_handle *dh;
+	int fd=(int)get_svc_arg(svc_sp,0);
+	if (fd<0) {
+		set_svc_ret(svc_sp,-1);
+		return 0;
+	}
+	fdd=&current->asp->fd_tab[fd];
+	driver=fdd->driver;
+	dh=fdd->dev_handle;
 	if (!driver) {
 		set_svc_ret(svc_sp,-1);
 		return 0;
@@ -939,12 +944,19 @@ static int io_read(unsigned long int *svc_sp) {
 }
 
 static int io_write(unsigned long int *svc_sp) {
-	int fd=(int)get_svc_arg(svc_sp,0);
-	struct user_fd *fdd=&current->asp->fd_tab[fd];
-	struct driver *driver=fdd->driver;
-	struct device_handle *dh=fdd->dev_handle;
 	int rc=0;
 	int done=0;
+	struct user_fd *fdd;
+	struct driver *driver;
+	struct device_handle *dh;
+	int fd=(int)get_svc_arg(svc_sp,0);
+	if (fd<0) {
+		set_svc_ret(svc_sp,-1);
+		return 0;
+	}
+	fdd=&current->asp->fd_tab[fd];
+	driver=fdd->driver;
+	dh=fdd->dev_handle;
 	if (!driver) {
 		set_svc_ret(svc_sp,-1);
 		return 0;
@@ -985,12 +997,19 @@ again:
 }
 
 static int io_control(unsigned long int *svc_sp) {
-	int	fd	=(int)get_svc_arg(svc_sp,0);
-	struct	user_fd		*fdd=&current->asp->fd_tab[fd];
-	struct	driver		*driver=fdd->driver;
-	struct	device_handle	*dh=fdd->dev_handle;
 	int	ufd;
 	int	rc;
+	struct	user_fd		*fdd;
+	struct	driver		*driver;
+	struct	device_handle	*dh;
+	int	fd	=(int)get_svc_arg(svc_sp,0);
+	if (fd<0) {
+		set_svc_ret(svc_sp,-1);
+		return 0;
+	}
+	fdd=&current->asp->fd_tab[fd];
+	driver=fdd->driver;
+	dh=fdd->dev_handle;
 
 	if (!driver) {
 		set_svc_ret(svc_sp,-1);
@@ -1032,10 +1051,18 @@ static int io_control(unsigned long int *svc_sp) {
 }
 
 static int io_lseek(unsigned long int *svc_sp) {
-	int fd=(int)get_svc_arg(svc_sp,0);
-	struct driver *driver=current->asp->fd_tab[fd].driver;
-	struct device_handle *dh=current->asp->fd_tab[fd].dev_handle;
 	int rc;
+	int fd=(int)get_svc_arg(svc_sp,0);
+	struct driver *driver;
+	struct device_handle *dh;
+
+	if (fd<0) {
+		set_svc_ret(svc_sp,-1);
+		return 0;
+	}
+
+	driver=current->asp->fd_tab[fd].driver;
+	dh=current->asp->fd_tab[fd].dev_handle;
 	if (!driver) {
 		set_svc_ret(svc_sp,-1);
 		return 0;
@@ -1154,16 +1181,22 @@ static int io_mmap(unsigned long int *svc_sp) {
 	unsigned int len=(unsigned int)get_svc_arg(svc_sp,1);
 	int prot=(int)get_svc_arg(svc_sp,2);
 	int flags=(int)get_svc_arg(svc_sp,3);
-	int fd=(int)get_svc_arg(svc_sp,4);
 	long int offset=(long int)get_svc_arg(svc_sp,5);
-	struct driver *driver=current->asp->fd_tab[fd].driver;
-	struct device_handle *dh=current->asp->fd_tab[fd].dev_handle;
 	unsigned long int paddr;
 	unsigned long int vaddr;
 	unsigned long int start_vaddr;
 	unsigned int npages;
 	int i;
 	int rc;
+	struct driver *driver;
+	struct device_handle *dh;
+	int fd=(int)get_svc_arg(svc_sp,4);
+	if (fd<0) {
+		set_svc_ret(svc_sp,-1);
+		return 0;
+	}
+	driver=current->asp->fd_tab[fd].driver;
+	dh=current->asp->fd_tab[fd].dev_handle;
 
 	sys_printf("IO_MMAP: addr=%x, len=%d, prot=%d, flags=%d, fd=%d, offset=%d\n",
 				addr,len,prot,flags,fd,offset);
@@ -2167,8 +2200,8 @@ void driver_user_put_udata(struct device_handle *root,
 
 /**********************************************/
 
-static struct driver *my_usart;
-static struct device_handle *my_usart_dh;
+static struct driver *my_uart;
+static struct device_handle *my_uart_dh;
 
 static struct device_handle *console_open(void *driver_instance, DRV_CBH cb, void *dum) {
 	return 0;
@@ -2180,8 +2213,8 @@ static int console_close(struct device_handle *dh) {
 
 static int console_control(struct device_handle *dh, int cmd, void *arg1, int arg2) {
 	int rc=0;
-		if (my_usart_dh) {
-			rc=my_usart->ops->control(my_usart_dh,cmd,arg1,arg2);
+		if (my_uart_dh) {
+			rc=my_uart->ops->control(my_uart_dh,cmd,arg1,arg2);
 		}
 	return rc;
 }
@@ -2191,12 +2224,12 @@ static int console_init(void *instance) {
 }
 
 static int console_start(void *instance) {
-	my_usart=driver_lookup(CFG_CONSOLE_DEV);
-	if (!my_usart) {
-		sys_printf("dont have usart\n");
+	my_uart=driver_lookup(CFG_CONSOLE_DEV);
+	if (!my_uart) {
+		sys_printf("dont have uart\n");
 		return 0;
 	}
-	my_usart_dh=my_usart->ops->open(my_usart->instance,0,0);
+	my_uart_dh=my_uart->ops->open(my_uart->instance,0,0);
 	return 0;
 }
 
@@ -2205,6 +2238,7 @@ static int console_start(void *instance) {
 /*  Sys support functions and unecessary stuff                                 */
 /*                                                                             */
 
+extern void serial_puts(char *);
 extern unsigned long int init_func_begin[];
 extern unsigned long int init_func_end[];
 typedef void (*ifunc)(void);
@@ -2212,15 +2246,6 @@ typedef void (*ifunc)(void);
 void init_sys(void) {
 	unsigned long int *i;
 	init_sys_arch();
-	init_memory_protection();
-#if 0
-	slab_256=(struct Slab_256 *)((unsigned int)((slab_256+0xff))&~0xff);
-	max_slab_256=(((unsigned int)slab_1024)-((unsigned int)slab_256))/0x100;
-	unmap_stack_memory((unsigned long int)slab_1024);
-	map_stack_page((unsigned long int)&slab_1024[15], 9); /* map in last stackpage, size 1k */
-	__builtin_memset(&slab_1024[15],0,900);
-#endif
-	activate_memory_protection();
 	init_switcher();
 	init_irq();
 
@@ -2242,6 +2267,7 @@ void start_up(void) {
 
         /* start the executive */
         sys_printf("tsos git ver %s, starting tasks\n",ver);
+	enable_interrupts();
         start_sys();
 }
 
@@ -2302,7 +2328,6 @@ void start_sys(void) {
 
 	}
 #endif
-
 	if(mount_nand(CFG_ROOT_FS_DEV)<0) {
 		sys_printf("could not mount nand\n");
 	}
