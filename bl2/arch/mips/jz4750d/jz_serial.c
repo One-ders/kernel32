@@ -240,6 +240,18 @@ static int usart_polled_putc(struct user_data *u, int c) {
         return 1;
 }
 
+static int usart_flush_txqueue(struct user_data *u) {
+	struct usart_data *ud=u->drv_data;
+
+	while(ud->tx_in-ud->tx_out) {
+		int c;
+		c=ud->tx_buf[IX(ud->tx_out)];
+		ud->tx_out++;
+		usart_polled_putc(u,c);
+	}
+	return 0;
+}
+
 
 static int usart_read(struct user_data *u, char *buf, int len) {
 	struct usart_data *ud=u->drv_data;
@@ -356,6 +368,7 @@ static int usart_control(struct device_handle *dh,
 			if (enabled) {
 				ud->regs->uier&=~UART_IER_TDRIE;
 				usart_putc_fnc=usart_polled_putc;
+				usart_flush_txqueue(u);
 			} else {
 				usart_putc_fnc=usart_putc;
 				if (!tx_buf_empty()) {

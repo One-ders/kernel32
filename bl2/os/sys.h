@@ -66,7 +66,7 @@ extern int sys_printf(const char *format, ...);
 #define DEBUGP(lev,a ...)
 #endif
 
-#define ASSERT(a) { if (!(a)) {io_setpolled(1); sys_printf("%t: assert stuck\n");} while (!(a)) ; }
+#define ASSERT(a) { if (!(a)) {io_setpolled(1); sys_printf("%t: assert stuck, %s %d\n", __FILE__, __LINE__);} while (!(a)) ; }
 
 extern unsigned int sys_irqs;
 extern struct task *volatile ready[5];
@@ -89,7 +89,7 @@ struct user_fd {
 struct blocker {
 	struct blocker *next;
 	struct blocker *next2;
-	unsigned int ev;
+	unsigned long ev;
 	struct device_handle *dh;
 	struct driver *driver;
 	unsigned int wake;
@@ -182,7 +182,7 @@ struct task {
 #define TASK_STATE_DEAD		6
 
 #define MAX_PRIO                4
-#define GET_PRIO(a)             ((a)->prio_flags&0x3)
+#define GET_PRIO(a)             ((a)->prio_flags==4?4:(a)->prio_flags&0x3)
 #define SET_PRIO(a,b)           ((a)->prio_flags=(b)&0xf)
 #define GET_TMARK(a)            ((a)->prio_flags&0x10)
 #define SET_TMARK(a)            ((a)->prio_flags|=0x10)
@@ -422,6 +422,7 @@ void driver_user_put_udata(struct device_handle *root,
 #else
 
 #define ASMLINE(a) #a
+
 #ifdef _M_X64
 #define INIT_FUNC(fnc) asm(".section	.init_funcs,\"a\",%progbits\n\t");\
 			asm(ASMLINE(.align 2\n\t));\

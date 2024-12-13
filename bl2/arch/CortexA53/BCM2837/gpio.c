@@ -38,9 +38,12 @@ int gpio_set_pull(unsigned int pin, unsigned int pull_type) {
 	wait_cycles(150);
 	gpio_dev->gppudclk[pin_reg]=0;
 	gpio_dev->gppud=0;
+#if 0
+	// crap after hunting ghost io pin for sd-card insertion
 	if (pin!=14&&pin!=15) {
 		sys_printf("set_pul real reg fsel4 after: %08x\n", gpio_dev->gpfsel[4]);
 	}
+#endif
 	return 0;
 }
 

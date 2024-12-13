@@ -50,10 +50,12 @@ void mmu_init() {
 
 int arch_fixups(unsigned long int x0, unsigned long int x1, unsigned long int atags) {
 	serial_init();
+#if 0
 	serial_puts("ATAGS val: ");
 	serial_put_hexint(atags>>32);
 	serial_put_hexint(atags&0xffffffff);
 	serial_puts("\n");
+#endif
 
 	mmu_init();
 }

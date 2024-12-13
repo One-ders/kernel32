@@ -61,9 +61,9 @@ int serial_init (void) {
 	gpio_set_pull(UART0_RX,GPPUD_PULL_DISABLE);
 	gpio_set_pull(UART0_TX,GPPUD_PULL_DISABLE);
 
-	uart_dev->lcrh=LCRH_WLEN(3)|LCRH_FEN;
-	uart_dev->ibrd=135;
-	uart_dev->fbrd=41;
+	uart_dev->lcrh=LCRH_WLEN(3);
+	uart_dev->ibrd=1;  // (3000000(clk)/(115200(baud)*16))
+	uart_dev->fbrd=41;   // fraction from above *64 + 0.5
 	uart_dev->cr=CR_RXE|CR_TXE|CR_UARTEN;
 	return 0;
 }
@@ -71,8 +71,10 @@ int serial_init (void) {
 void serial_setbrg (void) {
 	struct UART_DEV *uart_dev=UART_DEV_BASE;
 
-	uart_dev->ibrd=135;
-	uart_dev->fbrd=41;
+//	uart_dev->ibrd=135;
+//	uart_dev->fbrd=41;
+	uart_dev->ibrd=1;  // (3000000(clk)/(115200(baud)*16))
+	uart_dev->fbrd=41;   // fraction from above *64 + 0.5
 }
 
 void serial_putc (const char c) {
@@ -132,8 +134,7 @@ static int uart_putc(struct user_data *u, int c);
 
 int uart_irq_handler(int irq_num, void *dum) {
 	struct uart_data *ud=(struct uart_data *)dum;
-#if 0
-	unsigned int uirq=ud->regs->mu_iir_reg&0x7;
+	unsigned int uirq=ud->regs->mis;
 
 #if 0
 	if (uirq!=1) {
@@ -145,10 +146,11 @@ int uart_irq_handler(int irq_num, void *dum) {
 	}
 #endif
 //ud->regs->ulsr & (UART_LSR_TDRQ | UART_LSR_TEMP
-	while (ud->regs->mu_lsr_reg&AUX_MU_LSR_REG_TX_EMPTY) {
+	ud->regs->icr=ICR_TXIC;
+	while (ud->txr && !(ud->regs->fr&FR_TXFF)) {
 		if (ud->tx_in-ud->tx_out) {
                 	if (uart_putc_fnc==uart_putc) {
-				ud->regs->mu_io_reg=ud->tx_buf[IX(ud->tx_out)];
+				ud->regs->dr=ud->tx_buf[IX(ud->tx_out)];
 				ud->tx_out++;
 				if ((ud->tx_in-ud->tx_out)==0) {
 					if (ud->wblocker_list.first) {
@@ -163,15 +165,16 @@ int uart_irq_handler(int irq_num, void *dum) {
 		}
 	}
 
-	if ((ud->regs->mu_lsr_reg&AUX_MU_LSR_REG_TX_EMPTY)&&
+	if (ud->txr && (ud->regs->fr&FR_TXFE)&&
 		!(ud->tx_in-ud->tx_out)) {
-		ud->regs->mu_ier_reg&=~AUX_MU_IER_REG_TX_IRQ_ENABLE;
+		ud->regs->imsc&=~IMSC_TXIM;
 		ud->txr=0;
         }
 
-	if (uirq&AUX_MU_IIR_REG_RX_HOLD_BYTE) {
-		while (ud->regs->mu_lsr_reg&AUX_MU_LSR_REG_DATA_READY) {
-			unsigned char c=ud->regs->mu_io_reg;
+	if (uirq&RIS_RXRIS) {
+		ud->regs->icr=ICR_RXIC;
+		while (!ud->regs->fr&FR_RXFE) {
+			unsigned char c=ud->regs->dr;
 			ud->rx_buf[ud->rx_i%(RX_BSIZE)]=c;
 			ud->rx_i++;
 		}
@@ -179,7 +182,6 @@ int uart_irq_handler(int irq_num, void *dum) {
                         sys_wakeup_from_list(&ud->rblocker_list);
                 }
         }
-#endif
 	return 0;
 }
 
@@ -207,7 +209,9 @@ again:
 	ud->tx_in++;
 	if (!ud->txr) {
 		ud->txr=1;
-//		ud->regs->cr|=AUX_MU_IER_REG_TX_IRQ_ENABLE;
+		ud->regs->imsc|=IMSC_TXIM;
+		ud->regs->dr=ud->tx_buf[IX(ud->tx_out)];
+		ud->tx_out++;
 	}
 	return 1;
 }
@@ -218,7 +222,7 @@ static int uart_polled_putc(struct user_data *u, int c) {
 
 	/* Wait for fifo to shift out some bytes */
 	while((!ud->chip_dead)&&
-		!((ud->regs->fr&FR_TXFE)));
+		(ud->regs->fr&FR_TXFF));
 	ud->regs->dr=c;
 
         return 1;
@@ -359,7 +363,6 @@ static int uart_control(struct device_handle *dh,
 
 static int uart_init(void *instance) {
 	struct uart_data *ud=(struct uart_data *)instance;
-//	unsigned int baud_reg=(250000000/(115200*8))-1;
 
 	uart_putc_fnc=uart_putc;
 //	uart_putc_fnc=uart_polled_putc;
@@ -373,15 +376,20 @@ static int uart_init(void *instance) {
 	gpio_set_pull(UART0_RX,GPPUD_PULL_DISABLE);
 	gpio_set_pull(UART0_TX,GPPUD_PULL_DISABLE);
 
-	ud->txr=1;
-//	ud->regs->enables=AUX_ENABLES_UART;
+	ud->txr=0;
 	ud->regs->cr=0;
-	ud->regs->ibrd=135;  // (250000000(clk)/(115200(baud)*16))
+//	ud->regs->ibrd=135;  // (250000000(clk)/(115200(baud)*16))
+//	ud->regs->fbrd=41;   // fraction from above *64 + 0.5
+	ud->regs->ibrd=1;  // (3000000(clk)/(115200(baud)*16))
 	ud->regs->fbrd=41;   // fraction from above *64 + 0.5
-	ud->regs->lcrh=LCRH_WLEN(3)|LCRH_FEN;
+
+//	ud->regs->lcrh=LCRH_WLEN(3)|LCRH_FEN;
+	ud->regs->lcrh=LCRH_WLEN(3);
+	ud->regs->imsc=IMSC_RXIM|IMSC_TXIM;
 	ud->regs->cr=CR_RXE|CR_TXE|CR_UARTEN;
-//	install_irq_handler(AUX,uart_irq_handler,ud);
-//	ud->regs->mu_ier_reg=AUX_MU_IER_REG_RX_IRQ_ENABLE|AUX_MU_IER_REG_TX_IRQ_ENABLE;
+	install_irq_handler(UART,uart_irq_handler,ud);
+	ud->regs->icr=ICR_OEIC|ICR_BEIC|ICR_PEIC|ICR_FEIC|ICR_RTIC|ICR_TXIC|
+			ICR_RXIC|ICR_CTSMIC;
 
 #if 0
 	ud->regs->ufcr=0;

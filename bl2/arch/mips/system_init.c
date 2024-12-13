@@ -25,7 +25,7 @@ struct task main_task = {
 .next	=	0,
 .next2	=	0,
 .state	=	1,
-.prio_flags=	3,
+.prio_flags=	4,
 .estack	=	(void *)(0x84000000-0x3000),
 .asp	=	&kernel_asp
 };

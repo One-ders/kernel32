@@ -110,6 +110,7 @@ struct UART_DEV {
 	unsigned int	rsrecr;		// 0x4
 	unsigned int	pad0[4];	// 0x8-0x14
 	unsigned int	fr;		// 0x18
+	unsigned int	pad1;
 	unsigned int	ilrp;		// 0x20
 	unsigned int	ibrd;		// 0x24
 	unsigned int 	fbrd;		// 0x28
@@ -121,7 +122,7 @@ struct UART_DEV {
 	unsigned int	mis;		// 0x40
 	unsigned int	icr;		// 0x44
 	unsigned int	dmacr;		// 0x48
-	unsigned int	pad1[13];	// 0x4c-0x7c
+	unsigned int	pad2[13];	// 0x4c-0x7c
 	unsigned int	itcr;		// 0x80
 	unsigned int	itip;		// 0x84
 	unsigned int	itop;		// 0x88

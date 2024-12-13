@@ -9,13 +9,15 @@ Quick start:
 2. cd bl2/boards/pavo
 3. make
 4. cd
-5. pavo_nandflash<br>
-#if container started with X support
-6. qemu-system-mipsel -M pavo -mtdblock pavo-nand.bin -serial stdio<br>
-#else container started without X support
-6. qemu-system-mipsel -M pavo -mtdblock pavo-nand.bin -nographic
+5. pavo_nandflash
 
-7. at the prompt type 'fb vorvalp.raw'
+if container started with X support
+6. qemu-system-mipsel -M pavo -mtdblock pavo-nand.bin -serial stdio
+
+else container started without X support
+7. qemu-system-mipsel -M pavo -mtdblock pavo-nand.bin -nographic
+
+8. at the prompt type 'fb vorvalp.raw'
 
 
 

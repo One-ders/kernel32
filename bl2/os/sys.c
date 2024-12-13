@@ -119,6 +119,11 @@ void SysTick_Handler(void) {
 
 	current->active_tics++;
 	sys_irqs++;
+#if 0
+	if (!(tq_tic%100)) {
+		sys_printf("sys_tic: +100, tic: %d current %s\n",tq_tic,current->name);
+	}
+#endif
 	tq_tic++;
 	tqp=&tq[tq_tic%TQ_SIZE];
 
@@ -173,7 +178,9 @@ void SysTick_Handler(void) {
 		enable_interrupts();
 		return;
 	}
-	SET_TMARK(current);
+	if (current!=&main_task) {
+		SET_TMARK(current);
+	}
 
 	if (task_cemetery) {
 		struct task *t;
@@ -372,7 +379,7 @@ static int create_task(unsigned long int *svc_sp) {
 		return 0;
 	}
 
-	if (tca->prio>MAX_PRIO) {
+	if (tca->prio>=MAX_PRIO) {
 		set_svc_ret(svc_sp,-1);
 		return 0;
 	}
@@ -663,11 +670,13 @@ static int block_task(unsigned long int *svc_sp) {
 	if (t==current) {
 		SET_PRIO(t,t->prio_flags|0x8);
 		DEBUGP(DSYS_SCHED,DLEV_INFO,"blocking current task: %s\n",current->name);
+		sys_printf("blocking current task: %s\n",current->name);
 		switch_on_return();
 	} else {
 		struct task *p=ready[GET_PRIO(t)];
 		struct task * volatile *p_prev=&ready[GET_PRIO(t)];
 		SET_PRIO(t,t->prio_flags|0x8);
+		sys_printf("blocking  task: %s\n",t->name);
 		while(p) {
 			if (p==t) {
 				(*p_prev)=p->next;
@@ -814,7 +823,7 @@ static int setprio_task(unsigned long int *svc_sp) {
 		set_svc_ret(svc_sp,-1);
 		return 0;
 	}
-	if (prio>MAX_PRIO) {
+	if (prio>=MAX_PRIO) {
 		set_svc_ret(svc_sp,-2);
 		return 0;
 	}

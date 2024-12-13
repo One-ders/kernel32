@@ -79,7 +79,7 @@ static int get_procdata(int fd, char *name, struct Env *env) {
 		dprintf(env->io_fd, "could not open proc data\n");
 		return -1;
 	}
-	
+
 	rc=io_read(fd2,&pd,sizeof(pd));
 	if(rc>0) {
 		dprintf(env->io_fd, "task(%3d@%08x) %14s, sp=0x%08x, pc=0x%08x, prio=%x, state=%c, atics=%d\n",
@@ -100,9 +100,9 @@ static int ps_fnc(int argc, char **argv, struct Env *env) {
 		dprintf(env->io_fd,"could not open ps driver\n");
 		return -1;
 	}
-	
+
 	rc=io_control(fd,READDIR,dents,256);
-	
+
 	if (rc<0) {
 		dprintf(env->io_fd,"directory error\n");
 		return 0;
@@ -126,7 +126,7 @@ static int get_devdata(int fd, char *name, struct Env *env) {
 		dprintf(env->io_fd, "could not open dev data\n");
 		return -1;
 	}
-	
+
 	rc=io_read(fd2,&dd,sizeof(dd));
 	if(rc>0) {
 		int i;
@@ -289,7 +289,7 @@ static int nand_fnc(int argc, char **argv, struct Env *env) {
 	unsigned long int address=0;
 
 /*      nand read <nr> <offset> <size>
-        nand write <nr> <offset> <data> 
+        nand write <nr> <offset> <data>
         nand erase <nr> <block>
 */
 
@@ -305,7 +305,7 @@ static int nand_fnc(int argc, char **argv, struct Env *env) {
 		dprintf(env->io_fd,"strtoul failed for nand %s\n",argv[1]);
 		return 0;
 	}
-	
+
 	sprintf(dev_name,"nand%d",dev_no);
 
 	if (strcmp(argv[2],"read")==0) {
@@ -449,7 +449,7 @@ static int debug_fnc(int argc, char **argv, struct Env *env) {
 	}
 	set_debug_level(dbglev);
 	return 0;
-} 
+}
 
 static int block_fnc(int argc, char **argv, struct Env *env) {
 	int rc;
@@ -486,7 +486,7 @@ static int setprio_fnc(int argc, char **argv, struct Env *env) {
 		dprintf(env->io_fd,"setprio: prio must be between 0-4\n");
 		return 0;
 	}
-	dprintf(env->io_fd, "set prio of %s to %d", argv[1], prio);
+	dprintf(env->io_fd, "setprio of %s to %d", argv[1], prio);
 	rc=setprio_task(argv[1],prio);
 	dprintf(env->io_fd, "returned %d\n", rc);
 
@@ -630,7 +630,7 @@ static int psdumpmap_fnc(int argc, char **argv, struct Env *env) {
 		dprintf(env->io_fd, "vaddr=%8x, pte=%8x, sh info=%x\n", ps_memmap.vaddr, ps_memmap.pte, ps_memmap.sh_data);
 		rc=io_control(fd,KMEM_GET_NEXT_PSMAP, &ps_memmap, sizeof(ps_memmap));
 		if (rc<0) break;
-	}	
+	}
 
 	io_close(fd);
 	return 0;
@@ -664,6 +664,16 @@ static int flushtlb_fnc(int argc, char **argv, struct Env *env) {
 	return rc;
 }
 
+static int loop_fnc(void *dum) {
+	while(1);
+	return 1;
+}
+
+static int runloop_fnc(int argc, char **argv, struct Env *env) {
+	thread_create(loop_fnc,0,0,3,"loop");
+	return 0;
+}
+
 static struct cmd cmd_root[] = {
 		{"help", generic_help_fnc},
 		{"ps", ps_fnc},
@@ -683,6 +693,7 @@ static struct cmd cmd_root[] = {
 		{"dump_tlb", dumptlb_fnc},
 		{"flush_tlb", flushtlb_fnc},
 		{"loadnrun", loadnrun_fnc},
+		{"runloop", runloop_fnc},
 		{0,0}
 };
 
@@ -743,7 +754,7 @@ void main(void *dum) {
 			if (cmd) {
 				int rc;
 				dprintf(1,"\n");
-				rc=cmd->fnc(argc,argv,&env); 
+				rc=cmd->fnc(argc,argv,&env);
 				if (rc<0) {
 					dprintf(1,"%s returned %d\n",argv[0],rc);
 				}

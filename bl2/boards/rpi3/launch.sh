@@ -1,7 +1,11 @@
 #!/bin/bash
 
 
-qemu-system-aarch64 \
+
+#qemu-system-aarch64 \
+#
+
+  /home/anders/qemu/qemu/build/qemu-system-aarch64 \
     -machine raspi3b \
     -cpu cortex-a53 \
     -m 1G -smp 4 \

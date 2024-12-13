@@ -88,8 +88,16 @@ unsigned long int handle_switch(unsigned long int *v_sp) {
 	}
 
 	if (!t) {
+		t=&main_task;
+#if 0
 		sys_printf("no ready proc\n");
 		ASSERT(0);
+#endif
+	} else {
+		if (t==&main_task) {
+			sys_printf("idle task in job queue\n");
+			ASSERT(0);
+		}
 	}
 
 	if (t==current) {
@@ -109,14 +117,20 @@ unsigned long int handle_switch(unsigned long int *v_sp) {
 		int prio=current->prio_flags&0xf;
 		ASSERT(!current->next);
 		CLR_TMARK(current);
-		if (prio>4) prio=4;
-		current->state=TASK_STATE_READY;
-		if (ready[prio]) {
-			ready_last[prio]->next=current;
+		if (prio!=4) {
+			if (prio>4) {
+				prio=4;
+			}
+			current->state=TASK_STATE_READY;
+			if (ready[prio]) {
+				ready_last[prio]->next=current;
+			} else {
+				ready[prio]=current;
+			}
+			ready_last[prio]=current;
 		} else {
-			ready[prio]=current;
+			current->state=TASK_STATE_READY;
 		}
-		ready_last[prio]=current;
 	}
 
         DEBUGP(DSYS_SCHED,DLEV_INFO, "switch in task: %s\n", t->name);

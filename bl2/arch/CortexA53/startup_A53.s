@@ -27,11 +27,15 @@ _start:
 	cmp     x0, #12
 	bne     5f
 	// should never be executed, just for completeness
-	mov     x3, #0x5b1
+	mov     x3, #0x5b1 // TWE(13)=0,TWI(12)=0,ST(11)=0
+			   // RW(10)=1,SIF(9)=0,HCE(8)=1
+			   // SMD(7)=1,EA(3)=0,FIQ(2)=0,IRQ(1)=0
+			   // NS(0)=1
 	msr     scr_el3, x3
-	mov     x3, #0x3c9
+	mov     x3, #0x3c9 // EL2.h
 	msr     spsr_el3, x3
-	adr     x3, 5f
+	msr	cptr_el3,xzr;
+	adr     x3, 5f     // to label 5f
 	msr     elr_el3, x3
 	eret
 
@@ -57,8 +61,9 @@ _start:
 	ldr     x3, =_vectors
 	msr     vbar_el1, x3
 	// change execution level to EL1
-	mov     x3, #0x3c4
+	mov     x3, #0x3c5          // to EL1 with SP_EL1
 	msr     spsr_el2, x3
+	msr	cptr_el2, xzr
 	adr     x3, 5f
 	msr     elr_el2, x3
 	eret
@@ -91,7 +96,7 @@ LoopFillZerobss:
 	b       1b
 
 _interrupt_entry:
-	sub sp, sp, #192
+	sub sp, sp, #816
 	stp x0,x1,[sp,#0]
 	stp x2,x3,[sp,#16]
 	stp x4,x5,[sp,#32]
@@ -101,16 +106,68 @@ _interrupt_entry:
 	stp x12,x13,[sp,#96]
 	stp x14,x15,[sp,#112]
 	stp x16,x17,[sp,#128]
-	stp x18,x29,[sp,#144]
-	stp x30,xzr,[sp,#160]
+	stp x18,x19,[sp,#144]
+	stp x20,x21,[sp,#160]
+	stp x22,x23,[sp,#176]
+	stp x24,x25,[sp,#192]
+	stp x26,x27,[sp,#208]
+	stp x28,x29,[sp,#224]
+	stp x30,xzr,[sp,#240]
 
 	mrs x0,esr_el1
-	mrs x1,far_el1
-	stp x0,x1,[sp,#176]
+	mrs x1,elr_el1
+	stp x0,x1,[sp,#256]
+
+	stp q0, q1, [sp, #272]
+	stp q2, q3, [sp, #304]
+	stp q4, q5, [sp, #336]
+	stp q6, q7, [sp, #368]
+	stp q8, q9, [sp, #400]
+	stp q10, q11, [sp, #432]
+	stp q12, q13, [sp, #464]
+	stp q14, q15, [sp, #496]
+	stp q16, q17, [sp, #528]
+	stp q18, q19, [sp, #560]
+	stp q20, q21, [sp, #592]
+	stp q22, q23, [sp, #624]
+	stp q24, q25, [sp, #656]
+	stp q26, q27, [sp, #688]
+	stp q28, q29, [sp, #720]
+	stp q30, q31, [sp, #752]
+
+	mrs x0, FPCR
+	mrs x1, FPSR
+	str x0, [sp, #784]
+	str x1, [sp, #800]
 
 	mov x0,sp
 	bl irq_dispatch
 
+	ldr x0,  [sp, #784]
+	ldr x1,  [sp, #800]
+	msr FPCR, x0
+	msr FPSR, x1
+
+	ldp q30, q31, [sp, #752]
+	ldp q28, q29, [sp, #720]
+	ldp q26, q27, [sp, #688]
+	ldp q24, q25, [sp, #656]
+	ldp q22, q23, [sp, #624]
+	ldp q20, q21, [sp, #592]
+	ldp q18, q19, [sp, #560]
+	ldp q16, q17, [sp, #528]
+	ldp q14, q15, [sp, #496]
+	ldp q12, q13, [sp, #464]
+	ldp q10, q11, [sp, #432]
+	ldp q8, q9, [sp, #400]
+	ldp q6, q7, [sp, #368]
+	ldp q4, q5, [sp, #336]
+	ldp q2, q3, [sp, #304]
+	ldp q0, q1, [sp, #272]
+
+	ldp x0,x1,[sp,#256]
+	msr elr_el1,x1
+	msr esr_el1,x0
 	ldp x0,x1,[sp,#0]
 	ldp x2,x3,[sp,#16]
 	ldp x4,x5,[sp,#32]
@@ -120,16 +177,20 @@ _interrupt_entry:
 	ldp x12,x13,[sp,#96]
 	ldp x14,x15,[sp,#112]
 	ldp x16,x17,[sp,#128]
-	ldp x18,x29,[sp,#144]
-	ldp x30,xzr,[sp,#160]
-	add sp,sp,#192
+	ldp x18,x19,[sp,#144]
+	ldp x20,x21,[sp,#160]
+	ldp x22,x23,[sp,#176]
+	ldp x24,x25,[sp,#192]
+	ldp x26,x27,[sp,#208]
+	ldp x28,x29,[sp,#224]
+	ldp x30,xzr,[sp,#240]
+	add sp,sp,#816
 	eret
 
 
-    .align 11
+.balign	2048
 _vectors:
     // synchronous
-    .align  7
     mov     x0, #0
     mrs     x1, esr_el1
     mrs     x2, elr_el1
@@ -138,12 +199,12 @@ _vectors:
     mrs     x5, sctlr_el1
     b       exc_handler
 
-// IRQ
 .balign  0x80
+// IRQ
 	b	_interrupt_entry
 
-    // FIQ
-    .align  7
+.balign  0x80
+// FIQ
     mov     x0, #2
     mrs     x1, esr_el1
     mrs     x2, elr_el1
@@ -151,8 +212,8 @@ _vectors:
     mrs     x4, far_el1
     b       exc_handler
 
+.balign	0x80
     // SError
-    .align  7
     mov     x0, #3
     mrs     x1, esr_el1
     mrs     x2, elr_el1
@@ -160,4 +221,35 @@ _vectors:
     mrs     x4, far_el1
     b       exc_handler
 
+    // synchronous
+.balign	0x80
+    mov     x0, #0
+    mrs     x1, esr_el1
+    mrs     x2, elr_el1
+    mrs     x3, spsr_el1
+    mrs     x4, far_el1
+    mrs     x5, sctlr_el1
+    b       exc_handler
+
+.balign  0x80
+// IRQ
+	b	_interrupt_entry
+
+.balign  0x80
+// FIQ
+    mov     x0, #2
+    mrs     x1, esr_el1
+    mrs     x2, elr_el1
+    mrs     x3, spsr_el1
+    mrs     x4, far_el1
+    b       exc_handler
+
+.balign	0x80
+    // SError
+    mov     x0, #3
+    mrs     x1, esr_el1
+    mrs     x2, elr_el1
+    mrs     x3, spsr_el1
+    mrs     x4, far_el1
+    b       exc_handler
 

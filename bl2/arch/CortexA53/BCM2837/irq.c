@@ -76,7 +76,7 @@ void irq_dispatch(void *sp) {
 #endif
 	while(pos=ffs(p1)) {
 		unsigned int irq=pos-1;
-		p1&=~pos;
+		p1&=~(1<<(pos-1));
 		if (handlers[irq].handler) {
 			handlers[irq].handler(irq,handlers[irq].h_data);
 		} else {
@@ -85,29 +85,18 @@ void irq_dispatch(void *sp) {
 	}
 	while(pos=ffs(p2)) {
 		unsigned int irq=pos-1+32;
-		p2&=~pos;
+		p2&=~(1<<(pos-1));
 		if (handlers[irq].handler) {
 			handlers[irq].handler(irq,handlers[irq].h_data);
 		} else {
 			sys_printf("unhandled irq: %d\n",irq);
 		}
 	}
+	disable_interrupts();
 }
 
-int gruux=0;
 void wait_irq(void) {
-#if 0
-	set_c0_status(get_c0_status()|0x1c00);
-	asm volatile ("wait\t\n\t"
+	asm volatile ("wfe\t\n\t"
 			: : );
-#endif
-#if 0
-	if ((gruux%10000000)==0) {
-		sys_printf("wait irq: c0_status %x, c0_cause %x, INTC.icmr %x\n",
-			get_c0_status(), get_c0_cause(), INTC->icmr);
-	        set_c0_status(get_c0_status()|0x1c00);
-	}
-	gruux++;
-#endif
 }
 

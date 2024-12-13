@@ -13,6 +13,7 @@
 
 /* define board */
 #define RPI3
+#define _M_X64
 
 #define CONFIG_BAUDRATE	115200
 

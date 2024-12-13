@@ -7,8 +7,8 @@ static unsigned int us2next;
 static int sys_timer1_irq_handler(int irq_num, void *hdata) {
 	unsigned long int cpu_flags;
         struct SYS_TIMER *sys_timer=SYS_TIMER_BASE;
-        sys_timer->c1=sys_timer->clo+us2next;	// set next timeout
         sys_timer->cs|=SYS_TIMER_CS_M1;		// clear interrupt
+        sys_timer->c1=sys_timer->clo+us2next;	// set next timeout
 
 //	cpu_flags=save_cpu_flags();
 //	enable_interrupts();
@@ -22,10 +22,11 @@ void config_sys_tic(unsigned int ms) {
 
 	us2next=ms*1000;         // cycle time for timer cnt is 1 uS
 
-        sys_timer->c1=sys_timer->clo+us2next;
-        sys_timer->cs|=SYS_TIMER_CS_M1;
-
 	install_irq_handler(SYS_TIMER1_MATCH, sys_timer1_irq_handler,0);
+
+        sys_timer->cs|=SYS_TIMER_CS_M1;
+        sys_timer->c1=sys_timer->clo+us2next;
+
 #if 0
         while(1) {
                 if ((sys_timer->cs&SYS_TIMER_CS_M1)!=0) {
