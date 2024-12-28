@@ -206,10 +206,10 @@ ret_from_irq:
 	sw	v0,0(k0)	# update current
 	lui	k0,%hi(curr_pgd)
 	addiu	k0,k0,%lo(curr_pgd)
-	lw	v1,10*4(v0)	# read address space
+	lw	v1,9*4(v0)	# read address space
 	lw	v1,0*4(v1)	# read page table dir
 	sw	v1,0(k0)
-	lw	v1,10*4(v0)	# read address space
+	lw	v1,9*4(v0)	# read address space
 	lw	v1,1*4(v1)	# read address space id
 	mtc0	v1,CP0_ENTRYHI
 	ssnop
@@ -998,10 +998,10 @@ ret_from_sys:
 	sw	v0,0(k0)	# update current
 	lui	k0,%hi(curr_pgd)
 	addiu	k0,k0,%lo(curr_pgd)
-	lw	v1,10*4(v0)	# read address space
+	lw	v1,9*4(v0)	# read address space
 	lw	v1,0*4(v1)	# read page table dir
 	sw	v1,0(k0)
-	lw	v1,10*4(v0)	# read address space
+	lw	v1,9*4(v0)	# read address space
 	lw	v1,1*4(v1)	# read address space id
 	mtc0	v1,CP0_ENTRYHI
 	ssnop

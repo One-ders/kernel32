@@ -204,7 +204,6 @@ again:
 		restore_cpu_flags(cpu_flags);
 		goto again;
 	}
-	restore_cpu_flags(cpu_flags);
 	ud->tx_buf[IX(ud->tx_in)]=c;
 	ud->tx_in++;
 	if (!ud->txr) {
@@ -213,6 +212,7 @@ again:
 		ud->regs->dr=ud->tx_buf[IX(ud->tx_out)];
 		ud->tx_out++;
 	}
+	restore_cpu_flags(cpu_flags);
 	return 1;
 }
 

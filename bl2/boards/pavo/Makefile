@@ -7,6 +7,7 @@ ARCH:=mips
 GIT_VERSION:=$(shell git describe --abbrev=4 --dirty --always --tags)
 
 export COMPILER_PREFIX:=/opt/cross/bin/mipsel-linux-
+export MUSL_CONFIG_FLAGS=--build=mipsel-linux --disable-shared
 
 export AS:=mipsel-linux-as
 export CC:=mipsel-linux-gcc
@@ -15,13 +16,14 @@ export OBJCOPY:=mipsel-linux-objcopy
 
 #include $(TOP)/os/Makefile
 
-#CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4740 -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls
 CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/boards/$(BOARD) -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl/jz4740 -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4740 -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -D__KERNEL__ -DQEMU -DDEBUG -DDEFAULT_TRACE_LEV=0x0 -DDEFAULT_TRACE_SYS=0x0
+
 CFLAGS_USR:=-I$(TOP)/usr/include -I$(OBJ)/usr/libc/obj/include -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -DMMU -DMIPS -D__mips_o32 -msoft-float
-#CFLAGS_USR:=-I$(TOP)/usr/incl -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -DMMU -DMIPS -D__mips_o32
+
 LDFLAGS:=-g -T./pavo.ld
-#LDFLAGS_USR:=-g $(OBJ)/usr/lib/start.o $(OBJ)/usr/lib/usrlib.o $(OBJ)/usr/lib/stdlib/stdlib.o $(OBJ)/usr/lib/stdio/libstdio.o $(OBJ)/usr/lib/sys/sys.o $(OBJ)/usr/lib/gdtoa/gdtoa.o $(OBJ)/usr/lib/termios/libtermios.o -T$(OBJ)/../mips_usr.ld -L/opt/cross/lib/gcc/mipsel-linux/8.1.0 -lgcc
+
 LDFLAGS_USR:=-g -T$(OBJ)/../mips_usr.ld  $(OBJ)/usr/syslib/start.o $(OBJ)/usr/syslib/usrlib.o
+
 LDLIBS_USR:=-L$(OBJ)/usr/libc/lib -lc -L/opt/cross/lib/gcc/mipsel-linux/8.1.0 -lgcc
 
 

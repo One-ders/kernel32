@@ -18,8 +18,8 @@ struct address_space kernel_asp = {
 .brk	= 0
 };
 
-struct task main_task = {
-.name	=	"init_main:000",
+struct task idle_task = {
+.name	=	"idle:000",
 .sp	=	(void *)(0x84000000-0x2000),
 .id	=	256,
 .next	=	0,

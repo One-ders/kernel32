@@ -1,1 +1,0 @@
-/home/anders/test1/nrepo/kernel32/bl2/boards/rpi4/../../os/sys_init.c

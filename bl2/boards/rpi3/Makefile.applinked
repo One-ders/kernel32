@@ -25,33 +25,24 @@ CFLAGS_USR:=-I$(TOP)/usr/include -I$(OBJ)/usr/libc/obj/include -I$(GCC_INCL) -g 
 
 LDFLAGS:=-g -T./rpi3.ld
 
-LDFLAGS_USR:=-g -T$(OBJ)/../aarch64_usr.ld  $(OBJ)/usr/syslib/start.o $(OBJ)/usr/syslib/usrlib.o
+#LDFLAGS_USR=-g -r $(OBJ)/usr/lib/usrlib.o
+LDFLAGS_USR=-g -r $(OBJ)/usr/libc/lib/libc.a
 
 LDLIBS_USR:=-L$(OBJ)/usr/libc/lib -lc -L$(GCC_LIB) -lgcc
 
-all: kernel8.img uroot.img
-
-fsize=$(shell stat -c "%s" tmp/fot4)
-nblock=$(shell expr $(fsize) / 4096)
-
-uroot.img: usr.bin
-	rm -rf uroot
-	mkdir uroot
-	cp obj/usr/sys_cmd/sys_cmd uroot/init
-	cp obj/usr/ls/ls uroot/ls
-	cp obj/usr/fb/fb uroot/fb
-	cp -r $(TOP)/usr/files/* uroot/.
-	mkyaffs2image 1 uroot rootf.img
+all: kernel8.img
 
 kernel8.img: uCore
 	$(OBJCOPY) -O binary $< $@
 
-uCore: os version aarch64_lib aarch64 BCM2837 mm stddrv stdlib fb fs bin_fmt
+#uCore: os version aarch64_lib aarch64 BCM2837 mm stddrv stdlib fb fs bin_fmt $(OBJ)/usr/libc $(OBJ)/usr/syslib usr.bin.o
+uCore: os version aarch64_lib aarch64 BCM2837 mm stddrv stdlib fb fs bin_fmt $(OBJ)/usr/sys_cmd usr.bin.o
 	$(LD) $(LDFLAGS) -o $@ $(OBJ)/lib/init_sect.o $(OBJ)/lib/aarch64.o \
 		$(OBJ)/lib/BCM2837.o $(OBJ)/version.o $(OBJ)/lib/os.o \
 		$(OBJ)/lib/mm.o $(OBJ)/stddrv/stddrv.o $(OBJ)/stdlib/stdlib.o \
 		$(OBJ)/lib/fb.o $(OBJ)/lib/fs.o $(OBJ)/lib/bin_fmt.o \
 		$(OBJ)/arch/aarch64_lib/strings.o $(OBJ)/lib/end_sect.o \
+		$(OBJ)/usr/usr.bin.o \
 		-L/usr/lib/gcc/aarch64-linux-gnu/14 -lgcc
 
 version:
@@ -128,10 +119,31 @@ $(OBJ)/arch/aarch64/BCM2837: $(TOP)/arch/aarch64/BCM2837
 	mkdir -p $@
 	lndir $< $@
 
+usr.bin.o: $(OBJ)/usr/sys_cmd/sys_cmd.o
+	$(LD) -o $(OBJ)/usr/usr.bin.o $(LDFLAGS_USR) $(OBJ)/usr/sys_cmd/sys_cmd $(OBJ)/usr/syslib/usrlib.o $(OBJ)/usr/libc/lib/libc.a /usr/lib/gcc/aarch64-linux-gnu/14/libgcc.a
+	$(OBJCOPY) --prefix-symbols=__usr_ $(OBJ)/usr/usr.bin.o
 
-#$(OBJ)/usr/libc $(OBJ)/usr/syslib $(OBJ)/usr/sys_cmd/sys_cmd $(OBJ)/usr/ls $(OBJ)/usr/fb
+#$(OBJ)/usr/sys_cmd/sys_cmd.o: $(OBJ)/usr/lib/usrlib.o $(OBJ)/usr/sys_cmd
+$(OBJ)/usr/sys_cmd/sys_cmd.o: $(OBJ)/usr/libc $(OBJ)/usr/syslib $(OBJ)/usr/sys_cmd
+	CFLAGS="$(CFLAGS_USR)" TOP="$(TOP)" OBJ="$(OBJ)" LDFLAGS="$(LDFLAGS_USR)" $(MAKE) -C $(OBJ)/usr/sys_cmd
 
-usr.bin: $(OBJ)/usr/libc $(OBJ)/usr/syslib $(OBJ)/usr/sys_cmd/sys_cmd $(OBJ)/usr/ls $(OBJ)/usr/fb
+$(OBJ)/usr/sys_cmd: $(TOP)/usr/sys_cmd
+	mkdir -p $@
+	lndir $< $@
+
+$(OBJ)/usr/lib/usrlib.o: $(OBJ)/usr/lib $(OBJ)/usr/lib/aarch64/syscall_lib.o
+	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $(OBJ)/usr/lib
+
+$(OBJ)/usr/lib: $(TOP)/usr/lib
+	mkdir -p $@
+	lndir $< $@
+
+$(OBJ)/usr/lib/aarch64/syscall_lib.o: $(TOP)/usr/lib
+	mkdir -p $(OBJ)/usr/lib/aarch64
+	lndir $< $(OBJ)/usr/lib
+	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $(OBJ)/usr/lib/aarch64
+
+#usr.bin: $(OBJ)/usr/libc $(OBJ)/usr/syslib $(OBJ)/usr/sys_cmd/sys_cmd $(OBJ)/usr/ls $(OBJ)/usr/fb
 
 $(OBJ)/usr/libc: $(TOP)/usr/libc
 	mkdir -p $@
@@ -147,35 +159,18 @@ $(OBJ)/usr/syslib/aarch64: $(TOP)/usr/syslib/aarch64
 	mkdir -p $@
 	lndir $< $@
 	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
-
-$(OBJ)/usr/sys_cmd/sys_cmd: $(TOP)/usr/sys_cmd
-	mkdir -p $(dir $@)
-	lndir $< $(dir $@)
-	CFLAGS="$(CFLAGS_USR)" LDFLAGS="$(LDFLAGS_USR)" LDLIBS="$(LDLIBS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
-
 $(OBJ)/usr/ls: $(TOP)/usr/ls
 	mkdir -p $@
 	lndir $< $@
 	CFLAGS="$(CFLAGS_USR)" LDFLAGS="$(LDFLAGS_USR)" LDLIBS="$(LDLIBS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
+
 
 $(OBJ)/usr/fb: $(TOP)/usr/fb
 	mkdir -p $@
 	lndir $< $@
 	CFLAGS="$(CFLAGS_USR)" LDFLAGS="$(LDFLAGS_USR)" LDLIBS="$(LDLIBS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<
 
-
-#$(OBJ)/usr/lib/arm/syscall_lib.o: $(TOP)/usr/lib
-#	mkdir -p $(OBJ)/usr/lib/arm
-#	lndir $< $(OBJ)/usr/lib
-#	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $(OBJ)/usr/lib/aarch64
-
-#$(OBJ)/usr/lib/arm/ffs.o: $(TOP)/usr/lib
-#	mkdir -p $(OBJ)/usr/lib/arm
-#	lndir $< $(OBJ)/usr/lib
-#	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $(OBJ)/usr/lib/aarch64
-
-
 clean:
-	rm -rf $(OBJECTS) uCore uCore.bin uroot rootf.img kernel8.img
+	rm -rf $(OBJECTS) uCore uCore.bin uCore.img uroot rootf.img kernel8.img
 	rm -rf tmp obj *.o
 	$(MAKE) -C $(TOP)/usr/libc clean

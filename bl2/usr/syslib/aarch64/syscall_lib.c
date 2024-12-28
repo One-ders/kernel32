@@ -1,4 +1,4 @@
-/* $Nosix/Leanaux: , v1.1 2014/04/07 21:44:00 anders Exp $ */
+/* $KK2: , v1.1 2014/04/07 21:44:00 anders Exp $ */
 
 /*
  * Copyright (c) 2014, Anders Franzen.
@@ -30,10 +30,11 @@
  *
  * @(#)sys_tasklib.c
  */
-#include "io.h"
-#include "sys.h"
+#include "mycore/io.h"
+#include <sys/select.h>
+#include "mycore/sys.h"
 
-#include <sys_svc.h>
+#include "mycore/sys_svc.h"
 
 #if 0
 #define SVC_CREATE_TASK 1
@@ -85,7 +86,7 @@ struct task_create_args {
  * Inline assembler helper directive: call SVC with the given immediate
  */
 #define svc(code) asm volatile ("svc %[immediate]\n\t"::[immediate] "I" (code))
- 
+
 /*
  * Use a normal C function, the compiler will make sure that this is going
  * to be called using the standard C ABI which ends in a correct stack
@@ -98,16 +99,22 @@ int svc_io_open(const char *);
 int svc_io_read(int fd, void *b, int size);
 int svc_io_write(int fd, const void *b, int size);
 int svc_io_control(int fd, int cmd, void *b, int s);
-int svc_io_lseek(int fd, unsigned long int offs, int whence);
+unsigned long int svc_io_lseek(int fd, unsigned long int offs, int whence);
 int svc_io_close(int fd);
 int svc_io_select(struct sel_args *sel_args);
+void *svc_io_mmap(void *addr, unsigned int len, int prot, int flags, int fd, long int offset);
+int svc_io_munmap(void *addr, unsigned int len);
 int svc_block_task(char *name);
 int svc_unblock_task(char *name);
-int svc_kill_task(char *name);
+int svc_kill_process(char *name);
 int svc_setprio_task(char *name, int prio);
 int svc_set_debug_level(unsigned int dbglev);
 int svc_reboot(unsigned int cookie);
 unsigned int svc_gettic(void);
+void *svc_sbrk(long int incr);
+int svc_brk(void *nbrk);
+int svc_wait(int *wstatus);
+
 
 
 __attribute__ ((noinline)) int svc_create_task(struct task_create_args *ta) {
@@ -125,7 +132,7 @@ __attribute__ ((noinline)) int svc_kill_self() {
 
 __attribute__ ((noinline)) int svc_msleep(unsigned int ms) {
 	register int rc asm("r0");
-	svc(SVC_MSLEEP); 
+	svc(SVC_MSLEEP);
 	return rc;
 }
 
@@ -153,8 +160,8 @@ __attribute__ ((noinline)) int svc_io_control(int fd, int cmd, void *b, int s) {
 	return rc;
 }
 
-__attribute__ ((noinline)) int svc_io_lseek(int fd, unsigned long int offs, int whence) {
-	register int rc asm("r0");
+__attribute__ ((noinline)) unsigned long int svc_io_lseek(int fd, unsigned long int offs, int whence) {
+	register int rc asm("x0");
 	svc(SVC_IO_LSEEK);
 	return rc;
 }
@@ -172,6 +179,19 @@ __attribute__ ((noinline)) int svc_io_select(struct sel_args *sel_args) {
 	return rc;
 }
 
+__attribute__ ((noinline)) void *svc_io_mmap(void *addr, unsigned int len, int prot, int flags,
+                                                int fd, long int offset) {
+        register void *rc asm("x0");
+        svc(SVC_IO_MMAP);
+        return rc;
+}
+
+__attribute__ ((noinline)) int svc_io_munmap(void *addr, unsigned int len) {
+        register int rc asm("r0");
+        svc(SVC_IO_MUNMAP);
+        return rc;
+}
+
 __attribute__ ((noinline)) int svc_block_task(char *name) {
 	register int rc asm("r0");
 	svc(SVC_BLOCK_TASK);
@@ -184,9 +204,9 @@ __attribute__ ((noinline)) int svc_unblock_task(char *name) {
 	return rc;
 }
 
-__attribute__ ((noinline)) int svc_kill_task(char *name) {
+__attribute__ ((noinline)) int svc_kill_process(char *name) {
 	register int rc asm("r0");
-	svc(SVC_KILL_TASK);
+	svc(SVC_KILL_PROC);
 	return rc;
 }
 
@@ -213,6 +233,34 @@ __attribute__ ((noinline)) unsigned int svc_gettic(void) {
 	register int rc asm("r0");
 	svc(SVC_GETTIC);
 	return rc;
+}
+
+__attribute__ ((noinline)) void *svc_sbrk(long int incr) {
+        register void *rc asm("x0");
+        svc(SVC_SBRK);
+        return rc;
+}
+
+__attribute__ ((noinline)) int svc_brk(void *nbrk) {
+        register int rc asm("r0");
+        svc(SVC_BRK);
+        return rc;
+}
+
+__attribute__ ((noinline)) int svc_my_fork(void) {
+        register int rc asm("r0");
+        svc(SVC_FORK);
+        return rc;
+}
+
+__attribute__ ((noinline)) void svc_exit(int st) {
+        svc(SVC_EXIT);
+}
+
+__attribute__ ((noinline)) int svc_wait(int *wstatus) {
+        register int rc asm("r0");
+        svc(SVC_WAIT);
+        return rc;
 }
 
 
@@ -243,8 +291,8 @@ int unblock_task(char *name) {
 	return svc_unblock_task(name);
 }
 
-int kill_task(char *name) {
-	return svc_kill_task(name);
+int kill_process(char *name) {
+	return svc_kill_process(name);
 }
 
 int setprio_task(char *name,int prio) {
@@ -304,5 +352,34 @@ int io_select(int nfds, fd_set *rfds, fd_set *wfds, fd_set *stfds, unsigned int 
 //	printf("io_select: nfds=%d, rfds=%x, wfds=%x, stfds=%x, tout=%x\n",
 //			nfds,rfds,wfds,stfds,tout);
 	return svc_io_select(&sel_args);
+}
+
+void *io_mmap(void *addr, unsigned int len, int prot, int flags, int fd, long int offset) {
+        return svc_io_mmap(addr,len,prot,flags,fd,offset);
+}
+
+int io_munmap(void *addr, unsigned int len) {
+        return svc_io_munmap(addr, len);
+}
+
+void *sbrk(long int incr) {
+        return svc_sbrk(incr);
+}
+
+int brk(void *nbrk) {
+        return svc_brk(nbrk);
+}
+
+int my_fork(void) {
+        return svc_my_fork();
+}
+
+
+void exit(int st) {
+        svc_exit(st);
+}
+
+int wait(int *status) {
+        svc_wait(status);
 }
 

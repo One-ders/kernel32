@@ -68,9 +68,22 @@ extern int sys_printf(const char *format, ...);
 
 #define ASSERT(a) { if (!(a)) {io_setpolled(1); sys_printf("%t: assert stuck, %s %d\n", __FILE__, __LINE__);} while (!(a)) ; }
 
-extern unsigned int sys_irqs;
-extern struct task *volatile ready[5];
-extern struct task *volatile ready_last[5];
+#define MAX_PRIO                3
+#define GET_PRIO(a)             ((a)->prio_flags&(0x3))
+#define SET_PRIO(a,b)           ((a)->prio_flags=(b)&(MAX_PRIO))
+#define GET_BLCK_STATE(a)	((a)->prio_flags&0x08)
+#define SET_BLCK_STATE(a)	((a)->prio_flags|=0x08)
+#define CLR_BLCK_STATE(a)	((a)->prio_flags&=~0x08)
+#define GET_TMARK(a)            ((a)->prio_flags&0x10)
+#define SET_TMARK(a)            ((a)->prio_flags|=0x10)
+//#define CLR_TMARK(a)            ((a)->prio_flags&=~0x10)  ?????? why not
+#define CLR_TMARK(a)            ((a)->prio_flags&=0xEF)
+
+
+extern unsigned long int sys_irqs;
+extern struct task *volatile ready[MAX_PRIO+1];
+extern struct task *volatile ready_last[MAX_PRIO+1];
+extern struct task *volatile blocked_list;
 extern struct task *troot;
 extern struct task * volatile current;
 
@@ -153,19 +166,19 @@ struct address_space {
 
 
 struct task {
-	char            *name;		/* 0-3 */
-	void            *sp;		/* 4-7 */
-	int		id;		/* 8-11 */
+	char            *name;		/* 0-3 */   /* 0-7   */
+	void            *sp;		/* 4-7 */   /* 8-15  */
+	long int	id;		/* 8-11 */  /* 16-23 */
 
-	struct task     *next;		/* 12-15 */   /* link of task of same state */
-	struct task     *next2;		/* 16-19 */  /* all tasks chain */
-	int             state;		/* 20-23 */
-	int             prio_flags;	/* 24-27 */
-	void          	*estack;	/* 28-31 */
-	struct user_fd  *fd_list;	/* 32-35 */ /* open driver list */
-	unsigned int    active_tics;	/* 36-39 */
-	struct address_space *asp;	/* 40-43 */
-	int		sel_data_valid;
+	struct task     *next;		/* 12-15 */ /* 24-31 */ /* link of task of same state */
+	struct task     *next2;		/* 16-19 */ /* 32-39 */ /* all tasks chain */
+	int             state;		/* 20-23 */ /* 40-43 */
+	int             prio_flags;	/* 24-27 */ /* 44-47 */
+	void          	*estack;	/* 28-31 */ /* 48-55 */
+	struct user_fd  *fd_list;	/* 32-35 */ /* 56-63 *//* open driver list */
+	struct address_space *asp;	/* 36-39 */ /* 64-71 */
+	unsigned int    active_tics;	/* 40-43 */ /* 72-75 */
+	int		sel_data_valid; /* 44-47 */ /* 76-79 */
 	struct sel_data sel_data;
 	struct blocker  blocker;
 	unsigned long	kheap;
@@ -181,16 +194,8 @@ struct task {
 #define TASK_STATE_WAIT		5
 #define TASK_STATE_DEAD		6
 
-#define MAX_PRIO                4
-#define GET_PRIO(a)             ((a)->prio_flags==4?4:(a)->prio_flags&0x3)
-#define SET_PRIO(a,b)           ((a)->prio_flags=(b)&0xf)
-#define GET_TMARK(a)            ((a)->prio_flags&0x10)
-#define SET_TMARK(a)            ((a)->prio_flags|=0x10)
-#define CLR_TMARK(a)            ((a)->prio_flags&=0xEF)
-
-
-extern struct task main_task;
-extern volatile unsigned int tq_tic;
+extern struct task idle_task;
+extern volatile unsigned long int tq_tic;
 
 void start_up(void);
 void init_sys(void);
@@ -226,7 +231,7 @@ void config_sys_tic(unsigned int ms);
 void board_reboot(void);
 void wait_irq(void);
 
-unsigned int get_svc_number(void *sp);
+unsigned int get_svc_number(void *sp, unsigned int *syscall_domain);
 unsigned long int get_svc_arg(void *sp, int arg_ix);
 void set_svc_ret(void *sp, long int val);
 void set_svc_lret(void *sp, long int val);

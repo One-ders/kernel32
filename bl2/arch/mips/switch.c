@@ -73,7 +73,7 @@ unsigned long int handle_switch(unsigned long int *v_sp) {
 //	sys_irqs++;
 //	sys_printf("handle_switch: sp %x\n", v_sp);
 
-	while(i<MAX_PRIO) {
+	while(i<=MAX_PRIO) {
 		t=ready[i];
 		if (t) {
 			ready[i]=t->next;
@@ -88,13 +88,13 @@ unsigned long int handle_switch(unsigned long int *v_sp) {
 	}
 
 	if (!t) {
-		t=&main_task;
+		t=&idle_task;
 #if 0
 		sys_printf("no ready proc\n");
 		ASSERT(0);
 #endif
 	} else {
-		if (t==&main_task) {
+		if (t==&idle_task) {
 			sys_printf("idle task in job queue\n");
 			ASSERT(0);
 		}
@@ -114,23 +114,18 @@ unsigned long int handle_switch(unsigned long int *v_sp) {
 	/* Should not have next, move away current if still here,
 	   timer and blocker move themselves */
 	if (current->state==TASK_STATE_RUNNING) {
-		int prio=current->prio_flags&0xf;
+		int prio=GET_PRIO(current);
 		ASSERT(!current->next);
 		CLR_TMARK(current);
-		if (prio!=4) {
-			if (prio>4) {
-				prio=4;
-			}
-			current->state=TASK_STATE_READY;
+		if ((!GET_BLCK_STATE(current))&&(current!=&idle_task)) {
 			if (ready[prio]) {
 				ready_last[prio]->next=current;
 			} else {
 				ready[prio]=current;
 			}
 			ready_last[prio]=current;
-		} else {
-			current->state=TASK_STATE_READY;
 		}
+		current->state=TASK_STATE_READY;
 	}
 
         DEBUGP(DSYS_SCHED,DLEV_INFO, "switch in task: %s\n", t->name);

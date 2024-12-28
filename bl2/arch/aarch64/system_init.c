@@ -8,14 +8,14 @@ extern void serial_puts(char *s);
 void _exit(int status) {
 }
 
-struct task main_task = {
-.name	=	"init_main",
+struct task idle_task = {
+.name	=	"idle",
 .sp	=	(void *)(0x20020000),
 .id	=	256,
 .next	=	0,
 .next2	=	0,
 .state	=	1,
-.prio_flags=	3,
+.prio_flags=	4,
 .estack	=	(void *)(0x20020000-0x800)
 };
 
@@ -74,6 +74,7 @@ int load_binary(char *path) {
 	return 0;
 }
 
+#if 0
 void build_free_page_list() {
 	unsigned long int mptr=SDRAM_START;
 	int i;
@@ -93,7 +94,6 @@ void build_free_page_list() {
 	}
 }
 
-#if 0
 void *get_page(void) {
 	int i;
 	for(i=0;i<(sizeof(free_page_map)/sizeof(unsigned long int));i++) {

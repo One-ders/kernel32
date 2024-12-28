@@ -7,19 +7,21 @@ ARCH:=mips
 GIT_VERSION:=$(shell git describe --abbrev=4 --dirty --always --tags)
 
 export COMPILER_PREFIX:=/opt/cross/bin/mipsel-linux-
+export MUSL_CONFIG_FLAGS=--build=mipsel-linux --disable-shared
+
 
 export AS:=mipsel-linux-as
 export CC:=mipsel-linux-gcc
 export LD:=mipsel-linux-ld
 export OBJCOPY:=mipsel-linux-objcopy
- 
+
 #include $(TOP)/os/Makefile
 
 #CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4740 -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls
 CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/boards/$(BOARD) -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl/jz4740 -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4740 -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -D__KERNEL__ -DDEBUG -DDEFAULT_TRACE_LEV=0x0 -DDEFAULT_TRACE_SYS=0x0
 CFLAGS_USR:=-I$(TOP)/usr/include -I$(OBJ)/usr/libc/obj/include -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -DMMU -DMIPS -D__mips_o32 -msoft-float
 #CFLAGS_USR:=-I$(TOP)/usr/incl -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -DMMU -DMIPS -D__mips_o32
-LDFLAGS:=-g -T./$(BOARD).ld 
+LDFLAGS:=-g -T./$(BOARD).ld
 #LDFLAGS_USR:=-g $(OBJ)/usr/lib/start.o $(OBJ)/usr/lib/usrlib.o $(OBJ)/usr/lib/stdlib/stdlib.o $(OBJ)/usr/lib/stdio/libstdio.o $(OBJ)/usr/lib/sys/sys.o $(OBJ)/usr/lib/gdtoa/gdtoa.o $(OBJ)/usr/lib/termios/libtermios.o -T$(OBJ)/../cetus_usr.ld -L/opt/cross/lib/gcc/mipsel-linux/8.1.0 -lgcc
 LDFLAGS_USR:=-g -T$(OBJ)/../usr.ld  $(OBJ)/usr/syslib/start.o $(OBJ)/usr/syslib/usrlib.o
 LDLIBS_USR:=-L$(OBJ)/usr/libc/lib -lc -L/opt/cross/lib/gcc/mipsel-linux/8.1.0 -lgcc
@@ -52,19 +54,19 @@ uroot.img: usr.bin
 	cp obj/usr/fb/fb uroot/fb
 	cp -r $(TOP)/usr/files/* uroot/.
 	mkyaffs2image 1 uroot rootf.img
-	
+
 tmp/fot3: tmp/fot2
 	dd if=tmp/fot2 of=tmp/fot3 ibs=4096 count=1
 
 tmp/fot2: ipl/boot.bin tmp/fot1
 	cat ipl/boot.bin tmp/fot1 > tmp/fot2
-	
-	
+
+
 
 tmp/fot1:
 	mkdir -p tmp
 	dd if=/dev/zero of=tmp/fot1 ibs=4096 count=1
-	
+
 
 uCore.bin: uCore
 	$(OBJCOPY) -O binary $< $@
@@ -84,7 +86,7 @@ uCore: os version mips jz mm stddrv stdlib fb fs bin_fmt
 #jz_serial.o: ../../mips/jz4740/jz_serial.c
 #	$(CC) $(CFLAGS) -c -o $@ $<
 
-version: 
+version:
 	echo "const char *ver=\"$(BOARD)-$(GIT_VERSION)\";" > $(OBJ)/version.c
 	$(CC) -c -o $(OBJ)/version.o $(OBJ)/version.c
 
@@ -161,7 +163,7 @@ $(OBJ)/usr/libc: $(TOP)/usr/libc
 	lndir $< $@
 	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) ARCH=$(ARCH) $(MAKE) -C $@
 
-$(OBJ)/usr/syslib: $(TOP)/usr/syslib $(OBJ)/usr/syslib/mips 
+$(OBJ)/usr/syslib: $(TOP)/usr/syslib $(OBJ)/usr/syslib/mips
 	mkdir -p $@
 	lndir $< $@
 	CFLAGS="$(CFLAGS_USR)" TOP=$(TOP) OBJ=$(OBJ) $(MAKE) -C $<

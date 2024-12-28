@@ -60,29 +60,64 @@ int setup_return_stack(struct task *t, void *stackp_v,
 					unsigned long int ret_fnc,
 					char **arg0,
 					char **arg1) {
-	unsigned long int *stackp=(unsigned long int *)stackp_v;
+	unsigned long int stacktop=(unsigned long int)stackp_v;
+	t->sp=(void *)stacktop-800;
+	unsigned long int *stackp=(unsigned long int *)t->sp;
 
-	*(--stackp)=0x01000000;                  // xPSR
-	*(--stackp)=(unsigned long int)fnc;    // r15
-	*(--stackp)=(unsigned long int)ret_fnc;//svc_destroy_self;     // r14
-	*(--stackp)=0;     // x12
-	*(--stackp)=0;     // x3
-	*(--stackp)=0;     // x2
-	*(--stackp)=(unsigned long int)arg1;    // x1
-	*(--stackp)=(unsigned long int)arg0;    // x0
-////
-	*(--stackp)=0;     // x4
-	*(--stackp)=0;     // x5
-	*(--stackp)=0;     // x6
-	*(--stackp)=0;     // x7
-	*(--stackp)=0;     // x8
-	*(--stackp)=0;     // x9
-	*(--stackp)=0;     // x10
-	*(--stackp)=0;     // x11
-
-	t->sp=stackp;
+	stackp[0]=0x00000000;                // esr_el1
+	stackp[1]=(unsigned long int)fnc;    // slr_el1
+	stackp[2]=(unsigned long int)arg0;    // x0
+	stackp[3]=(unsigned long int)arg1;    // x1
+	stackp[4]=0;     // x2
+	stackp[5]=0;     // x3
+	stackp[6]=0;     // x4
+	stackp[7]=0;     // x5
+	stackp[8]=0;     // x6
+	stackp[9]=0;     // x7
+	stackp[10]=0;    // x8
+	stackp[11]=0;    // x9
+	stackp[12]=0;    // x10
+	stackp[13]=0;    // x11
+	stackp[14]=0;     // x12
+	stackp[15]=0;     // x13
+	stackp[16]=0;     // x14
+	stackp[17]=0;     // x15
+	stackp[18]=0;     // x16
+	stackp[19]=0;     // x17
+	stackp[20]=0;     // x18
+	stackp[21]=0;     // x19
+	stackp[22]=0;     // x20
+	stackp[23]=0;     // x21
+	stackp[24]=0;     // x22
+	stackp[25]=0;     // x23
+	stackp[26]=0;     // x24
+	stackp[27]=0;     // x25
+	stackp[28]=0;     // x26
+	stackp[29]=0;     // x27
+	stackp[30]=0;     // x28
+	stackp[31]=0;     // x29
+	stackp[32]=(unsigned long int)ret_fnc;//svc_destroy_self; // r30
+	stackp[33]=0;     // x31
 
 	return 0;
+}
+
+void *handle_syscall(unsigned long int *sp);
+
+void handle_trap(void *sp, unsigned long esr, unsigned long elr, unsigned long spsr, unsigned long far, unsigned long sctlr) {
+	unsigned int ec=esr>>26; // exception class
+	switch(ec) {
+		case 0x15:
+			handle_syscall(sp);
+			break;
+		case 0x25:
+			sys_printf("Data abort\n");
+			while(1);
+		default:
+			sys_printf("unhandle trap ec=%x\n", ec);
+			while(1);
+			break;
+	}
 }
 
 unsigned long int get_stacked_pc(struct task *t) {
