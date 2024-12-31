@@ -231,7 +231,7 @@ void config_sys_tic(unsigned int ms);
 void board_reboot(void);
 void wait_irq(void);
 
-unsigned int get_svc_number(void *sp, unsigned int *syscall_domain);
+int get_svc_number(void *sp, unsigned int *syscall_domain);
 unsigned long int get_svc_arg(void *sp, int arg_ix);
 void set_svc_ret(void *sp, long int val);
 void set_svc_lret(void *sp, long int val);

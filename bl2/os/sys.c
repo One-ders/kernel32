@@ -409,7 +409,7 @@ static int create_task(unsigned long int *svc_sp) {
 
 	t->state=TASK_STATE_READY;
 	t->name=alloc_kheap(t,strlen(tca->name)+5);
-	sys_sprintf(t->name,"%s:%03d",tca->name,t->asp->id);
+	sys_sprintf(t->name,"%s:%03d:%03d",tca->name,t->asp->id,t->id);
 	SET_PRIO(t,tca->prio);
 	t->next2=troot;
 	troot=t;
@@ -474,7 +474,7 @@ static struct task *create_task_sa(struct task_create_args *tca) {
 
 	t->state=TASK_STATE_READY;
 	t->name=alloc_kheap(t,strlen(tca->name)+5);
-	sys_sprintf(t->name,"%s:%03d",tca->name,t->asp->id);
+	sys_sprintf(t->name,"%s:%03d:%03d",tca->name,t->asp->id,t->id);
 	SET_PRIO(t,tca->prio);
 	t->next2=troot;
 	troot=t;
@@ -486,7 +486,7 @@ static struct task *create_task_sa(struct task_create_args *tca) {
 	}
 	ready_last[tca->prio]=t;
 
-	if (tca->prio<GET_PRIO(current)) {
+	if ((current==&idle_task)||(tca->prio<GET_PRIO(current))) {
 		DEBUGP(DSYS_SCHED,DLEV_INFO,"Create task: %s, switch out %s\n", t->name, current->name);
 		switch_on_return();
 	} else {
@@ -2461,6 +2461,7 @@ void start_sys(void) {
 	struct task *t;
 	char *targs[]={CFG_CONSOLE_DEV, (char *)0x0};
 	char *environ[]={(char *)0x0};
+	int	load_user=0;
 
 #ifdef MMU
 #if 0
@@ -2490,22 +2491,29 @@ void start_sys(void) {
 
 	t=create_user_context();
 	if (!t) {
+#ifdef RPI3
 		struct task_create_args tca;
 
-#ifdef GNURP
+		disable_interrupts();
 		memset(&tca,0,sizeof(tca));
 		tca.val=CFG_CONSOLE_DEV;
 		tca.prio=3;
 		tca.fnc=__usr_main;
 		tca.name="grrrk";
 		t=create_task_sa(&tca);
-#else
-		while(1);
+
+		t->asp->fd_tab[0]=fd_con;
+		t->asp->fd_tab[1]=fd_con;
+		t->asp->fd_tab[2]=fd_con;
 #endif
+
+	} else {
+		load_user=1;
 	}
 
 	if (!t) {
 		sys_printf("no task created\n");
+		while(1);
 	}
 
 	sys_printf("load_init:\n");
@@ -2520,37 +2528,39 @@ void start_sys(void) {
 	}
 #endif
 
-	t->name=alloc_kheap(t,strlen("sys_mon")+5);
-	sys_sprintf(t->name,"%s:%03d","sys_mon",t->asp->id);
-	t->state=TASK_STATE_READY;
-	t->prio_flags=3;  // Prio 3, not blocked, not scheduled for tslice switch
-	stackp=((unsigned long int)t)+4096;
-	t->estack=(void *)(((unsigned long int)t)+2048);
-	setup_return_stack(t,(void *)stackp,(unsigned long int)usr_init,0, targs, environ);
+	if (load_user) {
+		t->name=alloc_kheap(t,strlen("sys_mon")+5);
+		sys_sprintf(t->name,"%s:%03d","sys_mon",t->asp->id);
+		t->state=TASK_STATE_READY;
+		t->prio_flags=3;  // Prio 3, not blocked, not scheduled for tslice switch
+		stackp=((unsigned long int)t)+4096;
+		t->estack=(void *)(((unsigned long int)t)+2048);
+		setup_return_stack(t,(void *)stackp,(unsigned long int)usr_init,0, targs, environ);
 
-	disable_interrupts();
+		disable_interrupts();
 
-	t->asp->fd_tab[0]=fd_con;
-	t->asp->fd_tab[1]=fd_con;
-	t->asp->fd_tab[2]=fd_con;
+		t->asp->fd_tab[0]=fd_con;
+		t->asp->fd_tab[1]=fd_con;
+		t->asp->fd_tab[2]=fd_con;
 
-	t->asp->next=current->asp->child;
-	current->asp->child=t->asp;
-	t->asp->parent=current->asp;
+		t->asp->next=current->asp->child;
+		current->asp->child=t->asp;
+		t->asp->parent=current->asp;
 
-	t->next2=troot;
-	troot=t;
+		t->next2=troot;
+		troot=t;
 
-	if(!ready[GET_PRIO(t)]) {
-		ready[GET_PRIO(t)]=t;
-	} else {
-		ready_last[GET_PRIO(t)]->next=t;
+		if(!ready[GET_PRIO(t)]) {
+			ready[GET_PRIO(t)]=t;
+		} else {
+			ready_last[GET_PRIO(t)]->next=t;
+		}
+		ready_last[GET_PRIO(t)]=t;
+		switch_on_return();  /* will switch in the task on return from next irq */
 	}
-	ready_last[GET_PRIO(t)]=t;
-	switch_on_return();  /* will switch in the task on return from next irq */
 	clear_all_interrupts();
+	enable_interrupts();
 	while(1) {
-		enable_interrupts();
 		wait_irq();
 	}
 

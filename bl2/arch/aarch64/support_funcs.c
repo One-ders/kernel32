@@ -1,20 +1,114 @@
 
+#include <io.h>
 #include <sys.h>
 #include <frame.h>
 #include <string.h>
 
+#include "syscall.h.in" // musl linux syscalls
+
 //#include <system_params.h>
 
-unsigned int get_svc_number(void *sp) {
-	return (((char *)((unsigned long int *)sp)[6])[-2]);
+static int lnx_sys_map(unsigned int lnx_scall) {
+
+	switch(lnx_scall) {
+		case __NR_dup:		return LNX_DUP;
+		case __NR_fcntl:	return LNX_FCNTL;
+		case __NR_ioctl:	return LNX_IOCTL;
+		case __NR_flock:	return LNX_FLOCK;
+		case __NR_statfs:	return LNX_STATFS;
+		case __NR_fstatfs:	return LNX_FSTATFS;
+		case __NR_truncate:	return LNX_TRUNCATE;
+		case __NR_ftruncate:	return LNX_FTRUNCATE;
+		case __NR_chdir:	return LNX_CHDIR;
+		case __NR_fchdir:	return LNX_FCHDIR;
+		case __NR_chroot:	return LNX_CHROOT;
+		case __NR_fchmod:	return LNX_FCHMOD;
+		case __NR_fchown:	return LNX_FCHOWN;
+		case __NR_close:	return LNX_CLOSE;
+		case __NR_getdents64:	return LNX_GETDENTS64;
+		case __NR_lseek:	return LNX_LSEEK;
+		case __NR_read:		return LNX_READ;
+		case __NR_write:	return LNX_WRITE;
+		case __NR_readv:	return LNX_READV;
+		case __NR_writev:	return LNX_WRITEV;
+		case __NR_newfstatat:   return LNX_NEWFSTATAT;
+		case __NR_fstat:	return LNX_FSTAT;
+		case __NR_sync:		return LNX_SYNC;
+		case __NR_fsync:	return LNX_FSYNC;
+		case __NR_exit:		return LNX_EXIT;
+		case __NR_nanosleep:	return LNX_NANOSLEEP;
+		case __NR_getitimer:	return LNX_GETITIMER;
+		case __NR_setitimer:	return LNX_SETITIMER;
+		case __NR_ptrace:	return LNX_PTRACE;
+		case __NR_kill:		return LNX_KILL;
+		case __NR_sigaltstack:	return LNX_SIGALTSTACK;
+		case __NR_setpriority:	return LNX_SETPRIORITY;
+		case __NR_getpriority:	return LNX_GETPRIORITY;
+		case __NR_reboot:	return LNX_REBOOT;
+		case __NR_socket:	return LNX_SOCKET;
+		case __NR_socketpair:	return LNX_SOCKETPAIR;
+		case __NR_bind:		return LNX_BIND;
+		case __NR_listen:	return LNX_LISTEN;
+		case __NR_accept:	return LNX_ACCEPT;
+		case __NR_connect:	return LNX_CONNECT;
+		case __NR_getsockname:	return LNX_GETSOCKNAME;
+		case __NR_getpeername:	return LNX_GETPEERNAME;
+		case __NR_sendto:	return LNX_SENDTO;
+		case __NR_recvfrom:	return LNX_RECVFROM;
+		case __NR_setsockopt:	return LNX_SETSOCKOPT;
+		case __NR_getsockopt:	return LNX_GETSOCKOPT;
+		case __NR_shutdown:	return LNX_SHUTDOWN;
+		case __NR_sendmsg:	return LNX_SENDMSG;
+		case __NR_recvmsg:	return LNX_RECVMSG;
+		case __NR_readahead:	return LNX_READAHEAD;
+		case __NR_brk:		return LNX_BRK;
+		case __NR_munmap:	return LNX_MUNMAP;
+		case __NR_mremap:	return LNX_MREMAP;
+		case __NR_clone:	return LNX_CLONE;
+		case __NR_execve:	return LNX_EXECVE;
+		case __NR_mmap:		return LNX_MMAP;
+		case __NR_mprotect:	return LNX_MPROTECT;
+		case __NR_msync:	return LNX_MSYNC;
+		case __NR_mlock:	return LNX_MLOCK;
+		case __NR_munlock:	return LNX_MUNLOCK;
+		case __NR_mlockall:	return LNX_MLOCKALL;
+		case __NR_munlockall:	return LNX_MUNLOCKALL;
+		case __NR_mincore:	return LNX_MINCORE;
+		case __NR_madvise:	return LNX_MADVISE;
+		case __NR_wait4:	return LNX_WAIT4;
+		default: return -1;
+	}
+	return -1;
+}
+
+int get_svc_number(void *sp, unsigned int *domain) {
+	unsigned long int *sp_ptr=(unsigned long int *)sp;
+	unsigned int svc_no=sp_ptr[0]&0xffff; // svc no, stored in SR_EL1
+	// check svc number: 0 is Musl linux
+	// 			else Native
+
+	if (svc_no==0) {
+		int mapped_svc=lnx_sys_map(sp_ptr[10]);
+		*domain=SYSCALL_LNX;
+		if (mapped_svc<0) {
+			io_setpolled(1);
+			sys_printf("no map for lnx svc %x\n", sp_ptr[10]);
+			while(1);
+		}
+		return (mapped_svc);
+	} else {
+		*domain=SYSCALL_NATIVE;
+		return svc_no;
+	}
+	return -1;
 }
 
 unsigned long int get_svc_arg(void *svc_sp, int arg) {
-	return ((unsigned long int *)svc_sp)[arg];
+	return ((unsigned long int *)svc_sp)[arg+2];
 }
 
 void set_svc_ret(void *svc_sp, long int val) {
-//	((unsigned long int *)svc_sp)[0]=val;
+	((unsigned long int *)svc_sp)[2]=val;
 }
 
 void set_svc_lret(void *sp, long int val)  {
@@ -114,6 +208,7 @@ void handle_trap(void *sp, unsigned long esr, unsigned long elr, unsigned long s
 			sys_printf("Data abort\n");
 			while(1);
 		default:
+			io_setpolled(1);
 			sys_printf("unhandle trap ec=%x\n", ec);
 			while(1);
 			break;
@@ -125,17 +220,15 @@ unsigned long int get_stacked_pc(struct task *t) {
 }
 
 unsigned long int get_usr_pc(struct task *t) {
-	unsigned long int *estackp=(unsigned long int *)t->estack;
+//	unsigned long int *estackp=(unsigned long int *)t->estack;
 	unsigned long int *stackp=t->sp;
+
+	return stackp[1];
+#if 0
 	unsigned long int *bstackp=estackp+512;
 	unsigned long int rval;
 	unsigned long int cpu_flags;
 
-	// We need to map in the stack page of the process we want to read.
-	// It is mpu protected while inactive.
-	// Also shut off irqs to prevent rescheduling, if we would
-	// get switched out, the aux stack page will not be present
-	// at switch in.
 	cpu_flags=disable_interrupts();
 	for(;stackp<bstackp;stackp++) {
 		if (stackp[0]==0xfffffff9) {
@@ -146,6 +239,7 @@ unsigned long int get_usr_pc(struct task *t) {
 	}
 	restore_cpu_flags(cpu_flags);
 	return 0;
+#endif
 }
 
 int sys_udelay(unsigned int usec) {

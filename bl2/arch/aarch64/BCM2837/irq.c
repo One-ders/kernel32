@@ -96,7 +96,7 @@ void irq_dispatch(void *sp) {
 }
 
 void wait_irq(void) {
-	asm volatile ("wfe\t\n\t"
+	asm volatile ("wfi\t\n\t"
 			: : );
 }
 

@@ -8,6 +8,12 @@ extern void serial_puts(char *s);
 void _exit(int status) {
 }
 
+struct address_space kernel_asp = {
+.pgd	= 0,
+.id	= 0,
+.brk	= 0
+};
+
 struct task idle_task = {
 .name	=	"idle",
 .sp	=	(void *)(0x20020000),
@@ -16,7 +22,8 @@ struct task idle_task = {
 .next2	=	0,
 .state	=	1,
 .prio_flags=	4,
-.estack	=	(void *)(0x20020000-0x800)
+.estack	=	(void *)(0x20020000-0x800),
+.asp	=	&kernel_asp
 };
 
 //extern int __usr_main(int argc, char **argv);

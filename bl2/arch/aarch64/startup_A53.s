@@ -3,6 +3,7 @@
 .section ".text.boot"  // Make sure the linker puts this at the start of the kernel image
 
 .global _start  // Execution starts here
+.global do_switch
 
 _start:
 	// Check processor ID is zero (executing on main core), else hang
@@ -11,7 +12,7 @@ _start:
 	cbz     x1, 2f
 	b       1f
 	// We're not on the main core, so hang in an infinite wait loop
-1:	wfe
+1:	wfi
 	b       1b
 2:	// We're on the main core!
 	// set top of stack just before our code (stack grows to a lower address per AAPCS64)
@@ -160,8 +161,8 @@ ret_from_irq:
 	mov	sp, x3
 	add	x3,sp,#800
 	str	x3,[x0, #8]
-	mov	x3,#1
-	str	x3,[x2,#5*8]   // task state == 1 (running)
+	mov	w3,#1		// store 32 bit
+	str	w3,[x0,#5*8]   // task state == 1 (running)
 
 2:
 	ldr x0,  [sp, #784]
@@ -273,8 +274,8 @@ ret_from_irq_2:
 	mov	sp, x3
 	add	x3,sp,#800
 	str	x3,[x0, #8]
-	mov	x3,#1
-	str	x3,[x2,#5*8]   // task state == 1 (running)
+	mov	w3,#1		// store 32 bit
+	str	w3,[x0,#5*8]   // task state == 1 (running)
 
 2:
 	ldr x0,  [sp, #784]
@@ -392,8 +393,8 @@ ret_from_irq_1:
 	mov	sp, x3
 	add	x3,sp,#800
 	str	x3,[x0, #8]
-	mov	x3,#1
-	str	x3,[x2,#5*8]   // task state == 1 (running)
+	mov	w3,#1		// store 32 bit
+	str	w3,[x0,#5*8]   // task state == 1 (running)
 
 2:
 	ldr x0,  [sp, #784]
@@ -510,8 +511,8 @@ ret_from_irq_3:
 	mov	sp, x3
 	add	x3,sp,#800
 	str	x3,[x0, #8]
-	mov	x3,#1
-	str	x3,[x2,#5*8]   // task state == 1 (running)
+	mov	w3,#1		// store 32 bit
+	str	w3,[x0,#5*8]   // task state == 1 (running)
 
 2:
 	ldr x0,  [sp, #784]
@@ -557,6 +558,57 @@ ret_from_irq_3:
 	ldp x30,xzr,[sp,#256]
 	add sp,sp,#800
 	eret
+
+do_switch:
+	msr daifset,#2   // irq off
+	sub sp,sp,#800   // allocate a full frame
+	stp x0,x1,[sp,#16]
+#	mrs x0,spsr_el1
+	mrs x0,esr_el1
+	mrs x1,elr_el1
+	stp x0,x1,[sp,#0]
+	stp x2,x3,[sp,#32]
+	stp x4,x5,[sp,#48]
+	stp x6,x7,[sp,#64]
+	stp x8,x9,[sp,#80]
+	stp x10,x11,[sp,#96]
+	stp x12,x13,[sp,#112]
+	stp x14,x15,[sp,#128]
+	stp x16,x17,[sp,#144]
+	stp x18,x19,[sp,#160]
+	stp x20,x21,[sp,#176]
+	stp x22,x23,[sp,#192]
+	stp x24,x25,[sp,#208]
+	stp x26,x27,[sp,#224]
+	stp x28,x29,[sp,#240]
+	stp x30,xzr,[sp,#256]
+
+
+	stp q0, q1, [sp, #272]
+	stp q2, q3, [sp, #304]
+	stp q4, q5, [sp, #336]
+	stp q6, q7, [sp, #368]
+	stp q8, q9, [sp, #400]
+	stp q10, q11, [sp, #432]
+	stp q12, q13, [sp, #464]
+	stp q14, q15, [sp, #496]
+	stp q16, q17, [sp, #528]
+	stp q18, q19, [sp, #560]
+	stp q20, q21, [sp, #592]
+	stp q22, q23, [sp, #624]
+	stp q24, q25, [sp, #656]
+	stp q26, q27, [sp, #688]
+	stp q28, q29, [sp, #720]
+	stp q30, q31, [sp, #752]
+
+	mrs x0, FPCR
+	mrs x1, FPSR
+	str x0, [sp, #784]
+	str x1, [sp, #792]
+
+	mov x0,sp
+	b	ret_from_irq
+
 
 
 

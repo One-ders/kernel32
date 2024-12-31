@@ -8,16 +8,9 @@
 extern unsigned long int *curr_pgd;
 
 
-unsigned int get_svc_number(void *sp, unsigned int *domain)  {
-	struct fullframe *ff=(struct fullframe *)sp;
+static int lnx_sys_map(unsigned int lnx_scall) {
 
-	if (ff->v0<4000) {
-		*domain=SYSCALL_NATIVE;
-		return ff->v0;
-	}
-
-	*domain=SYSCALL_LNX;
-	switch(ff->v0) {
+	switch(lnx_scall) {
 		case __NR_exit: 	return LNX_EXIT;
 		case __NR_fork: 	return LNX_FORK;
 		case __NR_read:		return LNX_READ;
@@ -232,8 +225,27 @@ unsigned int get_svc_number(void *sp, unsigned int *domain)  {
 		case __NR_fcntl64:	return LNX_FCNTL64;
 		default: return -1;
 	}
-
 	return -1;
+}
+
+int get_svc_number(void *sp, unsigned int *domain)  {
+	struct fullframe *ff=(struct fullframe *)sp;
+	int mapped_svc;
+
+	if (ff->v0<4000) {
+		*domain=SYSCALL_NATIVE;
+		return ff->v0;
+	}
+
+	*domain=SYSCALL_LNX;
+	mapped_svc=lnx_sys_map(ff->v0);
+	if (mapped_svc<0) {
+		io_setpolled(1);
+		sys_printf("no map for lnx svc %x\n", ff->v0);
+		while(1);
+	}
+
+	return mapped_svc;
 }
 
 unsigned long int get_svc_arg(void *sp,int arg) {

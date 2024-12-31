@@ -435,11 +435,11 @@ static int debug_fnc(int argc, char **argv, struct Env *env) {
 	if (argc>1) {
 		char *nptr;
 		unsigned int address=strtoul(argv[1],&nptr,0);
-		if (nptr!=optarg) {
+		if (nptr!=argv[1]) {
 			dbglev=address;
-		} else if (__builtin_strcmp(argv[1],"on")==0) {
-			dbglev=0xffff;
-		} else if (__builtin_strcmp(argv[1],"off")==0) {
+		} else if (strcmp(argv[1],"on")==0) {
+			dbglev=0xffffffff;
+		} else if (strcmp(argv[1],"off")==0) {
 			dbglev=0;
 		} else {
 			dprintf(env->io_fd,"debug <on> | <off>\n");
@@ -448,6 +448,7 @@ static int debug_fnc(int argc, char **argv, struct Env *env) {
 	} else {
 		dbglev=0;
 	}
+	dprintf(env->io_fd,"setting debug level to %x\n", dbglev);
 	set_debug_level(dbglev);
 	return 0;
 }

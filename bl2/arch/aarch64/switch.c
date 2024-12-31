@@ -2,6 +2,7 @@
 #include "sys.h"
 
 extern void serial_puts(const char *);
+void do_switch(void);
 
 volatile unsigned int irq_lev=0;
 volatile unsigned int switch_flag=0;
@@ -112,10 +113,8 @@ void switch_on_return(void) {
 }
 
 void switch_now(void) {
-#if 0
 	switch_flag=1;
 	do_switch();
-#endif
 }
 
 int decr_address_space_users(struct address_space *asp) {

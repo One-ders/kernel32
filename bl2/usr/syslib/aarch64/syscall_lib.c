@@ -266,9 +266,11 @@ __attribute__ ((noinline)) int svc_wait(int *wstatus) {
 
 /****************************************************************/
 
+//int __attribute__((optimize("O0"))) thread_create(void *fnc, void *val, unsigned int val_size,
 int thread_create(void *fnc, void *val, unsigned int val_size,
 		int prio, char *name) {
-	struct task_create_args tc_args;
+
+	volatile struct task_create_args tc_args;
 	tc_args.fnc=fnc;
 	tc_args.val=val;
 	tc_args.val_size=val_size;

@@ -173,10 +173,11 @@ int uart_irq_handler(int irq_num, void *dum) {
 
 	if (uirq&RIS_RXRIS) {
 		ud->regs->icr=ICR_RXIC;
-		while (!ud->regs->fr&FR_RXFE) {
+		while (ud->regs->fr&FR_RXFF) {
 			unsigned char c=ud->regs->dr;
 			ud->rx_buf[ud->rx_i%(RX_BSIZE)]=c;
 			ud->rx_i++;
+			break;
 		}
                 if (ud->rblocker_list.first) {
                         sys_wakeup_from_list(&ud->rblocker_list);
