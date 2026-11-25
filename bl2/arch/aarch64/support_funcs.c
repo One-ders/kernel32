@@ -276,12 +276,12 @@ int setup_return_stack(struct task *t, void *stackp_v,
 
 	// allocate space on process stack
 	v_stack-=args_storage_size;                     // arguments
-	v_stack=v_stack&(~7);
+	v_stack=v_stack&(~0xfUL);
 	args_storage=(char *)v_stack;
 
 	v_stack-=((nr_args+1)*sizeof(unsigned long int)); // argument pointers
 
-	v_stack=v_stack&(~7);   // stack aligned at 8, missaligned long longs give ugly printouts
+	v_stack=v_stack&(~0xfUL);   // stack aligned at 8, missaligned long longs give ugly printouts
 	argv_new=(char **)v_stack;
 
 

@@ -74,7 +74,7 @@ uCore.bin: uCore
 ipl/boot.bin:
 	$(MAKE) -C ipl
 
-uCore: os version mips jz mm stddrv stdlib fb fs bin_fmt
+uCore: bin_fmt os version mips jz mm stddrv stdlib fb fs
 	$(LD) $(LDFLAGS) -o $@ $(OBJ)/lib/init_sect.o $(OBJ)/lib/mips.o $(OBJ)/lib/jz.o $(OBJ)/version.o $(OBJ)/lib/os.o $(OBJ)/lib/mm.o $(OBJ)/stddrv/stddrv.o $(OBJ)/stdlib/stdlib.o $(OBJ)/lib/fb.o $(OBJ)/lib/fs.o $(OBJ)/lib/bin_fmt.o $(OBJ)/lib/end_sect.o -L/opt/cross/lib/gcc/mipsel-linux/8.1.0 -lgcc
 
 #traps.o: ../../mips/jz4740/traps.S

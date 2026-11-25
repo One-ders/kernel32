@@ -116,10 +116,9 @@ int create_task(unsigned long int *svc_sp) {
 #endif
 	t->asp=current->asp;
 	t->asp->ref++;
-	setup_return_stack(t,(void *)stackp,(unsigned long int)tca->fnc,0,0,targs,environ);
+	setup_return_stack(t,(void *)stackp,(unsigned long int)tca->fnc,0,targs,environ);
 
 	t->state=TASK_STATE_READY;
-sys_printf("alloc_kheap from create_task\n");
 	t->name=alloc_kheap(t,strlen(tca->name)+5);
 	sys_sprintf(t->name,"%s:%03d:%03d",tca->name,t->asp->id,t->id);
 	SET_PRIO(t,tca->prio);

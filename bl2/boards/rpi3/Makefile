@@ -49,7 +49,7 @@ uroot.img: usr.bin
 kernel8.img: uCore
 	$(OBJCOPY) -O binary $< $@
 
-uCore: os version aarch64_lib aarch64 BCM2837 mm stddrv stdlib fb fs bin_fmt
+uCore: bin_fmt os version aarch64_lib aarch64 BCM2837 mm stddrv stdlib fb fs
 	$(LD) $(LDFLAGS) -o $@ $(OBJ)/lib/init_sect.o $(OBJ)/lib/aarch64.o \
 		$(OBJ)/lib/BCM2837.o $(OBJ)/version.o $(OBJ)/lib/os.o \
 		$(OBJ)/lib/mm.o $(OBJ)/stddrv/stddrv.o $(OBJ)/stdlib/stdlib.o \
