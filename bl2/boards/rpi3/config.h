@@ -14,6 +14,7 @@
 /* define board */
 #define RPI3
 #define _M_X64
+#define P_SIZE		4096
 
 #define CONFIG_BAUDRATE	115200
 
@@ -51,7 +52,8 @@
 //#define USER_CONSOLE_DEV	"usb_serial0"
 #endif
 
-#define CFG_ROOT_FS_DEV		"nand2"
+#define CFG_NAND_BLOCK_SIZE     (256 << 10)
+#define CFG_ROOT_FS_DEV		"ramnand0"
 
 /* Macros defined by LED drv.
  * User leds */

@@ -1,6 +1,7 @@
 
 #include "uart.h"
 
+#if 0
 struct __attribute__((aligned(4096))) mmu_cfg {
 	unsigned long int ttlb_lvl0[512];
 	unsigned long int ttlb_lvl1[513];
@@ -47,15 +48,7 @@ void mmu_init() {
 	asm volatile("nop");
 	asm volatile("nop");
 }
-
-int arch_fixups(unsigned long int x0, unsigned long int x1, unsigned long int atags) {
-	serial_init();
-#if 0
-	serial_puts("ATAGS val: ");
-	serial_put_hexint(atags>>32);
-	serial_put_hexint(atags&0xffffffff);
-	serial_puts("\n");
 #endif
 
-	mmu_init();
+int arch_fixups(unsigned long int x0, unsigned long int x1, unsigned long int atags) {
 }

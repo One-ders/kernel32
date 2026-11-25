@@ -1,6 +1,6 @@
 
 #include <regdef.h>
-#include <frame.h>
+//#include <frame.h>
 #include <irq.h>
 #include <devices.h>
 #include <io.h>

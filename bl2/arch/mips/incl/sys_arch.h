@@ -1,5 +1,7 @@
 #include <../mmu.h>
 
+#include <frame.h>
+
 #define MIPS
 
 static inline __attribute__ ((always_inline))
@@ -12,7 +14,7 @@ unsigned long int save_cpu_flags() {
 
 static inline __attribute__ ((always_inline))
 void	restore_cpu_flags(unsigned long int flags) {
-	
+
 	__asm__ __volatile__("mtc0\t%z0, $12\n\t"
 				: : "Jr" (flags));
 }

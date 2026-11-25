@@ -1,6 +1,9 @@
 
+#define S_FRAME_SIZE 148
+
+
 struct fullframe {
-	unsigned int zero;	//	0*4
+	unsigned int zero;	//	0*4    (for saving previous irq_lev)
 	unsigned int at;	//	1*4
 	unsigned int v0;	//	2*4
 	unsigned int v1;	//	3*4

@@ -192,7 +192,7 @@ $(OBJ)/usr/fb: $(TOP)/usr/fb
 
 
 clean:
-	rm -rf $(OBJECTS) uCore uCore.bin uCore.img uroot rootf.img
+	rm -rf $(OBJECTS) uCore uCore.bin uCore.img uroot rootf.img pavo-nand.bin
 	rm -rf tmp obj *.o
 	$(MAKE) -C ipl clean
 	$(MAKE) -C $(TOP)/usr/libc clean

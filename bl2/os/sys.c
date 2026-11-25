@@ -82,20 +82,21 @@ CREATE_BITMAP(t_bp,512);
 CREATE_BITMAP(as_bp,256);
 
 int allocate_task_id(struct task *t) {
-        t->id=bitmap_alloc_first_free(t_bp);
+        t->id=bitmap_alloc_first_free(t_bp)+1;
 	return t->id;
 }
 
 void dealloc_task_id(int id) {
-	bitmap_dealloc(t_bp,id);
+	bitmap_dealloc(t_bp,id-1);
 }
 
 int allocate_as_id() {
-	return bitmap_alloc_first_free(as_bp);
+	int as_id=bitmap_alloc_first_free(as_bp)+1;
+	return as_id;
 }
 
 void dealloc_as_id(int id)  {
-	bitmap_dealloc(as_bp,id);
+	bitmap_dealloc(as_bp,id-1);
 }
 
 struct task *lookup_task_for_name(char *task_name) {
@@ -353,154 +354,9 @@ out:
 	return 0;
 }
 
-void *alloc_kheap(struct task *t, unsigned int size) {
-	unsigned long int a=t->kheap;
-	if (a+size>(((unsigned long int)t)+2048)) {
-		sys_printf("allocating outside kheap\n");
-		return 0;
-	}
-	t->kheap=a+size;
-	return (void *)a;
-}
-
-static int create_task(unsigned long int *svc_sp) {
-	struct task_create_args *tca=
-		(struct task_create_args *)get_svc_arg(svc_sp,0);
-	struct task *t=(struct task *)get_page();
-	unsigned char *estack=((unsigned char *)t)+2048;
-	unsigned long int *stackp=(unsigned long int *)(estack+2048);
-	unsigned char *uval=tca->val;
-	char *targs[]={uval,(char *)0x0};
-	char *environ[] = { (char *)0};
-
-	if (!t) {
-		set_svc_ret(svc_sp,-1);
-		return 0;
-	}
-
-	memset(t,0,sizeof(struct task));
-
-	t->kheap=(unsigned long int)(t+1);
-
-	if (allocate_task_id(t)<0) {
-		sys_printf("proc table full\n");
-		put_page(t);
-		set_svc_ret(svc_sp,-1);
-		return 0;
-	}
-
-	if (tca->prio>MAX_PRIO) {
-		set_svc_ret(svc_sp,-1);
-		return 0;
-	}
-	__builtin_memset(estack,0,2048);
-	t->estack=estack;
-#if 0
-	if (tca->val_size) {
-		int aval_size=(tca->val_size+7)&~0x7;
-		uval=((unsigned char *)stackp)-aval_size;
-		memcpy(uval,tca->val,tca->val_size);
-		stackp=(unsigned long int *)uval;
-	}
-#endif
-	t->asp=current->asp;
-	t->asp->ref++;
-	setup_return_stack(t,(void *)stackp,(unsigned long int)tca->fnc,0,targs,environ);
-
-	t->state=TASK_STATE_READY;
-	t->name=alloc_kheap(t,strlen(tca->name)+5);
-	sys_sprintf(t->name,"%s:%03d:%03d",tca->name,t->asp->id,t->id);
-	SET_PRIO(t,tca->prio);
-	t->next2=troot;
-	troot=t;
-
-	if(!ready[tca->prio]) {
-		ready[tca->prio]=t;
-	} else {
-		ready_last[tca->prio]->next=t;
-	}
-	ready_last[tca->prio]=t;
-
-	if (tca->prio<GET_PRIO(current)) {
-		DEBUGP(DSYS_SCHED,DLEV_INFO,"Create task: %s, switch out %s\n", t->name, current->name);
-		switch_on_return();
-	} else {
-		DEBUGP(DSYS_SCHED,DLEV_INFO,"Create task: %s\n", t->name);
-	}
-
-	set_svc_ret(svc_sp,0);
-	return 0;
-}
-
-static struct task *create_task_sa(struct task_create_args *tca) {
-	struct task *t=(struct task *)get_page();
-	unsigned char *estack=((unsigned char *)t)+2048;
-	unsigned long int *stackp=(unsigned long int *)(estack+2048);
-	unsigned char *uval=tca->val;
-	char *targs[]={uval,(char *)0x0};
-	char *environ[] = { (char *)0};
-
-	if (!t) {
-		sys_printf("get page -> 0\n");
-		return 0;
-	}
-
-	memset(t,0,sizeof(struct task));
-
-	t->kheap=(unsigned long int)(t+1);
-
-	if (allocate_task_id(t)<0) {
-		sys_printf("proc table full\n");
-		put_page(t);
-		return 0;
-	}
-
-	if (tca->prio>MAX_PRIO) {
-		return 0;
-	}
-	__builtin_memset(estack,0,2048);
-	t->estack=estack;
-#if 0
-	if (tca->val_size) {
-		int aval_size=(tca->val_size+7)&~0x7;
-		uval=((unsigned char *)stackp)-aval_size;
-		memcpy(uval,tca->val,tca->val_size);
-		stackp=(unsigned long int *)uval;
-	}
-#endif
-	t->asp=current->asp;
-	t->asp->ref++;
-	setup_return_stack(t,(void *)stackp,(unsigned long int)tca->fnc,0,targs,environ);
-
-	t->state=TASK_STATE_READY;
-	t->name=alloc_kheap(t,strlen(tca->name)+5);
-	sys_sprintf(t->name,"%s:%03d:%03d",tca->name,t->asp->id,t->id);
-	SET_PRIO(t,tca->prio);
-	t->next2=troot;
-	troot=t;
-
-	if(!ready[tca->prio]) {
-		ready[tca->prio]=t;
-	} else {
-		ready_last[tca->prio]->next=t;
-	}
-	ready_last[tca->prio]=t;
-
-	if ((current==&idle_task)||(tca->prio<GET_PRIO(current))) {
-		DEBUGP(DSYS_SCHED,DLEV_INFO,"Create task: %s, switch out %s\n", t->name, current->name);
-		switch_on_return();
-	} else {
-		DEBUGP(DSYS_SCHED,DLEV_INFO,"Create task: %s\n", t->name);
-	}
-
-	return t;
-}
-
-
 static int fork(unsigned long int *svc_sp) {
 	struct task *t;
 	unsigned char *estack;
-	unsigned long int *stackp;
 	int prio=GET_PRIO(current);
 	unsigned long int cpu_flags;
 	int rc;
@@ -518,8 +374,7 @@ static int fork(unsigned long int *svc_sp) {
 		return 0;
 	}
 
-	stackp=(void *)(((unsigned long int)t)+4096);
-	t->estack=(void *)(((unsigned long int)t)+2048);
+//	t->estack=(void *)(((unsigned long int)t)+2048);
 	t->prio_flags=current->prio_flags;
 
 	t->asp->fd_tab[0]=current->asp->fd_tab[0];
@@ -529,9 +384,14 @@ static int fork(unsigned long int *svc_sp) {
 	cpu_flags=disable_interrupts();
 	estack=t->estack;
 	__builtin_memcpy(estack,current->estack,2048);
-	t->sp=(((unsigned long int)svc_sp)-((unsigned long int)current->estack))+t->estack;
+//	t->sp=(((unsigned long int)svc_sp)-((unsigned long int)current->estack))+t->estack;
+//	t->sp=(((unsigned long int)current->sp)-((unsigned long int)current->estack))+t->estack;
+	unsigned long int offset = (unsigned long int)svc_sp - (unsigned long int)current->estack;
+	t->sp = (void *)((unsigned long int)t->estack + offset);
+
 
 	t->state=TASK_STATE_READY;
+sys_printf("calling alloc_kheap from fork\n");
 	t->name=alloc_kheap(t,strlen(current->name)+1);
 	if (!t->name) {
 		sys_printf("could not get space for task name\n");
@@ -1383,6 +1243,8 @@ static int set_debug_level(unsigned long int *svc_sp) {
 
 /* Linux syscall emulation, for musl */
 
+int arch_lnx_newfstatat(unsigned long int *svc_sp);
+
 extern struct driver yaffsfs_drv;
 
 struct yaffsfs_Handle {
@@ -1445,17 +1307,26 @@ static int lnx_close(unsigned long int *svc_sp) {
 	return 0;
 }
 
-static int lnx_execve(unsigned long int *svc_sp) {
+int lnx_execve(unsigned long int *svc_sp) {
 	char *path=(char *)get_svc_arg(svc_sp,0);
 	char npath[strlen(path + 1)];
 	char **argv=(char **)get_svc_arg(svc_sp,1);
-//	char **envp=(char **)get_svc_arg(svc_sp,2);
+	char **envp=(char **)get_svc_arg(svc_sp,2);
+	/* args */
 	int nr_args=array_size(argv);
 	int argv_storage_size=args_size(argv);
 	char *nargv[nr_args+1];
 	char argv_storage[argv_storage_size];
+	/* env */
+	int nr_envs=array_size(envp);
+	int env_storage_size=env_size(envp);
+	char *nenvp[nr_envs+1];
+	char env_storage[env_storage_size];
+
 	struct address_space *asp=current->asp;
-	char *envp[]={ NULL };
+	unsigned long int entry_vaddr;
+	unsigned long int user_sp_vaddr;
+
 
 	// copy stuff we need to kernel space
 	strcpy(npath,path);
@@ -1463,18 +1334,16 @@ static int lnx_execve(unsigned long int *svc_sp) {
 	copy_arguments(nargv,argv,argv_storage,nr_args);
 	nargv[nr_args]=0;
 
+	copy_env(nenvp,envp,env_storage,nr_envs);
+	nenvp[nr_envs]=0;
+
 	// forget all about this process
 	free_asp_pages(asp);
-	if (load_binary(npath)<0) {
+	if (load_binary(npath,&entry_vaddr)<0) {
 		sys_printf("must kill self\n");
 	}
 
-#if 0
-	current->kheap=((unsigned char *)current)+(sizeof(struct task)+sizeof(struct address_space));
-	current->name=alloc_kheap(current,strlen(argv[0])+5);
-	sys_sprintf(current->name,"%s:%03d",argv[0],current->asp->id);
-#endif
-	setup_return_stack(current, (void *)(((unsigned long int)svc_sp)+148), 0x40000, 0, nargv, envp);
+	setup_return_stack(current, (void *)(((unsigned long int)svc_sp)+S_FRAME_SIZE), entry_vaddr, 0, nargv, nenvp);
 
 	return 0;
 }
@@ -1669,7 +1538,31 @@ static int lnx_fcntl(unsigned long int *svc_sp) {
 	return 0;
 }
 
-void *handle_syscall(unsigned long int *svc_sp) {
+static int lnx_openat(unsigned long int *svc_sp) {
+	int dirfd=(int)get_svc_arg(svc_sp,0);
+	char *path=(char *)get_svc_arg(svc_sp,1);
+	int flags=(int)get_svc_arg(svc_sp,2);
+	int mode=(int)get_svc_arg(svc_sp,3);
+	int rc;
+	if (dirfd == -100) {
+		rc=sys_open(path,flags,mode);
+		if (rc<0) {
+			set_svc_ret(svc_sp, -yaffsfs_GetLastError());
+			set_svc_lret(svc_sp,-1);
+		} else {
+			void *dh=yaffsfs_HandleToPointer(rc);
+			int ufd=get_user_fd(current->asp,&yaffsfs_drv,dh);
+			set_svc_ret(svc_sp,ufd);
+			set_svc_lret(svc_sp,0);
+		}
+	} else {
+		set_svc_ret(svc_sp,-1);
+		set_svc_lret(svc_sp,-1);
+	}
+	return 0;
+}
+
+void *handle_syscall(unsigned long int *svc_sp, unsigned long int ereg) {
 	unsigned int sys_domain;
 	unsigned int svc_number;
 
@@ -1681,7 +1574,7 @@ void *handle_syscall(unsigned long int *svc_sp) {
 	 * First argument (r0) is svc_args[0]
 	 */
 
-	svc_number=get_svc_number(svc_sp,&sys_domain);
+	svc_number=get_svc_number(svc_sp,ereg,&sys_domain);
 	if (sys_domain==SYSCALL_NATIVE) {
 		switch(svc_number) {
 			case SVC_CREATE_TASK: {
@@ -1773,23 +1666,15 @@ void *handle_syscall(unsigned long int *svc_sp) {
 				return 0;
 			}
 			case SVC_SBRK: {
-#ifdef MMU
 				long int incr=get_svc_arg(svc_sp,0);
 				void *ret=sys_sbrk(current,incr);
 				set_svc_ret(svc_sp,(unsigned long)ret);
-#else
-				set_svc_ret(svc_sp,0);
-#endif
 				return 0;
 			}
 			case SVC_BRK: {
-#ifdef MMU
 				void *nbrk=(void *)get_svc_arg(svc_sp,0);
 				int ret=sys_brk(current,nbrk);
 				set_svc_ret(svc_sp,ret);
-#else
-				set_svc_ret(svc_sp,-1);
-#endif
 				return 0;
 			}
 			case SVC_FORK: {
@@ -1864,6 +1749,10 @@ void *handle_syscall(unsigned long int *svc_sp) {
 				lnx_lstat(svc_sp);
 				return 0;
 			}
+			case LNX_NEWFSTATAT: { // Linux fstatat
+				arch_lnx_newfstatat(svc_sp);
+				return 0;
+			}
 			case LNX_GETDENTS64: { // Linux dirent64
 				lnx_dirent64(svc_sp);
 				return 0;
@@ -1872,9 +1761,13 @@ void *handle_syscall(unsigned long int *svc_sp) {
 				lnx_fcntl(svc_sp);
 				return 0;
 			}
+			case LNX_OPENAT: { // Linux openat
+				lnx_openat(svc_sp);
+				return 0;
+			}
 			default:
 				io_setpolled(1);
-				sys_printf("%s: bad lnx syscall %x\n",current->name,svc_number);
+				sys_printf("%s: bad lnx syscall 0x%x\n",current->name,svc_number);
 				set_svc_ret(svc_sp,-1);
 				while(1);
 				break;
@@ -2429,8 +2322,7 @@ void start_up(void) {
 extern void sys_mon(void *);
 extern int switch_flag;
 
-//extern int __usr_main(int argc, char **argv);
-extern void *usr_init;
+//extern void *usr_init;
 
 int mount_nand(char *nand_dev_name);
 
@@ -2454,7 +2346,7 @@ int dump_page(unsigned char *buf, int len, char *prefix) {
 	}
 }
 
-extern int __usr_main(int argc, char **argv);
+//extern int __usr_main(int argc, char **argv);
 void start_sys(void) {
 
 	unsigned long int stackp;
@@ -2462,54 +2354,33 @@ void start_sys(void) {
 	char *targs[]={CFG_CONSOLE_DEV, (char *)0x0};
 	char *environ[]={(char *)0x0};
 	int	load_user=0;
+	unsigned long int entry_vaddr;
+	unsigned char buf[4096];
 
-#ifdef MMU
-#if 0
-	struct driver *nand_drv=driver_lookup(CFG_ROOT_FS_DEV);
+	struct driver *rootfs_drv=driver_lookup(CFG_ROOT_FS_DEV);
 
-	if (nand_drv) {
+	if (rootfs_drv) {
 		struct device_handle *dh;
 		unsigned char buf[4096];
-		dh=nand_drv->ops->open(nand_drv->instance,0,0);
+		dh=rootfs_drv->ops->open(rootfs_drv->instance,0,0);
 		if (dh) {
 			memset(buf,9,4096);
-			nand_drv->ops->control(dh,
-						NAND_READ_RAW,
-						buf,
-						2048+64);
-			dump_page(buf,2048,"Data: ");
-			dump_page(buf+2048,64,"OOB Data: ");
+			rootfs_drv->ops->control(dh,
+					NAND_READ_RAW,
+					buf,
+					2048+64);
+//			dump_page(buf,2048,"Data: ");
+//			dump_page(buf+2048,64,"OOB Data: ");
 		}
-	} else {
-		sys_printf("did not find : driver nand4\n");
-
+	}  else {
+		sys_printf("did not find : driver %s\n", CFG_ROOT_FS_DEV);
 	}
-#endif
+
 	if(mount_nand(CFG_ROOT_FS_DEV)<0) {
 		sys_printf("could not mount nand\n");
 	}
 
 	t=create_user_context();
-	if (!t) {
-#ifdef RPI3
-		struct task_create_args tca;
-
-		disable_interrupts();
-		memset(&tca,0,sizeof(tca));
-		tca.val=CFG_CONSOLE_DEV;
-		tca.prio=3;
-		tca.fnc=__usr_main;
-		tca.name="grrrk";
-		t=create_task_sa(&tca);
-
-		t->asp->fd_tab[0]=fd_con;
-		t->asp->fd_tab[1]=fd_con;
-		t->asp->fd_tab[2]=fd_con;
-#endif
-
-	} else {
-		load_user=1;
-	}
 
 	if (!t) {
 		sys_printf("no task created\n");
@@ -2517,54 +2388,42 @@ void start_sys(void) {
 	}
 
 	sys_printf("load_init:\n");
-	load_init(t);
-#else
-	t=(struct task *)get_page();
-	memset(t,0,sizeof(struct task));
-	if (allocate_task_id(t)<0) {
-		sys_printf("proc table full\n");
-		put_page(t);
-		while(1);
+	load_init(t,&entry_vaddr);
+
+	t->name=alloc_kheap(t,strlen("sys_mon")+5);
+	sys_sprintf(t->name,"%s:%03d","sys_mon",t->asp->id);
+	t->state=TASK_STATE_READY;
+	t->prio_flags=3;  // Prio 3, not blocked, not scheduled for tslice switch
+	setup_return_stack(t,t->sp,entry_vaddr,0, targs, environ);
+
+	disable_interrupts();
+
+	t->asp->fd_tab[0]=fd_con;
+	t->asp->fd_tab[1]=fd_con;
+	t->asp->fd_tab[2]=fd_con;
+
+	t->asp->next=current->asp->child;
+	current->asp->child=t->asp;
+	t->asp->parent=current->asp;
+
+	t->next2=troot;
+	troot=t;
+
+	if(!ready[GET_PRIO(t)]) {
+		ready[GET_PRIO(t)]=t;
+	} else {
+		ready_last[GET_PRIO(t)]->next=t;
 	}
-#endif
+	ready_last[GET_PRIO(t)]=t;
+	switch_on_return();  /* will switch in the task on return from next irq */
 
-	if (load_user) {
-		t->name=alloc_kheap(t,strlen("sys_mon")+5);
-		sys_sprintf(t->name,"%s:%03d","sys_mon",t->asp->id);
-		t->state=TASK_STATE_READY;
-		t->prio_flags=3;  // Prio 3, not blocked, not scheduled for tslice switch
-		stackp=((unsigned long int)t)+4096;
-		t->estack=(void *)(((unsigned long int)t)+2048);
-		setup_return_stack(t,(void *)stackp,(unsigned long int)usr_init,0, targs, environ);
-
-		disable_interrupts();
-
-		t->asp->fd_tab[0]=fd_con;
-		t->asp->fd_tab[1]=fd_con;
-		t->asp->fd_tab[2]=fd_con;
-
-		t->asp->next=current->asp->child;
-		current->asp->child=t->asp;
-		t->asp->parent=current->asp;
-
-		t->next2=troot;
-		troot=t;
-
-		if(!ready[GET_PRIO(t)]) {
-			ready[GET_PRIO(t)]=t;
-		} else {
-			ready_last[GET_PRIO(t)]->next=t;
-		}
-		ready_last[GET_PRIO(t)]=t;
-		switch_on_return();  /* will switch in the task on return from next irq */
-	}
-	clear_all_interrupts();
+//	clear_all_interrupts();
 	enable_interrupts();
+
 	while(1) {
 		wait_irq();
 	}
 
 //	thread_create(sys_mon,"usart0",0,3,"sys_mon");
-////	thread_create(sys_mon,"stterm0",3,"sys_mon");
 ////	thread_create(sys_mon,"usb_serial0",2,"sys_mon");
 }

@@ -1,5 +1,15 @@
 
+#include "sys_const.h"
 #include <../mmu.h>
+
+
+#ifndef __ASSEMBLY__
+typedef unsigned char     u8;
+typedef unsigned short int u16;
+typedef unsigned int u32;
+typedef unsigned long long int u64;
+typedef signed int s32;
+#endif
 
 static inline __attribute__ ((always_inline))
 unsigned long int save_cpu_flags(void) {

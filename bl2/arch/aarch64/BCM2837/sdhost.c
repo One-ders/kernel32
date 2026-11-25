@@ -1114,8 +1114,6 @@ static int sdhost_init(void *inst) {
 	if (!init_done) {
 		init_done=1;
 		init_gpio();
-
-		sys_printf("sdhost_init: done\n");
 	}
 
 	return 0;

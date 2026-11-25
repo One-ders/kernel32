@@ -4,7 +4,7 @@
 #include "io.h"
 #include "sys.h"
 #include "irq.h"
-#include "frame.h"
+//#include "frame.h"  // included from sys_arch.h
 
 #define TXB_SIZE 1024
 #define TXB_MASK (TXB_SIZE-1)

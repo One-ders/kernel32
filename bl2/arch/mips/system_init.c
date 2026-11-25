@@ -69,13 +69,13 @@ int sys_brk(struct task *t, void *nbrk) {
 
 extern unsigned long int *curr_pgd;
 
-int load_init(struct task *t) {
+int load_init(struct task *t, unsigned long int *entry_vaddr) {
 	unsigned long brk_save;
 	unsigned int brk=0;
 
 	struct elf_phdr phdr;
 
-	int rc=elf_get_first_phdr("/init",&phdr);
+	int rc=elf_get_first_phdr("/init",&phdr,entry_vaddr);
 	if (rc<0) {
 		sys_printf("could not open init\n");
 		return -1;
@@ -92,20 +92,20 @@ int load_init(struct task *t) {
 	init_tlb();
 
 	while(1) {
-		if (brk<phdr.p.p_vaddr+phdr.p.p_memsz) {
-			brk=phdr.p.p_vaddr+phdr.p.p_memsz;
+		if (brk<phdr.p32.p_vaddr+phdr.p32.p_memsz) {
+			brk=phdr.p32.p_vaddr+phdr.p32.p_memsz;
 			sys_brk(current,(void *)brk);
 		}
-		if (phdr.p.p_memsz) {
-			sys_lseek(phdr.fd,phdr.p.p_offset,SEEK_SET);
-			DEBUGP(DSYS_LOAD,DLEV_INFO, "load: at %x size %x\n", phdr.p.p_vaddr, phdr.p.p_memsz);
-			sys_read(phdr.fd,(void *)phdr.p.p_vaddr,phdr.p.p_filesz);
+		if (phdr.p32.p_memsz) {
+			sys_lseek(phdr.fd,phdr.p32.p_offset,SEEK_SET);
+			DEBUGP(DSYS_LOAD,DLEV_INFO, "load: at %x size %x\n", phdr.p32.p_vaddr, phdr.p32.p_memsz);
+			sys_read(phdr.fd,(void *)phdr.p32.p_vaddr,phdr.p32.p_filesz);
 		}
-		if (phdr.p.p_memsz-phdr.p.p_filesz) {
+		if (phdr.p32.p_memsz-phdr.p32.p_filesz) {
 			DEBUGP(DSYS_LOAD,DLEV_INFO, "zero out %d bytes at %x\n",
-				phdr.p.p_memsz-phdr.p.p_filesz,
-				phdr.p.p_vaddr+phdr.p.p_memsz);
-			memset((void *)phdr.p.p_vaddr+phdr.p.p_filesz,0,phdr.p.p_memsz-phdr.p.p_filesz);
+				phdr.p32.p_memsz-phdr.p32.p_filesz,
+				phdr.p32.p_vaddr+phdr.p32.p_memsz);
+			memset((void *)phdr.p32.p_vaddr+phdr.p32.p_filesz,0,phdr.p32.p_memsz-phdr.p32.p_filesz);
 		}
 
 		rc=elf_get_next_phdr(&phdr);
@@ -121,12 +121,12 @@ int load_init(struct task *t) {
 	return 0;
 }
 
-int load_binary(char *path) {
+int load_binary(char *path, unsigned long int *entry_vaddr) {
 	unsigned int brk=0;
 
 	struct elf_phdr phdr;
 
-	int rc=elf_get_first_phdr(path,&phdr);
+	int rc=elf_get_first_phdr(path,&phdr,entry_vaddr);
 	if (rc<0) {
 		sys_printf("could not open %s\n", path);
 		return -1;
@@ -136,20 +136,20 @@ int load_binary(char *path) {
 	current->asp->mmap_vaddr=0x10000000;
 
 	while(1) {
-		if (brk<phdr.p.p_vaddr+phdr.p.p_memsz) {
-			brk=phdr.p.p_vaddr+phdr.p.p_memsz;
+		if (brk<phdr.p32.p_vaddr+phdr.p32.p_memsz) {
+			brk=phdr.p32.p_vaddr+phdr.p32.p_memsz;
 			sys_brk(current,(void *)brk);
 		}
-		if (phdr.p.p_memsz) {
-			sys_lseek(phdr.fd,phdr.p.p_offset,SEEK_SET);
-			DEBUGP(DSYS_LOAD,DLEV_INFO, "load: at %x size %x\n", phdr.p.p_vaddr, phdr.p.p_memsz);
-			sys_read(phdr.fd,(void *)phdr.p.p_vaddr,phdr.p.p_filesz);
+		if (phdr.p32.p_memsz) {
+			sys_lseek(phdr.fd,phdr.p32.p_offset,SEEK_SET);
+			DEBUGP(DSYS_LOAD,DLEV_INFO, "load: at %x size %x\n", phdr.p32.p_vaddr, phdr.p32.p_memsz);
+			sys_read(phdr.fd,(void *)phdr.p32.p_vaddr,phdr.p32.p_filesz);
 		}
-		if (phdr.p.p_memsz-phdr.p.p_filesz) {
+		if (phdr.p32.p_memsz-phdr.p32.p_filesz) {
 			DEBUGP(DSYS_LOAD,DLEV_INFO, "zero out %d bytes at %x\n",
-				phdr.p.p_memsz-phdr.p.p_filesz,
-				phdr.p.p_vaddr+phdr.p.p_memsz);
-			memset((void *)phdr.p.p_vaddr+phdr.p.p_filesz,0,phdr.p.p_memsz-phdr.p.p_filesz);
+				phdr.p32.p_memsz-phdr.p32.p_filesz,
+				phdr.p32.p_vaddr+phdr.p32.p_memsz);
+			memset((void *)phdr.p32.p_vaddr+phdr.p32.p_filesz,0,phdr.p32.p_memsz-phdr.p32.p_filesz);
 		}
 
 		rc=elf_get_next_phdr(&phdr);
@@ -157,6 +157,5 @@ int load_binary(char *path) {
 	}
 
 	elf_close(&phdr);
-
 	return 0;
 }

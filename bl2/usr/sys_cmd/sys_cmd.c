@@ -83,8 +83,13 @@ static int get_procdata(int fd, char *name, struct Env *env) {
 
 	rc=io_read(fd2,&pd,sizeof(pd));
 	if(rc>0) {
-		dprintf(env->io_fd, "task(%3d@%08x) %14s, sp=0x%08x, pc=0x%08x, prio=%x, state=%c, atics=%d\n",
-		pd.id, pd.addr, pd.name, pd.sp, pd.pc, pd.prio_flags, toNum(pd.state),pd.active_tics);
+		if (sizeof(unsigned long int)==4) {
+			dprintf(env->io_fd, "task(%3ld@%08lx) %14s, sp=0x%08lx, pc=0x%08lx, prio=%lx, state=%c, atics=%ld\n",
+				pd.id, pd.addr, pd.name, pd.sp, pd.pc, pd.prio_flags, toNum(pd.state),pd.active_tics);
+		} else {
+			dprintf(env->io_fd, "task(%3ld@%016lx) %14s, sp=0x%016lx, pc=0x%016lx, prio=%lx, state=%c, atics=%ld\n",
+				pd.id, pd.addr, pd.name, pd.sp, pd.pc, pd.prio_flags, toNum(pd.state),pd.active_tics);
+		}
 	}
 	io_close(fd2);
 	return 0;
@@ -676,6 +681,47 @@ static int runloop_fnc(int argc, char **argv, struct Env *env) {
 	return 0;
 }
 
+#ifdef AARCH64
+uint64_t read_cycle_count() {
+	uint64_t val;
+	asm volatile(
+		"isb\n\t"
+		"mrs %0, cntvct_el0\n\t"
+		"isb"
+		: "=r" (val) :: "memory"
+	);
+	return val;
+}
+#endif
+
+static int refclocktst_fnc(int argc, char **argv, struct Env *env) {
+
+	uint64_t freq;
+	uint64_t stop;
+	uint64_t now;
+	uint64_t prev;
+
+#ifdef AARCH64
+	asm volatile("mrs %0, cntfrq_el0" : "=r" (freq));
+	dprintf(env->io_fd,"refclock freq %ld hz\n", freq);
+
+	now=prev=read_cycle_count();
+	stop=(freq*10)+now;
+	while(stop>now) {
+		now=read_cycle_count();
+		if(now>(prev+20000)) {
+			dprintf(env->io_fd,"refclock jumped %d steps\n", now-prev);
+		}
+		prev=now;
+	}
+	dprintf(env->io_fd,"refclock test done\n");
+#else
+	dprintf(env->io_fd,"refclock NOI\n");
+#endif
+
+	return 0;
+}
+
 static struct cmd cmd_root[] = {
 		{"help", generic_help_fnc},
 		{"ps", ps_fnc},
@@ -696,6 +742,7 @@ static struct cmd cmd_root[] = {
 		{"flush_tlb", flushtlb_fnc},
 		{"loadnrun", loadnrun_fnc},
 		{"runloop", runloop_fnc},
+		{"refclocktst", refclocktst_fnc},
 		{0,0}
 };
 

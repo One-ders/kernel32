@@ -177,6 +177,49 @@ char *itoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_nu
 	return buf;
 }
 
+char *litoa(unsigned long int val, char *buf, int bz, int prepend_zero, int prepend_num) {
+	int i=0;
+	int j;
+	int to;
+	char p_char=prepend_zero?'0':' ';
+	char p_neg=0;
+
+	if (((long int)val)<0) {
+		val=-((long int)val);
+		p_neg=1;
+	}
+	if (!val) {
+		ASSERT(i<bz);
+		buf[i++]=cmap[0];
+	} else {
+		while(val) {
+			ASSERT(i<bz);
+			buf[i]=cmap[(val%10)];
+			i++;
+			val=val/10;
+		}
+	}
+	to=prepend_num-i;
+	if (to<0)to=0;
+	if (p_neg) to++;
+	ASSERT(i<bz);
+	for(j=0;j<i/2;j++) {
+		char tmp=buf[j];
+		buf[j]=buf[i-j-1];
+		buf[i-j-1]=tmp;
+	}
+	ASSERT((i+to)<bz);
+	__builtin_memmove(&buf[to],buf,i);
+	__builtin_memset(buf,p_char,to);
+	if (p_neg) {
+		buf[0]='-';
+	}
+	buf[i+to]=0;
+
+	return buf;
+}
+
+
 char *xtoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_num) {
 	int i=0;
 	int j;
@@ -209,6 +252,40 @@ char *xtoa(unsigned int val, char *buf, int bz, int prepend_zero, int prepend_nu
 
 	return buf;
 }
+
+char *lxtoa(unsigned long int val, char *buf, int bz, int prepend_zero, int prepend_num) {
+	int i=0;
+	int j;
+	int to;
+	char p_char=prepend_zero?'0':' ';
+
+	if (!val) {
+		ASSERT(i<bz);
+		buf[i++]=cmap[(val%10)];
+	} else {
+		while(val) {
+			ASSERT(i<bz);
+			buf[i]=cmap[(val%16)];
+			i++;
+			val=val>>4;
+		}
+	}
+	to=prepend_num-i;
+	if (to<0)to=0;
+	ASSERT(i<bz);
+	for(j=0;j<i/2;j++) {
+		char tmp=buf[j];
+		buf[j]=buf[i-1-j];
+		buf[i-1-j]=tmp;
+	}
+	ASSERT((i+to)<bz);
+	__builtin_memmove(&buf[to],buf,i);
+	__builtin_memset(buf,p_char,to);
+	buf[i+to]=0;
+
+	return buf;
+}
+
 
 unsigned long int strtoul(char *str, char **endp, int base) {
 	char *p=str;
@@ -322,10 +399,20 @@ int parse_fmt(const char *fmt, int *field_width, int *zero_fill) {
 	return i;
 }
 
+int parse_arg_size(const char *fmt, char *arg_size) {
+	int i=0;
+	int val=0;
+	if ((*fmt)=='l') {
+		*arg_size='l';
+		i++;
+	}
+	return i;
+}
+
 int sys_printf(const char *fmt, ...) {
 	int i=0;
 	va_list ap;
-	char numericbuf[16];
+	char numericbuf[32];
 	const char *ppos=fmt;
 	int polled=0;
 
@@ -375,7 +462,9 @@ int sys_printf(const char *fmt, ...) {
 		c=ppos[i++];
 		if (c=='%') {
 			int prepend_zero=0, prepend_num=0;
+			char arg_size='w';
 			i+=parse_fmt(&ppos[i],&prepend_num, &prepend_zero);
+			i+=parse_arg_size(&ppos[i],&arg_size);
 			switch((c=ppos[i++])) {
 				case 's': {
 					char *s=va_arg(ap,char *);
@@ -397,19 +486,31 @@ int sys_printf(const char *fmt, ...) {
 					i++;
 				}
 				case 'd': {
-					char *s=itoa(va_arg(ap,unsigned int),numericbuf, 16,
+					char *s;
+					if (arg_size=='l') {
+						s=litoa(va_arg(ap,unsigned long int),numericbuf, 32,
 								prepend_zero, prepend_num);
+					} else {
+						s=itoa(va_arg(ap,unsigned int),numericbuf, 32,
+								prepend_zero, prepend_num);
+					}
 					io_add_str(s);
 					break;
 				}
 				case 'x': {
-					char *s=xtoa(va_arg(ap,unsigned int),numericbuf, 16,
+					char *s;
+					if (arg_size=='l') {
+						s=lxtoa(va_arg(ap,unsigned long int),numericbuf, 32,
 							prepend_zero, prepend_num);
+					} else {
+						s=xtoa(va_arg(ap,unsigned int),numericbuf, 32,
+							prepend_zero, prepend_num);
+					}
 					io_add_str(s);
 					break;
 				}
 				case 't': {
-					char *s=ts_format(tq_tic,numericbuf, 16);
+					char *s=ts_format(tq_tic,numericbuf, 32);
 					io_add_str(s);
 				}
 				default: {
@@ -456,7 +557,7 @@ int buf_add_strn(char **buf, const char *bytes, int len) {
 int sys_sprintf(char *buf, const char *fmt, ...) {
 	int i=0;
 	va_list ap;
-	char numericbuf[16];
+	char numericbuf[32];
 	const char *ppos=fmt;
 	int polled=0;
 
@@ -493,7 +594,9 @@ int sys_sprintf(char *buf, const char *fmt, ...) {
 		c=ppos[i++];
 		if (c=='%') {
 			int prepend_zero=0, prepend_num=0;
+			char arg_size='w';
 			i+=parse_fmt(&ppos[i],&prepend_num, &prepend_zero);
+			i+=parse_arg_size(&ppos[i],&arg_size);
 			switch((c=ppos[i++])) {
 				case 's': {
 					char *s=va_arg(ap,char *);
@@ -512,19 +615,31 @@ int sys_sprintf(char *buf, const char *fmt, ...) {
 					break;
 				}
 				case 'd': {
-					char *s=itoa(va_arg(ap,unsigned int),numericbuf, 16,
+					char *s;
+					if (arg_size=='l') {
+						s=litoa(va_arg(ap,unsigned long int), numericbuf, 32,
 								prepend_zero, prepend_num);
+					} else {
+						s=itoa(va_arg(ap,unsigned int),numericbuf, 32,
+								prepend_zero, prepend_num);
+					}
 					buf_add_str(&buf,s);
 					break;
 				}
 				case 'x': {
-					char *s=xtoa(va_arg(ap,unsigned int),numericbuf, 16,
+					char *s;
+					if (arg_size=='l') {
+						s=lxtoa(va_arg(ap,unsigned long int),numericbuf, 32,
 							prepend_zero, prepend_num);
+					} else {
+						s=xtoa(va_arg(ap,unsigned int),numericbuf, 32,
+							prepend_zero, prepend_num);
+					}
 					buf_add_str(&buf,s);
 					break;
 				}
 				case 't': {
-					char *s=ts_format(tq_tic,numericbuf, 16);
+					char *s=ts_format(tq_tic,numericbuf, 32);
 					buf_add_str(&buf,s);
 				}
 				default: {

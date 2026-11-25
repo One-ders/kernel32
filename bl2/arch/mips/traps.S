@@ -968,6 +968,7 @@ _handle_Sys:
 #
 	lui	ra,%hi(ret_from_sys)
 	addiu	ra, ra, %lo(ret_from_sys)
+	xor	a1,a1,a1
 	j	handle_syscall
 	move	a0,sp
 

@@ -1,64 +1,60 @@
-
 OUTPUT_ARCH(aarch64)
 ENTRY(_start)
 SECTIONS
 {
-        . = 0x0000400;
+        /* ========================================================
+           SEKTION 1: KOD & READ-ONLY DATA (ALLTID PÅ 4MB)
+           Mappas i kernel som: USER_READONLY | USER_EXECUTE
+           ======================================================== */
+        . = 0x00400000;
 
-        . = ALIGN(4);
-        .text       :
+        /* Tvinga fram 4KB-justering för starten av text (kod) */
+        .text : ALIGN(4096)
         {
           *(.text .text.*)
         }
 
-        . = 0x20000;
-        . = ALIGN(4);
-        .rodata  : { *(.rodata .rodata.* .gnu.linkonce.r.*) }
-	.rodata1 : { *(.rodata1) }
-	/* thread local storage */
-	.tdata	: { *(.tdata .tdata.* .gnu.linkonce.td.*) }
-	.tbss	: { *(.tbss .tbss.* .gnu.linkonce.tb.*) *(.tcommon) }
+        /* Lägg rodata direkt efter .text på en egen jämn sidgräns */
+        .rodata : ALIGN(4096)
+        {
+          *(.rodata .rodata.*)
+        }
+        .rodata1 : { *(.rodata1) }
 
-	.sdata2	: {
-		*(.sdata2 .sdata2.* .gnu.linkonce.s2.*)
-	}
+        /* ========================================================
+           SEKTION 2: DATA, BSS & HEAP (ALLTID PÅ 16MB)
+           Mappas i kernel som: USER_READWRITEEXECUTE
+           ======================================================== */
+        . = 0x01000000;
 
-	.sbbs2 : { *(.sbss2 .sbss2.* .gnu.linkonce.sb2.*) }
-
-        . = ALIGN(4);
-        .data  : { *(.data .data.*) }
+        /* Starten på datasegmentet justeras hårt till en ny 4KB-sida */
+        .data : ALIGN(4096)
+        {
+          *(.data .data.*)
+        }
         .data1  : { *(.data1) }
 
-        . = .;
+        /* Global Offset Table (används av dynamiska/musl-strukturer) */
+        .got    : { *(.got.plt) *(.got) }
 
-        _gp = ALIGN(16);
+        _edata = .; PROVIDE (edata = .);
 
-        .got  : { *(.got.plt) *(.got) }
+        /* ========================================================
+           SEKTION 3: BSS
+           ======================================================== */
+        . = ALIGN(4096);
+        __bss_start__ = .;
 
-        .sdata  : { *(.sdata .sdata.* .gnu.linkonce.s.*) }
+        .bss : ALIGN(4096)
+        {
+                *(.dynbss)
+                *(.bss .bss.*)
+                *(COMMON)
+        }
 
-	.lit8           : { *(.lit8) }
-	.lit4           : { *(.lit4) }
-	_edata = .; PROVIDE (edata = .);
-
-        . = ALIGN(4);
-
-	__bss_start__ = .;
-        .sbss  : {
-		*(.dynsbss)
-		*(.sbss .sbss.* .gnu.linkonce.sb.*)
-        	*(.scommon)
-	}
-        .bss  : {
-		*(.dynbss)
-		*(.bss .bss.* .gnu.linkonce.b.*)
-		*(COMMON)
-		. = ALIGN(. != 0 ? 32 / 8 : 1);
-	}
-
-	. = ALIGN(32 / 8);
-	. = ALIGN(32 / 8);
-	__bss_end__ = .;
-	_end = .; PROVIDE (end = .);
+        /* Slutjustera BSS och sätt Heap-starten på en ren sidgräns */
+        . = ALIGN(4096);
+        __bss_end__ = .;
+        _end = .; PROVIDE (end = .);
 }
 

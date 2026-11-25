@@ -90,7 +90,7 @@ static inline void
 swapfunc(char *a, char *b, size_t n, int swaptype)
 {
 
-	if (swaptype <= 1) 
+	if (swaptype <= 1)
 		swapcode(long, a, b, n)
 	else
 		swapcode(char, a, b, n)
@@ -218,11 +218,11 @@ struct context {
 };
 
 static struct context ctx;
-	
+
 static int yaffs_nand_write(struct yaffs_dev *dev, int nand_chunk,
-                                   const unsigned char *data, 
+                                   const unsigned char *data,
 					int data_len,
-                                   const unsigned char *oob, 
+                                   const unsigned char *oob,
 					int oob_len) {
 
 	sys_printf("yaffs_nand_write\n");
@@ -230,11 +230,11 @@ static int yaffs_nand_write(struct yaffs_dev *dev, int nand_chunk,
 }
 
 
-static int yaffs_nand_read(struct yaffs_dev *dev, 
+static int yaffs_nand_read(struct yaffs_dev *dev,
 					int nand_chunk,
-                                   unsigned char *data, 
+                                   unsigned char *data,
 					int data_len,
-                                   unsigned char *oob, 
+                                   unsigned char *oob,
 					int oob_len,
                                    enum yaffs_ecc_result *ecc_result_out) {
 
@@ -260,7 +260,7 @@ static int yaffs_nand_read(struct yaffs_dev *dev,
 //		sys_printf("nand_read: first data ints %x:%x\n",
 //			bdata[0], bdata[1]);
 //	}
-	
+
 	if (oob) {
 //		unsigned int *boob=(unsigned int *)oob;
 		memcpy(oob,&tmp_oobbuf[2],oob_len);   // bytes 2-38 free
@@ -272,7 +272,7 @@ static int yaffs_nand_read(struct yaffs_dev *dev,
 	if (ecc_result_out) {
 		*ecc_result_out=YAFFS_ECC_RESULT_NO_ERROR;
 	}
-	
+
 	return YAFFS_OK;
 }
 
@@ -293,7 +293,7 @@ static int yaffs_nand_check_bad(struct yaffs_dev *dev, int block_no) {
 	int rc;
 //	sys_printf("yaffs_nand_check_bad: block %d\n", block_no);
 
-	rc=nand_drv->ops->control(dh, NAND_CHECK_BLOCK, 
+	rc=nand_drv->ops->control(dh, NAND_CHECK_BLOCK,
 				&block_no,sizeof(block_no));
 	if (rc) {
 		return YAFFS_FAIL;
@@ -353,7 +353,11 @@ int mount_nand(char *nand_dev_name) {
 	param->start_block=0;
 	param->end_block=nand_cfg.n_blocks-1;
 	param->is_yaffs2=1;
-	param->use_nand_ecc=1;
+	if (nand_cfg.ecc_count) {
+		param->use_nand_ecc=1;
+	} else {
+		param->use_nand_ecc=0;
+	}
 	param->no_tags_ecc=1;
 	param->n_caches=10;
 	param->stored_endian=1;
@@ -382,7 +386,7 @@ int mount_nand(char *nand_dev_name) {
 	ctx.dh=dh;
 
 	ydev.driver_context=(void *)&ctx;
-	
+
 	yaffs_add_device(&ydev);
 
 //	yaffs_mount("bajs");

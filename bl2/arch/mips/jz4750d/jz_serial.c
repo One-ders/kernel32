@@ -4,7 +4,7 @@
 #include "sys.h"
 #include "io.h"
 #include "irq.h"
-#include "frame.h"
+//#include "frame.h"  // part of sys_arch.h
 #include "jz4750_clocks.h"
 
 //#include "jz4750d.h"  via sys.h -> config.h

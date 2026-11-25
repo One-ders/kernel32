@@ -8,8 +8,8 @@ ARCH:=aarch64
 GIT_VERSION:=$(shell git describe --abbrev=4 --dirty --always --tags)
 
 export COMPILER_PREFIX:=/usr/bin/aarch64-linux-gnu-
-export GCC_INCL:=/usr/lib/gcc/aarch64-linux-gnu/14/include
-export GCC_LIB:=/usr/lib/gcc/aarch64-linux-gnu/14
+export GCC_INCL:=/usr/lib/gcc/aarch64-linux-gnu/16/include
+export GCC_LIB:=/usr/lib/gcc/aarch64-linux-gnu/16
 export MUSL_CONFIG_FLAGS:=--build=aarch64-linux --disable-shared
 
 export AS:=aarch64-linux-gnu-as
@@ -19,7 +19,7 @@ export OBJCOPY:=aarch64-linux-gnu-objcopy
 
 #include $(TOP)/os/Makefile
 
-CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/boards/$(BOARD) -I$(TOP)/arch/aarch64 -I$(TOP)/arch/aarch64/incl/BCM2837 -I$(TOP)/arch/aarch64/incl -I$(TOP)/arch/aarch64/BCM2837 -I/usr/lib/gcc/aarch64-linux-gnu/14/include -g -fno-builtin -ffreestanding -nostdinc -O2 -mstrict-align -mno-outline-atomics -D__KERNEL__ -DDEBUG -DDEFAULT_TRACE_LEV=0x0 -DDEFAULT_TRACE_SYS=0x0
+CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/boards/$(BOARD) -I$(TOP)/arch/aarch64 -I$(TOP)/arch/aarch64/incl/BCM2837 -I$(TOP)/arch/aarch64/incl -I$(TOP)/arch/aarch64/BCM2837 -I/usr/lib/gcc/aarch64-linux-gnu/16/include -g -fno-builtin -ffreestanding -nostdinc -O2 -mstrict-align -mno-outline-atomics -D__KERNEL__ -DDEBUG -DDEFAULT_TRACE_LEV=0x0 -DDEFAULT_TRACE_SYS=0x0
 
 CFLAGS_USR:=-I$(TOP)/usr/include -I$(OBJ)/usr/libc/obj/include -I$(GCC_INCL) -g -Os -fno-builtin -ffreestanding -nostdinc -O2
 
@@ -41,7 +41,10 @@ uroot.img: usr.bin
 	cp obj/usr/ls/ls uroot/ls
 	cp obj/usr/fb/fb uroot/fb
 	cp -r $(TOP)/usr/files/* uroot/.
-	mkyaffs2image 1 uroot rootf.img
+	mkyaffs2image 1 uroot raw_rootf.img
+	python3 -c "import sys; sys.stdout.buffer.write(b'\xff' * 4325376)" > rootf.img
+	dd if=raw_rootf.img of=rootf.img conv=notrunc
+	rm raw_rootf.img
 
 kernel8.img: uCore
 	$(OBJCOPY) -O binary $< $@
@@ -52,7 +55,7 @@ uCore: os version aarch64_lib aarch64 BCM2837 mm stddrv stdlib fb fs bin_fmt
 		$(OBJ)/lib/mm.o $(OBJ)/stddrv/stddrv.o $(OBJ)/stdlib/stdlib.o \
 		$(OBJ)/lib/fb.o $(OBJ)/lib/fs.o $(OBJ)/lib/bin_fmt.o \
 		$(OBJ)/arch/aarch64_lib/strings.o $(OBJ)/lib/end_sect.o \
-		-L/usr/lib/gcc/aarch64-linux-gnu/14 -lgcc
+		-L/usr/lib/gcc/aarch64-linux-gnu/16 -lgcc
 
 version:
 	echo "const char *ver=\"$(BOARD)-$(GIT_VERSION)\";" > $(OBJ)/version.c

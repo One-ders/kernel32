@@ -149,14 +149,13 @@ void bitmap_dealloc(struct bitmap *bm, int id);
 #define FDTAB_SIZE 100
 
 struct address_space {
-#ifdef MMU
-	// an array of 1024 page tables
-	unsigned long int *pgd;		/* 00-03 */
-	int		id;		/* 04-07 */
-	unsigned long int brk;
-	unsigned long int mmap_vaddr;
-#endif
-	int		ref;
+	// an array of 1024 page tables on mips
+	//
+	unsigned long int	*pgd;		/* 00-03 */
+	int			id;		/* 04-07 */
+	unsigned long int	brk;
+	unsigned long int	mmap_vaddr;
+	int			ref;
 	struct address_space	*parent;
 	struct address_space	*next;
 	struct address_space	*child;
@@ -207,20 +206,26 @@ void put_page(void *);
 
 /* interface towards arch functions */
 void init_sys_arch(void);
-int setup_return_stack(struct task *t, void *stackp,
-					unsigned long int fnc,
-					unsigned long int ret_fnc,
-					char **args,
-					char **env);
+int setup_return_stack(struct task *t,
+			void *stackp,
+			unsigned long int fnc,
+			unsigned long int ret_fnc,
+			char **args,
+			char **env);
+
 int array_size(char **argv);
 int args_size(char **argv);
 int copy_arguments(char **argv_new, char **argv,
                         char *arg_storage, int nr_args);
+int env_size(char **argv);
+int copy_env(char **envp_new, char **envp,
+                        char *env_storage, int nr_envs);
 struct task *create_user_context(void);
 void delete_user_context(struct task *);
+int create_task(unsigned long int *svc_sp);
 int share_process_pages(struct task *to, struct task *from);
-int load_init(struct task *);
-int load_binary(char *npath);
+int load_init(struct task *,unsigned long int *entry);
+int  load_binary(char *npath,unsigned long int *entry);
 
 void init_switcher(void);
 void switch_on_return(void);
@@ -231,17 +236,15 @@ void config_sys_tic(unsigned int ms);
 void board_reboot(void);
 void wait_irq(void);
 
-int get_svc_number(void *sp, unsigned int *syscall_domain);
+int get_svc_number(void *sp, unsigned int ereg, unsigned int *syscall_domain);
 unsigned long int get_svc_arg(void *sp, int arg_ix);
 void set_svc_ret(void *sp, long int val);
 void set_svc_lret(void *sp, long int val);
 unsigned long int get_stacked_pc(struct task *t);
 unsigned long int get_usr_pc(struct task *t);
 
-#ifdef MMU
 void *sys_sbrk(struct task *t, long int incr);
 int sys_brk(struct task *t, void *nbrk);
-#endif
 
 void SysTick_Handler(void);
 int sys_udelay(unsigned int usec);
@@ -287,7 +290,7 @@ struct dyn_open_args {
 	struct device_handle	*dh;
 };
 
-#define RD_CHAR 1
+#define RD_CHAR	1
 #define WR_CHAR	2
 #define IO_POLL	3
 #define IO_CALL 4

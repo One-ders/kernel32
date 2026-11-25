@@ -245,3 +245,4 @@
 #define LNX_FCNTL64		212
 #define LNX_NEWFSTATAT		213
 #define LNX_READAHEAD		214
+#define LNX_OPENAT		215

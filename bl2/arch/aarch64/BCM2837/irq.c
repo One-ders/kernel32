@@ -19,7 +19,10 @@ static unsigned int installed_mask;
 static const unsigned int p1vmask=0x2000020a;
 static const unsigned int p2vmask=0x02ff6800;
 
+void irq_vector_init();
+
 void init_irq(void) {
+	irq_vector_init();
 }
 
 int install_irq_handler(int irq_num,

@@ -2,7 +2,7 @@
 #include <sys.h>
 #include <string.h>
 #include <devls.h>
-#include <frame.h>
+//#include <frame.h> // included from sys_arch.h
 
 static struct device_handle dh;
 

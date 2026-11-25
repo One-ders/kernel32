@@ -1,6 +1,6 @@
 #include <io.h>
 #include <sys.h>
-#include <frame.h>
+//#include <frame.h>  // taken from sys_arch.h
 #include <string.h>
 
 #include "syscall.h.in"   // musl linux syscalls
@@ -228,7 +228,7 @@ static int lnx_sys_map(unsigned int lnx_scall) {
 	return -1;
 }
 
-int get_svc_number(void *sp, unsigned int *domain)  {
+int get_svc_number(void *sp, unsigned int ereg, unsigned int *domain)  {
 	struct fullframe *ff=(struct fullframe *)sp;
 	int mapped_svc;
 
@@ -271,6 +271,14 @@ void set_svc_lret(void *sp, long int val)  {
 	ff->a3=val;
 }
 
+int arch_lnx_newfstatat(unsigned long int *svc_sp) {
+	sys_printf("someone called lnx_newfstatat\n");
+	set_svc_ret(svc_sp,-1);
+        set_svc_lret(svc_sp,0);
+        return 0;
+}
+
+
 int array_size(char **argv) {
 	int i=0;
 	while(argv[i]) {
@@ -304,13 +312,37 @@ int copy_arguments(char **argv_new, char **argv,
 	return to-arg_storage;
 }
 
+int env_size(char **envp) {
+	int total_size=0;
+	int i=0;
+
+	while(envp[i]) {
+		total_size+=(strlen(envp[i])+1);
+		i++;
+	}
+	return total_size;
+}
+
+int copy_env(char **envp_new, char **envp,
+			char *envp_storage, int nr_envs) {
+	int i=0;
+	char *to=envp_storage;
+	while(envp[i]) {
+		envp_new[i]=strcpy(to,envp[i]);
+		to+=strlen(envp[i]);
+		*to=0;
+		to++;
+		i++;
+	}
+	return to-envp_storage;
+}
 
 int setup_return_stack(struct task *t, void *stackp_v,
 			unsigned long int fnc,
 			unsigned long int ret_fnc,
 			char **argv,
 			char **envp) {
-//	unsigned long int *stackp=(unsigned long int *)(((char *)t)+4096);
+
 	unsigned long int *stackp=(unsigned long int *)stackp_v;
 	unsigned long int v_stack;
 	int nr_args;

@@ -1,5 +1,5 @@
 #include <regdef.h>
-#include <frame.h>
+//#include <frame.h> already in sys_arch.h
 #include <irq.h>
 #include <devices.h>
 #include <io.h>
@@ -109,7 +109,7 @@ void irq_dispatch(void *sp) {
 			enable_interrupts();
 			SysTick_Handler();
 			restore_cpu_flags(cpu_flags);
-			
+
 		}
 //		set_c0_status(get_c0_status()|CP0_CAUSE_IP7);
 	}
