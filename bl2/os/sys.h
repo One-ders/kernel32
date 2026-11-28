@@ -223,7 +223,8 @@ int copy_env(char **envp_new, char **envp,
 struct task *create_user_context(void);
 void delete_user_context(struct task *);
 int create_task(unsigned long int *svc_sp);
-int share_process_pages(struct task *to, struct task *from);
+//int share_process_pages(struct task *to, struct task *from);
+int copy_process_pages(struct task *to, struct task *from);
 int load_init(struct task *,unsigned long int *entry);
 int  load_binary(char *npath,unsigned long int *entry);
 

@@ -11,7 +11,7 @@
 
 
 int dump_tlb(void);
-static void flush_tlb_page(unsigned int vaddr, unsigned int pid);
+void flush_tlb_page(unsigned int vaddr, unsigned int pid);
 
 
 struct sh_page {
@@ -369,7 +369,7 @@ void handle_tlb_miss(void *sp) {
         }
 //      sys_printf("curr_pgd at %x\n",curr_pgd);
 
-        
+
         c0_hi=read_c0_hi();
 	c0_index=read_c0_index();
 	DEBUGP(DSYS_MEM,DLEV_INFO,">>>>tlb_miss for %x\n", badvaddr);
@@ -389,7 +389,7 @@ void handle_tlb_miss(void *sp) {
 		set_c0_index(c0_index);
 	}
 
-        if (((badvaddr<U_STACK_TOP)&&(badvaddr>=U_STACK_BOT)) || 
+        if (((badvaddr<U_STACK_TOP)&&(badvaddr>=U_STACK_BOT)) ||
             ((badvaddr<current->asp->brk) && (badvaddr>=U_HEAP_START)) ||
 	    ((badvaddr<U_HEAP_START)&&(badvaddr>=current->asp->mmap_vaddr)) ||
             ((badvaddr<U_INSTR_END)&&(badvaddr>=U_INSTR_START))) {
@@ -626,7 +626,7 @@ int mapmem(struct task *t, unsigned long int vaddr, unsigned long int paddr, uns
         unsigned int pgd_index=vaddr>>PT_SHIFT;
         unsigned int pt_index=(vaddr&P_MASK)>>P_SHIFT;
         unsigned long int *pt, pte;
-        
+
         pt=(unsigned long int *)t->asp->pgd[pgd_index];
         if (!pt) {
 //              sys_printf("allocating page table at pgd_index %x\n",pgd_index);
@@ -639,9 +639,9 @@ int mapmem(struct task *t, unsigned long int vaddr, unsigned long int paddr, uns
                 sys_printf("mapmem: already mapped %x\n", vaddr);
                 return -1;
         }
-        
+
         pte=pt[pt_index]=(paddr>>6)|attr|P_VALID|P_MAP;
-        
+
         return 0;
 }
 
@@ -675,7 +675,7 @@ int unmapmem(struct task *t, unsigned long int vaddr) {
 
 #define UNIQUE_ENTRYHI(idx) (0x80000000 + ((idx) << (PAGE_SHIFT + 1)))
 
-static void flush_tlb_page(unsigned int vaddr, unsigned int pid) {
+void flush_tlb_page(unsigned int vaddr, unsigned int pid) {
         int index;
 	int cpu_flags;
 	unsigned long int saved_hi;
@@ -762,6 +762,56 @@ int share_process_pages(struct task *to, struct task *from) {
         return 0;
 }
 
+#if 0
+static int copy_pt_pages(unsigned int pgd_index,struct task *to,
+                                        struct task *from) {
+        unsigned long int *pgd_from=from->asp->pgd;
+        unsigned long int *pgd_to=to->asp->pgd;
+        unsigned int pt_index;
+        unsigned long int *pt_from;
+        unsigned long int *pt_to;
+
+        pt_from=(unsigned long int *)pgd_from[pgd_index];
+        pt_to  =(unsigned long int *)pgd_to  [pgd_index];
+
+        if (!pt_to) {
+                pt_to=(unsigned long *)get_page();
+                memset(pt_to,0,4096);
+                pgd_to[pgd_index]=(unsigned long int)pt_to;
+        }
+
+        for(pt_index=0;pt_index<1024;pt_index++) {
+                unsigned long int p=pt_from[pt_index];
+                if (p) {
+			unsigned long int vaddr=(pgd_index<<PT_SHIFT)|(pt_index<<P_SHIFT);
+ 			unsigned long int paddr_from = (((p << 6) & ~(PAGE_SIZE - 1)) & 0x1fffffff) | 0x80000000;
+
+			unsigned long int paddr_to=get_page();
+			memcpy(paddr_to,paddr_from,PAGE_SIZE);
+			blast_dcache_range(paddr_to, paddr_to + PAGE_SIZE);
+                        pt_to[pt_index]=((paddr_to&0x1fffffff)>>6)|(p&0x3f&~P_SHARED);
+			flush_tlb_page(vaddr,to->asp->id);
+                }
+        }
+        return 0;
+}
+
+int copy_process_pages(struct task *to, struct task *from) {
+        unsigned long int *pgd_from=from->asp->pgd;
+        int i;
+
+	blast_dcache32();
+        for(i=0;i<1024;i++) {
+                if (pgd_from[i]) {
+                        if (copy_pt_pages(i,to,from)<0) {
+                                return -1;
+                        }
+                }
+        }
+        return 0;
+}
+#endif
+
 int free_asp_pages(struct address_space *asp) {
         int i;
         unsigned long int *pgd=asp->pgd;
@@ -785,7 +835,7 @@ int free_asp_pages(struct address_space *asp) {
         return 0;
 }
 
-void handle_address_err_load(void *sp) { 
+void handle_address_err_load(void *sp) {
 	io_setpolled(1);
 	sys_printf("address read error: at 0x%08x, address 0x%08x, sp=0x%08x, current=%s\n",
                       read_c0_epc(), read_c0_badvaddr(),sp, current->name);
@@ -793,7 +843,7 @@ void handle_address_err_load(void *sp) {
 	while(1);
 }
 
-void handle_address_err_store(void *sp) { 
+void handle_address_err_store(void *sp) {
 	io_setpolled(1);
 	sys_printf("address write error: at 0x%08x, address 0x%08x, sp=0x%08x, current=%s\n",
                       read_c0_epc(), read_c0_badvaddr(),sp, current->name);

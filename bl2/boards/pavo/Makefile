@@ -18,7 +18,7 @@ export OBJCOPY:=mipsel-linux-objcopy
 
 CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/boards/$(BOARD) -I$(TOP)/arch/mips -I$(TOP)/arch/mips/incl/jz4740 -I$(TOP)/arch/mips/incl -I$(TOP)/arch/mips/jz4740 -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -D__KERNEL__ -DQEMU -DDEBUG -DDEFAULT_TRACE_LEV=0x0 -DDEFAULT_TRACE_SYS=0x0
 
-CFLAGS_USR:=-I$(TOP)/usr/include -I$(OBJ)/usr/libc/obj/include -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -DMMU -DMIPS -D__mips_o32 -msoft-float
+CFLAGS_USR:=-I$(OBJ)/usr/include -I$(OBJ)/usr/libc/obj/include -I/opt/cross/lib/gcc/mipsel-linux/8.1.0/include -g -Os -fno-builtin -ffreestanding -nostdinc -mtune=r4600 -mips32 -O2 -mabicalls -DMMU -DMIPS -D__mips_o32 -msoft-float
 
 LDFLAGS:=-g -T./pavo.ld
 
@@ -74,7 +74,7 @@ uCore.bin: uCore
 ipl/boot.bin:
 	$(MAKE) -C ipl
 
-uCore: bin_fmt os version mips jz mm stddrv stdlib fb fs
+uCore: version bin_fmt os mips jz mm stddrv stdlib fb fs
 	$(LD) $(LDFLAGS) -o $@ $(OBJ)/lib/init_sect.o $(OBJ)/lib/mips.o $(OBJ)/lib/jz.o $(OBJ)/version.o $(OBJ)/lib/os.o $(OBJ)/lib/mm.o $(OBJ)/stddrv/stddrv.o $(OBJ)/stdlib/stdlib.o $(OBJ)/lib/fb.o $(OBJ)/lib/fs.o $(OBJ)/lib/bin_fmt.o $(OBJ)/lib/end_sect.o -L/opt/cross/lib/gcc/mipsel-linux/8.1.0 -lgcc
 
 #traps.o: ../../mips/jz4740/traps.S
@@ -87,6 +87,7 @@ uCore: bin_fmt os version mips jz mm stddrv stdlib fb fs
 #	$(CC) $(CFLAGS) -c -o $@ $<
 
 version:
+	mkdir -p $(OBJ)
 	echo "const char *ver=\"$(BOARD)-$(GIT_VERSION)\";" > $(OBJ)/version.c
 	$(CC) -c -o $(OBJ)/version.o $(OBJ)/version.c
 

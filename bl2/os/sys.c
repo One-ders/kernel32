@@ -194,14 +194,21 @@ void SysTick_Handler(void) {
 	}
 
 	if (task_cemetery) {
-		struct task *t;
-		for(t=task_cemetery;t;t=t->next) {
-			sys_printf("found task: %s in cemetry\n", t->name);
+		struct task *t=task_cemetery;
+		struct task **tprevp=&task_cemetery;
+		while(t) {
+			struct task *next;
+			sys_printf("found task: %s in cemetery\n", t->name);
+			next=t->next;
 			if (t->sp!=0) {
-				task_cemetery=t->next;
+				struct task *ttask=t;
+				*tprevp=t->next;
+				delete_user_context(ttask);
 			} else {
+				tprevp=&t->next;
 				sys_printf("task still not swiched out\n");
 			}
+			t=next;
 		}
 	}
 	return;
@@ -367,7 +374,7 @@ static int fork(unsigned long int *svc_sp) {
 		return 0;
 	}
 	t->asp->brk=current->asp->brk;
-	rc=share_process_pages(t,current);
+	rc=copy_process_pages(t,current);
 	if (rc<0) {
 		delete_user_context(t);
 		set_svc_ret(svc_sp,-1);
@@ -391,7 +398,6 @@ static int fork(unsigned long int *svc_sp) {
 
 
 	t->state=TASK_STATE_READY;
-sys_printf("calling alloc_kheap from fork\n");
 	t->name=alloc_kheap(t,strlen(current->name)+1);
 	if (!t->name) {
 		sys_printf("could not get space for task name\n");

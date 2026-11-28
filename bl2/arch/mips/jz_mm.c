@@ -48,7 +48,8 @@ void *get_page(void) {
 //                                      i,j);
 			j--;
 			free_page_map[i]&=~(1<<j);
-//			sys_printf("return page %x\n",(0x80000000 + (i*32*4096) + (j*4096)));
+//			sys_printf("GET %x (%x)\n",(void *)(0x80000000 + (i*32*4096) + (j*4096)) , __builtin_return_address(0));
+
 			return (void *)(0x80000000 + (i*32*4096) + (j*4096));
 		}
 	}
@@ -64,7 +65,7 @@ int count_free_pages(void) {
 				res+=32;
 			} else {
 				int j;
-				for(j=0;j<31;j++) {
+				for(j=0;j<32;j++) {
 					if ((1<<j)&free_page_map[i]) {
 						res++;
 					}
@@ -76,7 +77,7 @@ int count_free_pages(void) {
 }
 
 void put_page(void *p) {
-//	sys_printf("put_page %x\n", p);
+//	sys_printf("PUT %x (%x)\n", p, __builtin_return_address(0));
 	set_free(free_page_map,PHYS2PAGE(p));
 }
 
@@ -119,6 +120,7 @@ void *get_pages(unsigned int order) {
 	}
 
 
+	//sys_printf("GET %d conseq pages %x (%x)\n",(1<<order),(void *)(0x80000000 + (start_slot*32*4096)) , __builtin_return_address(0));
 	return (void *)(0x80000000 + (start_slot*32*4096));
 }
 
@@ -399,7 +401,7 @@ int dump_tlb(void) {
 	sys_printf("random_register %x\n", read_c0_random());
 	sys_printf("pageMask: %x\n", read_c0_pagemask());
 	sys_printf("Wired register: %x\n", read_c0_wired());
-	
+
 	for(i=0;i<=top_tlb_entry;i++) {
 		unsigned long int entryHi;
 		unsigned long int entryLo0;
@@ -452,3 +454,54 @@ void init_tlb() {
 	set_c0_pagemask(0);
 	flush_tlb();
 }
+
+void flush_tlb_page(unsigned int vaddr, unsigned int pid);
+
+static int copy_pt_pages(unsigned int pgd_index,struct task *to,
+                                        struct task *from) {
+        unsigned long int *pgd_from=from->asp->pgd;
+        unsigned long int *pgd_to=to->asp->pgd;
+        unsigned int pt_index;
+        unsigned long int *pt_from;
+        unsigned long int *pt_to;
+
+        pt_from=(unsigned long int *)pgd_from[pgd_index];
+        pt_to  =(unsigned long int *)pgd_to  [pgd_index];
+
+        if (!pt_to) {
+                pt_to=(unsigned long *)get_page();
+                memset(pt_to,0,4096);
+                pgd_to[pgd_index]=(unsigned long int)pt_to;
+        }
+
+        for(pt_index=0;pt_index<1024;pt_index++) {
+                unsigned long int p=pt_from[pt_index];
+                if (p) {
+                        unsigned long int vaddr=(pgd_index<<PT_SHIFT)|(pt_index<<P_SHIFT);
+                        unsigned long int paddr_from = (((p << 6) & ~(PAGE_SIZE - 1)) & 0x1fffffff) | 0x80000000;
+
+                        unsigned long int paddr_to=get_page();
+                        memcpy(paddr_to,paddr_from,PAGE_SIZE);
+                        blast_dcache_range(paddr_to, paddr_to + PAGE_SIZE);
+                        pt_to[pt_index]=((paddr_to&0x1fffffff)>>6)|(p&0x3f&~P_SHARED);
+                        flush_tlb_page(vaddr,to->asp->id);
+                }
+        }
+        return 0;
+}
+
+int copy_process_pages(struct task *to, struct task *from) {
+        unsigned long int *pgd_from=from->asp->pgd;
+        int i;
+
+        blast_dcache32();
+        for(i=0;i<1024;i++) {
+                if (pgd_from[i]) {
+                        if (copy_pt_pages(i,to,from)<0) {
+                                return -1;
+                        }
+                }
+        }
+        return 0;
+}
+

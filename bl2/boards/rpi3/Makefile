@@ -21,7 +21,7 @@ export OBJCOPY:=aarch64-linux-gnu-objcopy
 
 CFLAGS:=-I. -I$(TOP)/incl -I$(TOP)/boards/$(BOARD) -I$(TOP)/arch/aarch64 -I$(TOP)/arch/aarch64/incl/BCM2837 -I$(TOP)/arch/aarch64/incl -I$(TOP)/arch/aarch64/BCM2837 -I/usr/lib/gcc/aarch64-linux-gnu/16/include -g -fno-builtin -ffreestanding -nostdinc -O2 -mstrict-align -mno-outline-atomics -D__KERNEL__ -DDEBUG -DDEFAULT_TRACE_LEV=0x0 -DDEFAULT_TRACE_SYS=0x0
 
-CFLAGS_USR:=-I$(TOP)/usr/include -I$(OBJ)/usr/libc/obj/include -I$(GCC_INCL) -g -Os -fno-builtin -ffreestanding -nostdinc -O2
+CFLAGS_USR:=-I$(OBJ)/usr/include -I$(OBJ)/usr/libc/obj/include -I$(GCC_INCL) -g -Os -fno-builtin -ffreestanding -nostdinc -O2
 
 LDFLAGS:=-g -T./rpi3.ld
 
@@ -49,7 +49,7 @@ uroot.img: usr.bin
 kernel8.img: uCore
 	$(OBJCOPY) -O binary $< $@
 
-uCore: bin_fmt os version aarch64_lib aarch64 BCM2837 mm stddrv stdlib fb fs
+uCore: version bin_fmt os aarch64_lib aarch64 BCM2837 mm stddrv stdlib fb fs
 	$(LD) $(LDFLAGS) -o $@ $(OBJ)/lib/init_sect.o $(OBJ)/lib/aarch64.o \
 		$(OBJ)/lib/BCM2837.o $(OBJ)/version.o $(OBJ)/lib/os.o \
 		$(OBJ)/lib/mm.o $(OBJ)/stddrv/stddrv.o $(OBJ)/stdlib/stdlib.o \
@@ -58,6 +58,7 @@ uCore: bin_fmt os version aarch64_lib aarch64 BCM2837 mm stddrv stdlib fb fs
 		-L/usr/lib/gcc/aarch64-linux-gnu/16 -lgcc
 
 version:
+	mkdir -p $(OBJ)
 	echo "const char *ver=\"$(BOARD)-$(GIT_VERSION)\";" > $(OBJ)/version.c
 	$(CC) -c -o $(OBJ)/version.o $(OBJ)/version.c
 

@@ -60,9 +60,7 @@ struct task *create_user_context(void) {
 
 void delete_user_context(struct task *t) {
 	struct address_space *asp=t->asp;
-	dealloc_as_id(asp->id);
 	dealloc_task_id(t->id);
-	put_page(asp->pgd);
 	put_page(t);
 }
 

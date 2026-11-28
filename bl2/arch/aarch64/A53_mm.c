@@ -80,9 +80,8 @@ void *get_page(void) {
 //                      sys_printf("found free page att index %x, bit %x\n",
 //                                      i,j);
                         j--;
-                        free_page_map[i]&=~(1<<j);
-//                      sys_printf("return page %x\n",(SDRAM_START + (i*64*4096)
-//+ (j*4096)));
+                        free_page_map[i]&=~(1UL<<j);
+//		sys_printf("GET %x (%x)\n",(void *)(VA_START + (i*64*4096) + (j*4096)) , __builtin_return_address(0));
                         return (void *)(VA_START + (i*64*4096) + (j*4096));
                 }
         }
@@ -90,7 +89,8 @@ void *get_page(void) {
 }
 
 void put_page(void *p) {
-//	sys_printf("put_page %x\n", p);
+//	sys_printf("PUT %x (%x)\n", p, __builtin_return_address(0));
+
         set_free(free_page_map,VIRT2PAGE(p));
 	return;
 }
@@ -100,12 +100,12 @@ int count_free_pages(void) {
 	int res=0;
 	for(i=0;i<(sizeof(free_page_map)/sizeof(unsigned long int));i++) {
 		if (free_page_map[i]) {
-			if (free_page_map[i]==0xffffffffffffffffL) {
+			if (free_page_map[i]==~0UL) {
 				res+=64;
 			} else {
 				int j;
-				for(j=0;j<63;j++) {
-					if ((1<<j)&free_page_map[i]) {
+				for(j=0;j<64;j++) {
+					if ((1UL<<j)&free_page_map[i]) {
 						res++;
 					}
 				}
@@ -127,7 +127,7 @@ void *get_pages(unsigned int order) {
 
 	DEBUGP(DSYS_MEM,DLEV_INFO,"get_pages: num=%d,need_slots=%x\n", num, need_slots);
 	for(i=0;i<(sizeof(free_page_map)/sizeof(unsigned long int));i++) {
-		if (free_page_map[i]==0xffffffffffffffff) {
+		if (free_page_map[i]==0xffffffffffffffffUL) {
 			if (!have_slots) {
 				start_slot=i;
 			}
@@ -150,9 +150,10 @@ void *get_pages(unsigned int order) {
 		num-=64;
 	}
 	for(i=0;i<num;i++) {
-		free_page_map[last_slot]&=~(1<<i);
+		free_page_map[last_slot]&=~(1UL<<i);
 	}
 
+//		sys_printf("GET %d conseq pages %x (%x)\n",(1<<order),(void *)(VA_START + (start_slot*64*4096)) , __builtin_return_address(0));
 	return (void *)(VA_START + (start_slot*64*4096));
 }
 
@@ -211,7 +212,7 @@ void pmap_protect(unsigned long *pgd, unsigned long start_va, unsigned long end_
         asm volatile("tlbi vmalle1\n dsb ish\n isb\n" ::: "memory");
 }
 
-int share_process_pages(struct task *to, struct task *from) {
+int copy_process_pages(struct task *to, struct task *from) {
 	unsigned long int *pgd = from->asp->pgd;
 	unsigned long int *npgd= to->asp->pgd;
 	int pgd_ix;
@@ -222,21 +223,21 @@ int share_process_pages(struct task *to, struct task *from) {
 				(VA_START + (pud_val & 0x0000fffffffff000UL));
 		int pud_ix;
 		if (!pud_val) continue;
-		sys_printf("found pud(%lx) at pgd_ix %d\n", pud, pgd_ix);
+//		sys_printf("found pud(%lx) at pgd_ix %d\n", pud, pgd_ix);
 		for(pud_ix=0;pud_ix<512;pud_ix++) {
 			unsigned long int pmd_val=pud[pud_ix];
 			unsigned long int *pmd=(unsigned long int *)
 				(VA_START + (pmd_val & 0x0000fffffffff000UL));
 			int pmd_ix;
 			if (!pmd_val) continue;
-			sys_printf("found pmd(%lx) at pud_ix %d\n", pmd, pud_ix);
+//			sys_printf("found pmd(%lx) at pud_ix %d\n", pmd, pud_ix);
 			for(pmd_ix=0;pmd_ix<512;pmd_ix++) {
 				unsigned long int pte_val=pmd[pmd_ix];
 				unsigned long int *pte=(unsigned long int *)
 					(VA_START + (pte_val & 0x0000fffffffff000UL));
 				int pte_ix;
 				if (!pte_val) continue;
-				sys_printf("found pte(%lx) at pmd_ix %d\n", pte, pmd_ix);
+//				sys_printf("found pte(%lx) at pmd_ix %d\n", pte, pmd_ix);
 				for(pte_ix=0;pte_ix<512;pte_ix++) {
 					unsigned long int page_val=pte[pte_ix];
 					void *p_addr;
@@ -250,8 +251,8 @@ int share_process_pages(struct task *to, struct task *from) {
 					unsigned long int pa = page_val & 0x0000fffffffff000UL;
 					unsigned long int flags = page_val & ~0x0000fffffffff000UL;
 
-					sys_printf("  [%x:%x:%x:%x] VA 0x%lx -> PA 0x%lx (flags 0x%lx)\n",
-						pgd_ix, pud_ix, pmd_ix, pte_ix, va, pa, flags);
+//					sys_printf("  [%x:%x:%x:%x] VA 0x%lx -> PA 0x%lx (flags 0x%lx)\n",
+//						pgd_ix, pud_ix, pmd_ix, pte_ix, va, pa, flags);
 					p_addr=get_page();
 					memcpy(p_addr,(void *)(VA_START+pa),P_SIZE);
 					phys = (unsigned long)KV2P(p_addr);
@@ -312,21 +313,21 @@ int free_asp_pages(struct address_space *asp) {
 				(VA_START + (pud_val & 0x0000fffffffff000UL));
 		int pud_ix;
 		if (!pud_val) continue;
-		sys_printf("found pud(%lx) at pgd_ix %d\n", pud, pgd_ix);
+//		sys_printf("found pud(%lx) at pgd_ix %d\n", pud, pgd_ix);
 		for(pud_ix=0;pud_ix<512;pud_ix++) {
 			unsigned long int pmd_val=pud[pud_ix];
 			unsigned long int *pmd=(unsigned long int *)
 				(VA_START + (pmd_val & 0x0000fffffffff000UL));
 			int pmd_ix;
 			if (!pmd_val) continue;
-			sys_printf("found pmd(%lx) at pud_ix %d\n", pmd, pud_ix);
+//			sys_printf("found pmd(%lx) at pud_ix %d\n", pmd, pud_ix);
 			for(pmd_ix=0;pmd_ix<512;pmd_ix++) {
 				unsigned long int pte_val=pmd[pmd_ix];
 				unsigned long int *pte=(unsigned long int *)
 					(VA_START + (pte_val & 0x0000fffffffff000UL));
 				int pte_ix;
 				if (!pte_val) continue;
-				sys_printf("found pte(%lx) at pmd_ix %d\n", pte, pmd_ix);
+//				sys_printf("found pte(%lx) at pmd_ix %d\n", pte, pmd_ix);
 				for(pte_ix=0;pte_ix<512;pte_ix++) {
 					unsigned long int page_val=pte[pte_ix];
 					void *p_addr;
@@ -340,17 +341,17 @@ int free_asp_pages(struct address_space *asp) {
 					unsigned long int pa = page_val & 0x0000fffffffff000UL;
 					unsigned long int flags = page_val & ~0x0000fffffffff000UL;
 
-					sys_printf("put page  [%x:%x:%x:%x] VA 0x%lx -> PA 0x%lx (flags 0x%lx)\n",
-						pgd_ix, pud_ix, pmd_ix, pte_ix, va, pa, flags);
+//					sys_printf("put page  [%x:%x:%x:%x] VA 0x%lx -> PA 0x%lx (flags 0x%lx)\n",
+//						pgd_ix, pud_ix, pmd_ix, pte_ix, va, pa, flags);
 					put_page((void *)pa);
 				}
-				sys_printf("free pte table page at 0x%lx\n", pte);
+//				sys_printf("free pte table page at 0x%lx\n", pte);
 				put_page(pte);
 			}
-			sys_printf("free pmd table page at 0x%lx\n", pmd);
+//			sys_printf("free pmd table page at 0x%lx\n", pmd);
 			put_page(pmd);
 		}
-		sys_printf("free pud table page at 0x%lx, and zero out pgd_ix %d\n", pud,pgd_ix);
+//		sys_printf("free pud table page at 0x%lx, and zero out pgd_ix %d\n", pud,pgd_ix);
 		put_page(pud);
 		pgd[pgd_ix]=0;
 	}
